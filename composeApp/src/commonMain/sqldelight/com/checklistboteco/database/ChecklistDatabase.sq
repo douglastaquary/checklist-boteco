@@ -1,0 +1,76 @@
+CREATE TABLE User (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    password TEXT NOT NULL,
+    area TEXT NOT NULL,
+    permissionLevel TEXT NOT NULL,
+    allowedAreas TEXT NOT NULL
+);
+
+CREATE TABLE Activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    area TEXT NOT NULL,
+    frequency TEXT NOT NULL
+);
+
+CREATE TABLE ActivityCompletion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activityId INTEGER NOT NULL,
+    userId INTEGER NOT NULL,
+    completedAt INTEGER NOT NULL,
+    imagePath TEXT,
+    FOREIGN KEY (activityId) REFERENCES Activity(id),
+    FOREIGN KEY (userId) REFERENCES User(id)
+);
+
+insertUser:
+INSERT INTO User(name, password, area, permissionLevel, allowedAreas)
+VALUES (?, ?, ?, ?, ?);
+
+insertActivity:
+INSERT INTO Activity(name, area, frequency)
+VALUES (?, ?, ?);
+
+insertCompletion:
+INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath)
+VALUES (?, ?, ?, ?);
+
+selectAllUsers:
+SELECT * FROM User;
+
+selectUserByName:
+SELECT * FROM User WHERE name = ?;
+
+selectAllActivities:
+SELECT * FROM Activity;
+
+selectActivitiesByArea:
+SELECT * FROM Activity WHERE area = ?;
+
+selectCompletionsByActivityAndDate:
+SELECT * FROM ActivityCompletion 
+WHERE activityId = ? AND completedAt >= ?;
+
+selectCompletionsByAreaAndDate:
+SELECT ac.* FROM ActivityCompletion ac
+JOIN Activity a ON ac.activityId = a.id
+WHERE a.area = ? AND ac.completedAt >= ?;
+
+countActivitiesByArea:
+SELECT area, COUNT(*) AS total FROM Activity GROUP BY area;
+
+countCompletionsByAreaAndDate:
+SELECT a.area, COUNT(ac.id) AS completed FROM Activity a
+LEFT JOIN ActivityCompletion ac ON a.id = ac.activityId AND ac.completedAt >= ?
+GROUP BY a.area;
+
+updateActivity:
+UPDATE Activity SET name = ?, area = ?, frequency = ?
+WHERE id = ?;
+
+deleteActivity:
+DELETE FROM Activity WHERE id = ?;
+
+deleteCompletionsByActivity:
+DELETE FROM ActivityCompletion WHERE activityId = ?;
