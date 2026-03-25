@@ -1,5 +1,6 @@
 package com.checklistboteco.presentation.screen
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -33,9 +36,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
@@ -49,6 +56,7 @@ fun UserManagementScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         topBar = {
@@ -65,6 +73,11 @@ fun UserManagementScreen(
             FloatingActionButton(onClick = viewModel::showAddDialog) {
                 Icon(Icons.Default.Add, "Adicionar")
             }
+        },
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(onTap = {
+                focusManager.clearFocus()
+            })
         }
     ) { padding ->
         LazyColumn(
@@ -94,7 +107,10 @@ fun UserManagementScreen(
             onPermissionLevelChange = viewModel::updateNewUserPermissionLevel,
             onToggleAllowedArea = viewModel::toggleAllowedArea,
             onConfirm = viewModel::addUser,
-            onDismiss = viewModel::dismissAddDialog
+            onDismiss = {
+                focusManager.clearFocus()
+                viewModel.dismissAddDialog()
+            }
         )
     }
 }
@@ -144,9 +160,29 @@ private fun AddUserDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(24.dp)) {
+    val focusManager = LocalFocusManager.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                    })
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            focusManager.clearFocus()
+                        })
+                    }
+            ) {
                 Text("Novo Usuário", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(16.dp))
 
@@ -154,7 +190,10 @@ private fun AddUserDialog(
                     value = name,
                     onValueChange = onNameChange,
                     label = { Text("Nome") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { /* Foco automático já lida com Next */ }),
+                    singleLine = true
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -163,7 +202,10 @@ private fun AddUserDialog(
                     onValueChange = onPasswordChange,
                     label = { Text("Senha") },
                     modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation()
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    singleLine = true
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -175,7 +217,10 @@ private fun AddUserDialog(
                     Area.entries.forEach { a ->
                         FilterChip(
                             selected = area == a,
-                            onClick = { onAreaChange(a) },
+                            onClick = { 
+                                focusManager.clearFocus()
+                                onAreaChange(a) 
+                            },
                             label = { Text(a.displayName) }
                         )
                     }
@@ -190,7 +235,10 @@ private fun AddUserDialog(
                     PermissionLevel.entries.forEach { p ->
                         FilterChip(
                             selected = permissionLevel == p,
-                            onClick = { onPermissionLevelChange(p) },
+                            onClick = { 
+                                focusManager.clearFocus()
+                                onPermissionLevelChange(p) 
+                            },
                             label = { Text(p.displayName) }
                         )
                     }
@@ -206,7 +254,10 @@ private fun AddUserDialog(
                         Area.entries.forEach { a ->
                             FilterChip(
                                 selected = a in allowedAreas,
-                                onClick = { onToggleAllowedArea(a) },
+                                onClick = { 
+                                    focusManager.clearFocus()
+                                    onToggleAllowedArea(a) 
+                                },
                                 label = { Text(a.displayName) }
                             )
                         }
@@ -227,7 +278,10 @@ private fun AddUserDialog(
                         Text("Cancelar")
                     }
                     Spacer(Modifier.width(8.dp))
-                    Button(onClick = onConfirm) {
+                    Button(onClick = {
+                        focusManager.clearFocus()
+                        onConfirm()
+                    }) {
                         Text("Adicionar")
                     }
                 }
