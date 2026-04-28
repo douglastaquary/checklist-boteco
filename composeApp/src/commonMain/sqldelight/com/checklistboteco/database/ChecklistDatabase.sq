@@ -11,7 +11,8 @@ CREATE TABLE Activity (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     area TEXT NOT NULL,
-    frequency TEXT NOT NULL
+    frequency TEXT NOT NULL,
+    effort INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE ActivityCompletion (
@@ -20,6 +21,7 @@ CREATE TABLE ActivityCompletion (
     userId INTEGER NOT NULL,
     completedAt INTEGER NOT NULL,
     imagePath TEXT,
+    isLate INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (activityId) REFERENCES Activity(id),
     FOREIGN KEY (userId) REFERENCES User(id)
 );
@@ -29,12 +31,12 @@ INSERT INTO User(name, password, area, permissionLevel, allowedAreas)
 VALUES (?, ?, ?, ?, ?);
 
 insertActivity:
-INSERT INTO Activity(name, area, frequency)
-VALUES (?, ?, ?);
+INSERT INTO Activity(name, area, frequency, effort)
+VALUES (?, ?, ?, ?);
 
 insertCompletion:
-INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath)
-VALUES (?, ?, ?, ?);
+INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath, isLate)
+VALUES (?, ?, ?, ?, ?);
 
 selectAllUsers:
 SELECT * FROM User;
@@ -66,7 +68,7 @@ LEFT JOIN ActivityCompletion ac ON a.id = ac.activityId AND ac.completedAt >= ?
 GROUP BY a.area;
 
 updateActivity:
-UPDATE Activity SET name = ?, area = ?, frequency = ?
+UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?
 WHERE id = ?;
 
 deleteActivity:
@@ -74,3 +76,21 @@ DELETE FROM Activity WHERE id = ?;
 
 deleteCompletionsByActivity:
 DELETE FROM ActivityCompletion WHERE activityId = ?;
+
+getGlobalStats:
+SELECT
+    (SELECT COUNT(*) FROM Activity) AS totalActivities,
+    (SELECT COUNT(*) FROM ActivityCompletion WHERE completedAt >= :periodStart) AS totalCompleted,
+    (SELECT COUNT(*) FROM ActivityCompletion WHERE completedAt >= :periodStart AND isLate = 1) AS lateCompletions;
+
+getRankingData:
+SELECT
+    u.name,
+    COUNT(ac.id) AS totalCompletions,
+    SUM(CASE WHEN ac.isLate = 0 THEN 1 ELSE 0 END) AS onTimeCompletions,
+    SUM(a.effort) AS totalEffort
+FROM User AS u
+LEFT JOIN ActivityCompletion AS ac ON u.id = ac.userId AND ac.completedAt >= :periodStart
+LEFT JOIN Activity AS a ON ac.activityId = a.id
+GROUP BY u.id, u.name
+ORDER BY totalEffort DESC;

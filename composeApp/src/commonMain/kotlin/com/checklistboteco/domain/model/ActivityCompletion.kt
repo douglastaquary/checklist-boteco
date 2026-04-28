@@ -5,5 +5,6 @@ data class ActivityCompletion(
     val activityId: Long,
     val userId: Long,
     val completedAt: Long,
-    val imagePath: String?
+    val imagePath: String?,
+    val isLate: Boolean = false
 )

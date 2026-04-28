@@ -9,4 +9,5 @@ public data class ActivityCompletion(
   public val userId: Long,
   public val completedAt: Long,
   public val imagePath: String?,
+  public val isLate: Long,
 )

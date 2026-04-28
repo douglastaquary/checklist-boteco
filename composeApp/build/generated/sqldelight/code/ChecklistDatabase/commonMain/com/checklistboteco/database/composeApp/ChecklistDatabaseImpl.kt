@@ -42,7 +42,8 @@ private class ChecklistDatabaseImpl(
           |    id INTEGER PRIMARY KEY AUTOINCREMENT,
           |    name TEXT NOT NULL,
           |    area TEXT NOT NULL,
-          |    frequency TEXT NOT NULL
+          |    frequency TEXT NOT NULL,
+          |    effort INTEGER NOT NULL DEFAULT 1
           |)
           """.trimMargin(), 0)
       driver.execute(null, """
@@ -52,6 +53,7 @@ private class ChecklistDatabaseImpl(
           |    userId INTEGER NOT NULL,
           |    completedAt INTEGER NOT NULL,
           |    imagePath TEXT,
+          |    isLate INTEGER NOT NULL DEFAULT 0,
           |    FOREIGN KEY (activityId) REFERENCES Activity(id),
           |    FOREIGN KEY (userId) REFERENCES User(id)
           |)

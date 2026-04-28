@@ -17,6 +17,7 @@ data class ActivitiesManagementUiState(
     val newActivityName: String = "",
     val newActivityArea: Area = Area.ATENDIMENTO,
     val newActivityFrequency: Frequency = Frequency.DIARIO,
+    val newActivityEffort: Int = 1,
     val error: String? = null
 )
 
@@ -46,6 +47,7 @@ class ActivitiesManagementViewModel(
                 newActivityName = "",
                 newActivityArea = Area.ATENDIMENTO,
                 newActivityFrequency = Frequency.DIARIO,
+                newActivityEffort = 1,
                 error = null
             )
         }
@@ -67,6 +69,10 @@ class ActivitiesManagementViewModel(
         _uiState.update { it.copy(newActivityFrequency = frequency) }
     }
 
+    fun updateNewActivityEffort(effort: Int) {
+        _uiState.update { it.copy(newActivityEffort = effort) }
+    }
+
     fun addActivity() {
         val name = _uiState.value.newActivityName.trim()
         if (name.isBlank()) {
@@ -77,7 +83,8 @@ class ActivitiesManagementViewModel(
         repository.insertActivity(
             name = name,
             area = _uiState.value.newActivityArea,
-            frequency = _uiState.value.newActivityFrequency
+            frequency = _uiState.value.newActivityFrequency,
+            effort = _uiState.value.newActivityEffort
         )
         _uiState.update { 
             it.copy(

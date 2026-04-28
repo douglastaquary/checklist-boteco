@@ -6,6 +6,7 @@ import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
 import kotlin.Any
+import kotlin.Double
 import kotlin.Long
 import kotlin.String
 
@@ -80,25 +81,28 @@ public class ChecklistDatabaseQueries(
     name: String,
     area: String,
     frequency: String,
+    effort: Long,
   ) -> T): Query<T> = Query(384_786_999, arrayOf("Activity"), driver, "ChecklistDatabase.sq",
       "selectAllActivities",
-      "SELECT Activity.id, Activity.name, Activity.area, Activity.frequency FROM Activity") {
+      "SELECT Activity.id, Activity.name, Activity.area, Activity.frequency, Activity.effort FROM Activity") {
       cursor ->
     mapper(
       cursor.getLong(0)!!,
       cursor.getString(1)!!,
       cursor.getString(2)!!,
-      cursor.getString(3)!!
+      cursor.getString(3)!!,
+      cursor.getLong(4)!!
     )
   }
 
   public fun selectAllActivities(): Query<Activity> = selectAllActivities { id, name, area,
-      frequency ->
+      frequency, effort ->
     Activity(
       id,
       name,
       area,
-      frequency
+      frequency,
+      effort
     )
   }
 
@@ -107,22 +111,25 @@ public class ChecklistDatabaseQueries(
     name: String,
     area: String,
     frequency: String,
+    effort: Long,
   ) -> T): Query<T> = SelectActivitiesByAreaQuery(area) { cursor ->
     mapper(
       cursor.getLong(0)!!,
       cursor.getString(1)!!,
       cursor.getString(2)!!,
-      cursor.getString(3)!!
+      cursor.getString(3)!!,
+      cursor.getLong(4)!!
     )
   }
 
   public fun selectActivitiesByArea(area: String): Query<Activity> = selectActivitiesByArea(area) {
-      id, name, area_, frequency ->
+      id, name, area_, frequency, effort ->
     Activity(
       id,
       name,
       area_,
-      frequency
+      frequency,
+      effort
     )
   }
 
@@ -135,6 +142,7 @@ public class ChecklistDatabaseQueries(
       userId: Long,
       completedAt: Long,
       imagePath: String?,
+      isLate: Long,
     ) -> T,
   ): Query<T> = SelectCompletionsByActivityAndDateQuery(activityId, completedAt) { cursor ->
     mapper(
@@ -142,19 +150,21 @@ public class ChecklistDatabaseQueries(
       cursor.getLong(1)!!,
       cursor.getLong(2)!!,
       cursor.getLong(3)!!,
-      cursor.getString(4)
+      cursor.getString(4),
+      cursor.getLong(5)!!
     )
   }
 
   public fun selectCompletionsByActivityAndDate(activityId: Long, completedAt: Long):
       Query<ActivityCompletion> = selectCompletionsByActivityAndDate(activityId, completedAt) { id,
-      activityId_, userId, completedAt_, imagePath ->
+      activityId_, userId, completedAt_, imagePath, isLate ->
     ActivityCompletion(
       id,
       activityId_,
       userId,
       completedAt_,
-      imagePath
+      imagePath,
+      isLate
     )
   }
 
@@ -167,6 +177,7 @@ public class ChecklistDatabaseQueries(
       userId: Long,
       completedAt: Long,
       imagePath: String?,
+      isLate: Long,
     ) -> T,
   ): Query<T> = SelectCompletionsByAreaAndDateQuery(area, completedAt) { cursor ->
     mapper(
@@ -174,19 +185,21 @@ public class ChecklistDatabaseQueries(
       cursor.getLong(1)!!,
       cursor.getLong(2)!!,
       cursor.getLong(3)!!,
-      cursor.getString(4)
+      cursor.getString(4),
+      cursor.getLong(5)!!
     )
   }
 
   public fun selectCompletionsByAreaAndDate(area: String, completedAt: Long):
       Query<ActivityCompletion> = selectCompletionsByAreaAndDate(area, completedAt) { id,
-      activityId, userId, completedAt_, imagePath ->
+      activityId, userId, completedAt_, imagePath, isLate ->
     ActivityCompletion(
       id,
       activityId,
       userId,
       completedAt_,
-      imagePath
+      imagePath,
+      isLate
     )
   }
 
@@ -224,6 +237,51 @@ public class ChecklistDatabaseQueries(
     )
   }
 
+  public fun <T : Any> getGlobalStats(periodStart: Long, mapper: (
+    totalActivities: Long,
+    totalCompleted: Long,
+    lateCompletions: Long,
+  ) -> T): Query<T> = GetGlobalStatsQuery(periodStart) { cursor ->
+    mapper(
+      cursor.getLong(0)!!,
+      cursor.getLong(1)!!,
+      cursor.getLong(2)!!
+    )
+  }
+
+  public fun getGlobalStats(periodStart: Long): Query<GetGlobalStats> =
+      getGlobalStats(periodStart) { totalActivities, totalCompleted, lateCompletions ->
+    GetGlobalStats(
+      totalActivities,
+      totalCompleted,
+      lateCompletions
+    )
+  }
+
+  public fun <T : Any> getRankingData(periodStart: Long, mapper: (
+    name: String,
+    totalCompletions: Long,
+    onTimeCompletions: Long?,
+    totalEffort: Double?,
+  ) -> T): Query<T> = GetRankingDataQuery(periodStart) { cursor ->
+    mapper(
+      cursor.getString(0)!!,
+      cursor.getLong(1)!!,
+      cursor.getLong(2),
+      cursor.getDouble(3)
+    )
+  }
+
+  public fun getRankingData(periodStart: Long): Query<GetRankingData> =
+      getRankingData(periodStart) { name, totalCompletions, onTimeCompletions, totalEffort ->
+    GetRankingData(
+      name,
+      totalCompletions,
+      onTimeCompletions,
+      totalEffort
+    )
+  }
+
   public fun insertUser(
     name: String,
     password: String,
@@ -250,14 +308,16 @@ public class ChecklistDatabaseQueries(
     name: String,
     area: String,
     frequency: String,
+    effort: Long,
   ) {
     driver.execute(-80_309_149, """
-        |INSERT INTO Activity(name, area, frequency)
-        |VALUES (?, ?, ?)
-        """.trimMargin(), 3) {
+        |INSERT INTO Activity(name, area, frequency, effort)
+        |VALUES (?, ?, ?, ?)
+        """.trimMargin(), 4) {
           bindString(0, name)
           bindString(1, area)
           bindString(2, frequency)
+          bindLong(3, effort)
         }
     notifyQueries(-80_309_149) { emit ->
       emit("Activity")
@@ -269,15 +329,17 @@ public class ChecklistDatabaseQueries(
     userId: Long,
     completedAt: Long,
     imagePath: String?,
+    isLate: Long,
   ) {
     driver.execute(1_837_465_648, """
-        |INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath)
-        |VALUES (?, ?, ?, ?)
-        """.trimMargin(), 4) {
+        |INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath, isLate)
+        |VALUES (?, ?, ?, ?, ?)
+        """.trimMargin(), 5) {
           bindLong(0, activityId)
           bindLong(1, userId)
           bindLong(2, completedAt)
           bindString(3, imagePath)
+          bindLong(4, isLate)
         }
     notifyQueries(1_837_465_648) { emit ->
       emit("ActivityCompletion")
@@ -288,16 +350,18 @@ public class ChecklistDatabaseQueries(
     name: String,
     area: String,
     frequency: String,
+    effort: Long,
     id: Long,
   ) {
     driver.execute(-533_267_853, """
-        |UPDATE Activity SET name = ?, area = ?, frequency = ?
+        |UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?
         |WHERE id = ?
-        """.trimMargin(), 4) {
+        """.trimMargin(), 5) {
           bindString(0, name)
           bindString(1, area)
           bindString(2, frequency)
-          bindLong(3, id)
+          bindLong(3, effort)
+          bindLong(4, id)
         }
     notifyQueries(-533_267_853) { emit ->
       emit("Activity")
@@ -358,7 +422,7 @@ public class ChecklistDatabaseQueries(
 
     override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
         driver.executeQuery(874_359_144,
-        """SELECT Activity.id, Activity.name, Activity.area, Activity.frequency FROM Activity WHERE area = ?""",
+        """SELECT Activity.id, Activity.name, Activity.area, Activity.frequency, Activity.effort FROM Activity WHERE area = ?""",
         mapper, 1) {
       bindString(0, area)
     }
@@ -381,7 +445,7 @@ public class ChecklistDatabaseQueries(
 
     override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
         driver.executeQuery(1_376_942_719, """
-    |SELECT ActivityCompletion.id, ActivityCompletion.activityId, ActivityCompletion.userId, ActivityCompletion.completedAt, ActivityCompletion.imagePath FROM ActivityCompletion 
+    |SELECT ActivityCompletion.id, ActivityCompletion.activityId, ActivityCompletion.userId, ActivityCompletion.completedAt, ActivityCompletion.imagePath, ActivityCompletion.isLate FROM ActivityCompletion 
     |WHERE activityId = ? AND completedAt >= ?
     """.trimMargin(), mapper, 2) {
       bindLong(0, activityId)
@@ -406,7 +470,7 @@ public class ChecklistDatabaseQueries(
 
     override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
         driver.executeQuery(-1_983_270_975, """
-    |SELECT ac.id, ac.activityId, ac.userId, ac.completedAt, ac.imagePath FROM ActivityCompletion ac
+    |SELECT ac.id, ac.activityId, ac.userId, ac.completedAt, ac.imagePath, ac.isLate FROM ActivityCompletion ac
     |JOIN Activity a ON ac.activityId = a.id
     |WHERE a.area = ? AND ac.completedAt >= ?
     """.trimMargin(), mapper, 2) {
@@ -439,5 +503,62 @@ public class ChecklistDatabaseQueries(
     }
 
     override fun toString(): String = "ChecklistDatabase.sq:countCompletionsByAreaAndDate"
+  }
+
+  private inner class GetGlobalStatsQuery<out T : Any>(
+    public val periodStart: Long,
+    mapper: (SqlCursor) -> T,
+  ) : Query<T>(mapper) {
+    override fun addListener(listener: Query.Listener) {
+      driver.addListener("Activity", "ActivityCompletion", listener = listener)
+    }
+
+    override fun removeListener(listener: Query.Listener) {
+      driver.removeListener("Activity", "ActivityCompletion", listener = listener)
+    }
+
+    override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
+        driver.executeQuery(-1_240_323_839, """
+    |SELECT
+    |    (SELECT COUNT(*) FROM Activity) AS totalActivities,
+    |    (SELECT COUNT(*) FROM ActivityCompletion WHERE completedAt >= ?) AS totalCompleted,
+    |    (SELECT COUNT(*) FROM ActivityCompletion WHERE completedAt >= ? AND isLate = 1) AS lateCompletions
+    """.trimMargin(), mapper, 2) {
+      bindLong(0, periodStart)
+      bindLong(1, periodStart)
+    }
+
+    override fun toString(): String = "ChecklistDatabase.sq:getGlobalStats"
+  }
+
+  private inner class GetRankingDataQuery<out T : Any>(
+    public val periodStart: Long,
+    mapper: (SqlCursor) -> T,
+  ) : Query<T>(mapper) {
+    override fun addListener(listener: Query.Listener) {
+      driver.addListener("User", "ActivityCompletion", "Activity", listener = listener)
+    }
+
+    override fun removeListener(listener: Query.Listener) {
+      driver.removeListener("User", "ActivityCompletion", "Activity", listener = listener)
+    }
+
+    override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
+        driver.executeQuery(1_526_968_133, """
+    |SELECT
+    |    u.name,
+    |    COUNT(ac.id) AS totalCompletions,
+    |    SUM(CASE WHEN ac.isLate = 0 THEN 1 ELSE 0 END) AS onTimeCompletions,
+    |    SUM(a.effort) AS totalEffort
+    |FROM User AS u
+    |LEFT JOIN ActivityCompletion AS ac ON u.id = ac.userId AND ac.completedAt >= ?
+    |LEFT JOIN Activity AS a ON ac.activityId = a.id
+    |GROUP BY u.id, u.name
+    |ORDER BY totalEffort DESC
+    """.trimMargin(), mapper, 1) {
+      bindLong(0, periodStart)
+    }
+
+    override fun toString(): String = "ChecklistDatabase.sq:getRankingData"
   }
 }

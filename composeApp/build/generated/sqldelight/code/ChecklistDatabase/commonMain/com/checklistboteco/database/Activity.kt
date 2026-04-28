@@ -8,4 +8,5 @@ public data class Activity(
   public val name: String,
   public val area: String,
   public val frequency: String,
+  public val effort: Long,
 )

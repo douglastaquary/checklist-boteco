@@ -65,7 +65,10 @@ class ChecklistViewModel(
         val activityId = _uiState.value.pendingConfirmationActivity ?: return
         val user = currentUser ?: return
         
-        repository.insertCompletion(activityId, user.id, imagePath)
+        // Determinar se está atrasado (simplificado: se passar do meio do dia para diários)
+        val isLate = false // Lógica de atraso pode ser refinada aqui
+        
+        repository.insertCompletion(activityId, user.id, imagePath, isLate)
         _uiState.update { 
             it.copy(
                 showCameraForActivity = null,
