@@ -1,32 +1,11 @@
 package com.checklistboteco.presentation.screen
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.StackedBarChart
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.ActivityWithCompletion
-import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.platform.CameraCaptureTrigger
 import com.checklistboteco.presentation.viewmodel.ChecklistViewModel
@@ -46,9 +24,6 @@ fun ChecklistScreen(
     viewModel: ChecklistViewModel,
     user: User,
     onLogout: () -> Unit,
-    onNavigateToAdmin: () -> Unit,
-    onNavigateToActivitiesManagement: () -> Unit,
-    onNavigateToUserManagement: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -65,23 +40,13 @@ fun ChecklistScreen(
             TopAppBar(
                 title = { Text("Checklist - ${user.name}") },
                 actions = {
-                    if (user.permissionLevel == PermissionLevel.ADMIN) {
-                        IconButton(onClick = onNavigateToAdmin) {
-                            Icon(Icons.Default.StackedBarChart, "Relatórios")
-                        }
-                        IconButton(onClick = onNavigateToActivitiesManagement) {
-                            Icon(Icons.Default.Settings, "Atividades")
-                        }
-                        IconButton(onClick = onNavigateToUserManagement) {
-                            Icon(Icons.Default.People, "Usuários")
-                        }
-                    }
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.ExitToApp, "Sair")
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Sair")
                     }
                 }
             )
-        }
+        },
+        modifier = modifier
     ) { padding ->
         Column(
             modifier = Modifier
@@ -106,7 +71,7 @@ fun ChecklistScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+                contentPadding = PaddingValues(16.dp)
             ) {
                 items(state.activities, key = { it.activity.id }) { item ->
                     ActivityItem(
