@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.presentation.viewmodel.ActivitiesManagementViewModel
@@ -38,6 +39,9 @@ sealed class Tab(val title: String, val icon: ImageVector) {
 fun MainScreen(
     user: User,
     repository: ChecklistRepository,
+    backendApiClient: BackendApiClient?,
+    authToken: String?,
+    remoteUserId: String?,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -96,7 +100,16 @@ fun MainScreen(
                     )
                 }
                 is Tab.WorkClock -> {
-                    val viewModel = remember(user) { WorkClockViewModel(repository, user, scope) }
+                    val viewModel = remember(user, authToken, remoteUserId) {
+                        WorkClockViewModel(
+                            repository = repository,
+                            user = user,
+                            scope = scope,
+                            backendApiClient = backendApiClient,
+                            authToken = authToken,
+                            remoteUserId = remoteUserId
+                        )
+                    }
                     WorkClockScreen(
                         viewModel = viewModel,
                         user = user,

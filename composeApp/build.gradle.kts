@@ -29,6 +29,9 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation.common)
+                implementation(libs.ktor.serialization.kotlinx.json.common)
                 
                 implementation(libs.sqldelight.runtime)
                 implementation(libs.sqldelight.coroutines)
@@ -40,6 +43,7 @@ kotlin {
             dependencies {
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.lifecycle.viewmodel.compose)
+                implementation(libs.ktor.client.android)
                 implementation(libs.sqldelight.android)
             }
         }
@@ -69,6 +73,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        buildConfigField(
+            "String",
+            "CHECKLIST_API_BASE_URL",
+            "\"${providers.gradleProperty("CHECKLIST_API_BASE_URL").orNull.orEmpty()}\""
+        )
     }
     
     compileOptions {
@@ -78,8 +87,9 @@ android {
     
     buildFeatures {
         compose = true
+        buildConfig = true
     }
-    
+
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }

@@ -68,7 +68,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = state.userName,
                 onValueChange = viewModel::updateUserName,
-                label = { Text("Usuário") },
+                label = { Text("Usuário ou email") },
                 leadingIcon = { Icon(Icons.Default.Person, null) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -86,6 +86,19 @@ fun LoginScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
 
+            if (state.requiresTwoFactor) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = state.twoFactorCode,
+                    onValueChange = viewModel::updateTwoFactorCode,
+                    label = { Text("Código de verificação") },
+                    leadingIcon = { Icon(Icons.Default.Lock, null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
+
             state.error?.let { error ->
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -98,10 +111,17 @@ fun LoginScreen(
             Spacer(Modifier.height(24.dp))
 
             Button(
-                onClick = viewModel::login,
-                modifier = Modifier.fillMaxWidth()
+                onClick = if (state.requiresTwoFactor) viewModel::verifyTwoFactor else viewModel::login,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading
             ) {
-                Text("Entrar")
+                Text(
+                    when {
+                        state.isLoading -> "Aguarde..."
+                        state.requiresTwoFactor -> "Confirmar dispositivo"
+                        else -> "Entrar"
+                    }
+                )
             }
 
             TextButton(onClick = onNewUserClick) {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.database.DatabaseDriverFactory
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.database.ChecklistDatabase
@@ -33,6 +34,9 @@ fun App(
         val repository = remember {
             ChecklistRepository(database)
         }
+        val backendApiClient = remember {
+            BackendApiClient.fromEnvironment()
+        }
 
         val screenSaver = listSaver<Screen, Any>(
             save = { screen ->
@@ -52,7 +56,9 @@ fun App(
                         screen.user.createdAt,
                         screen.user.featurePermissions.canRegisterUsers,
                         screen.user.featurePermissions.canCreateActivities,
-                        screen.user.featurePermissions.canEditUsers
+                        screen.user.featurePermissions.canEditUsers,
+                        screen.authToken.orEmpty(),
+                        screen.remoteUserId.orEmpty()
                     )
                 }
             },
@@ -79,7 +85,11 @@ fun App(
                             canEditUsers = list[12] as Boolean
                         )
                     )
-                    Screen.Main(user)
+                    Screen.Main(
+                        user = user,
+                        authToken = (list.getOrNull(13) as? String)?.ifBlank { null },
+                        remoteUserId = (list.getOrNull(14) as? String)?.ifBlank { null }
+                    )
                 }
             }
         )
@@ -90,10 +100,13 @@ fun App(
 
         when (val s = currentScreen) {
             is Screen.Login -> {
-                val loginViewModel = remember { LoginViewModel(repository) }
+                val loginViewModel = remember { LoginViewModel(repository, backendApiClient) }
                 LoginScreen(
                     viewModel = loginViewModel,
-                    onLoginSuccess = { user -> currentScreen = Screen.Main(user) },
+                    onLoginSuccess = { user ->
+                        val state = loginViewModel.uiState.value
+                        currentScreen = Screen.Main(user, state.authToken, state.remoteUserId)
+                    },
                     onNewUserClick = { currentScreen = Screen.RegisterUser }
                 )
             }
@@ -110,6 +123,9 @@ fun App(
                 MainScreen(
                     user = s.user,
                     repository = repository,
+                    backendApiClient = backendApiClient,
+                    authToken = s.authToken,
+                    remoteUserId = s.remoteUserId,
                     onLogout = { currentScreen = Screen.Login }
                 )
             }
