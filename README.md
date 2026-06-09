@@ -12,6 +12,11 @@ Aplicativo de checklist para bares e restaurantes desenvolvido com **Kotlin Mult
 - **Permissões**: Cada usuário acessa apenas suas áreas configuradas
 - **Admin**: Gráficos de atividades realizadas e pendentes por área
 - **Cadastro de atividades**: Admins podem adicionar novas atividades (nome, área, frequência)
+- **Cadastro de novos usuários**: Fluxo público a partir da tela de login com nome, sobrenome, email, setor de trabalho em lista única, senha forte e confirmação
+- **Setores de trabalho**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente e Barman
+- **Permissões por funcionalidade**: Módulo apartado para admin configurar cadastro de novos funcionários, criação de atividades e edição de usuários
+- **Administração de permissões**: Lista usuários por setor, mostra detalhes do cadastro e permite ao admin ajustar acessos gerenciais por usuário
+- **Ponto de colaboradores**: Usuários comuns podem registrar entrada, almoço, descanso e saída com cálculo de horas trabalhadas, descanso e horas devidas
 
 ## Credenciais padrão
 
@@ -74,12 +79,44 @@ Abra o projeto no Xcode e execute no simulador ou dispositivo.
 ## Modelo de dados
 
 - **Áreas**: Atendimento, Cozinha, Estoque, Limpeza
+- **Setores**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente, Barman
 - **Frequências**: Diário, Quinzenal, Mensal
-- **Permissões**: Admin (acesso total) ou User (áreas específicas)
+- **Permissões**: Admin (acesso total), User (área derivada do setor) e permissões gerenciais por funcionalidade
+
+## Cadastro e permissões
+
+O botão **Novo usuário** fica abaixo do botão **Entrar** na tela de login. O cadastro exige:
+
+- Nome e sobrenome normalizados com a primeira letra de cada nome em maiúscula
+- Email com `@` e final `.com`
+- Setor de trabalho selecionado em lista de escolha única
+- Senha com no mínimo 8 caracteres, letra maiúscula, letra minúscula, número e caractere especial
+- Confirmação de senha igual à senha informada
+
+Usuários comuns recebem acesso às atividades vinculadas à área do seu setor de trabalho. Usuários admin recebem acesso total. A tela **Permissões por usuário** organiza os usuários por setor, abre os detalhes ao clicar no nome e permite ativar ou desativar permissões gerenciais.
+
+O cadastro público sempre cria usuários comuns, sem permissões gerenciais. A concessão de permissões fica isolada no módulo **Permissões**, visível por padrão para o usuário admin. Somente admin pode alterar permissões específicas de cada usuário.
+
+## Ponto de colaboradores
+
+O módulo **Ponto** aparece para colaboradores comuns e não aparece para usuários admin. A tela principal mostra um mapa operacional do local de trabalho, dados da próxima marcação, dia e hora, distância do local configurado e botão para confirmar a marcação.
+
+Regras do MVP:
+
+- Não existe escala fixa diária; o app calcula a partir das marcações realizadas no dia
+- A jornada esperada é de 8h trabalhadas por dia e 40h por semana
+- O descanso esperado é de 1h por dia
+- Jornadas de 12h trabalhadas exigem 2h de descanso
+- A tela de detalhes mostra marcações do dia, horas trabalhadas, descanso, descanso devido/excedente e horas devidas
+- Marcações não podem ser editadas após confirmação
+- O local de trabalho configurado é `Av. Vicente de Carvalho, 761 Centro - Bertioga (Beco da Praia)`, com raio permitido de 5 metros
+
+## Desenvolvimento assistido por IA e PDD
+
+Esta funcionalidade foi conduzida por **PDD (Prompt Driven Development)**: o arquivo `.github/prompts/new-user-feature.md` descreveu o comportamento esperado e orientou a implementação. O desenvolvimento assistido por IA foi usado para transformar o prompt em mudanças de modelo, banco local, telas Compose, viewmodels, validações compartilhadas, testes unitários e documentação.
 
 ## Próximos passos sugeridos
 
-- Cadastro de novos usuários: **Implementado** - acesse pelo ícone de usuários no menu (admin)
 - Implementação completa da câmera no iOS
 - Sincronização com servidor (opcional)
 - Notificações para atividades pendentes

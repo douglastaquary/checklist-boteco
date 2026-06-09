@@ -13,11 +13,14 @@ import com.checklistboteco.database.ChecklistDatabase
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
+import com.checklistboteco.domain.model.WorkSector
 import com.checklistboteco.presentation.navigation.Screen
 import com.checklistboteco.presentation.screen.LoginScreen
 import com.checklistboteco.presentation.screen.MainScreen
+import com.checklistboteco.presentation.screen.UserRegistrationScreen
 import com.checklistboteco.presentation.theme.ChecklistBotecoTheme
 import com.checklistboteco.presentation.viewmodel.LoginViewModel
+import com.checklistboteco.presentation.viewmodel.UserRegistrationViewModel
 
 @Composable
 fun App(
@@ -35,30 +38,46 @@ fun App(
             save = { screen ->
                 when (screen) {
                     is Screen.Login -> listOf("Login")
+                    is Screen.RegisterUser -> listOf("RegisterUser")
                     is Screen.Main -> listOf(
                         "Main",
                         screen.user.id,
                         screen.user.name,
+                        screen.user.email,
                         screen.user.password,
                         screen.user.area.name,
+                        screen.user.workSector.name,
                         screen.user.permissionLevel.name,
-                        screen.user.allowedAreas.joinToString(",") { it.name }
+                        screen.user.allowedAreas.joinToString(",") { it.name },
+                        screen.user.createdAt,
+                        screen.user.featurePermissions.canRegisterUsers,
+                        screen.user.featurePermissions.canCreateActivities,
+                        screen.user.featurePermissions.canEditUsers
                     )
                 }
             },
             restore = { list ->
                 val type = list[0] as String
                 if (type == "Login") Screen.Login
+                else if (type == "RegisterUser") Screen.RegisterUser
                 else {
                     val user = User(
                         id = list[1] as Long,
                         name = list[2] as String,
-                        password = list[3] as String,
-                        area = Area.fromString(list[4] as String),
-                        permissionLevel = PermissionLevel.fromString(list[5] as String),
-                        allowedAreas = (list[6] as String).split(",")
+                        email = list[3] as String,
+                        password = list[4] as String,
+                        area = Area.fromString(list[5] as String),
+                        workSector = WorkSector.fromString(list[6] as String),
+                        permissionLevel = PermissionLevel.fromString(list[7] as String),
+                        allowedAreas = (list[8] as String).split(",")
                             .filter { it.isNotEmpty() }
-                            .map { Area.fromString(it) }
+                            .map { Area.fromString(it) },
+                        createdAt = list[9] as Long,
+                        featurePermissions = com.checklistboteco.domain.model.FeaturePermissions(
+                            canRegisterUsers = list[10] as Boolean,
+                            canCreateActivities = list[11] as Boolean,
+                            canEditUsers = list[12] as Boolean
+                        )
                     )
                     Screen.Main(user)
                 }
@@ -74,7 +93,16 @@ fun App(
                 val loginViewModel = remember { LoginViewModel(repository) }
                 LoginScreen(
                     viewModel = loginViewModel,
-                    onLoginSuccess = { user -> currentScreen = Screen.Main(user) }
+                    onLoginSuccess = { user -> currentScreen = Screen.Main(user) },
+                    onNewUserClick = { currentScreen = Screen.RegisterUser }
+                )
+            }
+
+            is Screen.RegisterUser -> {
+                val userRegistrationViewModel = remember { UserRegistrationViewModel(repository) }
+                UserRegistrationScreen(
+                    viewModel = userRegistrationViewModel,
+                    onBack = { currentScreen = Screen.Login }
                 )
             }
 

@@ -16,13 +16,19 @@ public class ChecklistDatabaseQueries(
   public fun <T : Any> selectAllUsers(mapper: (
     id: Long,
     name: String,
+    email: String,
     password: String,
     area: String,
+    workSector: String,
     permissionLevel: String,
     allowedAreas: String,
+    createdAt: Long,
+    canRegisterUsers: Long,
+    canCreateActivities: Long,
+    canEditUsers: Long,
   ) -> T): Query<T> = Query(-1_301_143_170, arrayOf("User"), driver, "ChecklistDatabase.sq",
       "selectAllUsers",
-      "SELECT User.id, User.name, User.password, User.area, User.permissionLevel, User.allowedAreas FROM User") {
+      "SELECT User.id, User.name, User.email, User.password, User.area, User.workSector, User.permissionLevel, User.allowedAreas, User.createdAt, User.canRegisterUsers, User.canCreateActivities, User.canEditUsers FROM User") {
       cursor ->
     mapper(
       cursor.getLong(0)!!,
@@ -30,29 +36,48 @@ public class ChecklistDatabaseQueries(
       cursor.getString(2)!!,
       cursor.getString(3)!!,
       cursor.getString(4)!!,
-      cursor.getString(5)!!
+      cursor.getString(5)!!,
+      cursor.getString(6)!!,
+      cursor.getString(7)!!,
+      cursor.getLong(8)!!,
+      cursor.getLong(9)!!,
+      cursor.getLong(10)!!,
+      cursor.getLong(11)!!
     )
   }
 
-  public fun selectAllUsers(): Query<User> = selectAllUsers { id, name, password, area,
-      permissionLevel, allowedAreas ->
+  public fun selectAllUsers(): Query<User> = selectAllUsers { id, name, email, password, area,
+      workSector, permissionLevel, allowedAreas, createdAt, canRegisterUsers, canCreateActivities,
+      canEditUsers ->
     User(
       id,
       name,
+      email,
       password,
       area,
+      workSector,
       permissionLevel,
-      allowedAreas
+      allowedAreas,
+      createdAt,
+      canRegisterUsers,
+      canCreateActivities,
+      canEditUsers
     )
   }
 
   public fun <T : Any> selectUserByName(name: String, mapper: (
     id: Long,
     name: String,
+    email: String,
     password: String,
     area: String,
+    workSector: String,
     permissionLevel: String,
     allowedAreas: String,
+    createdAt: Long,
+    canRegisterUsers: Long,
+    canCreateActivities: Long,
+    canEditUsers: Long,
   ) -> T): Query<T> = SelectUserByNameQuery(name) { cursor ->
     mapper(
       cursor.getLong(0)!!,
@@ -60,19 +85,81 @@ public class ChecklistDatabaseQueries(
       cursor.getString(2)!!,
       cursor.getString(3)!!,
       cursor.getString(4)!!,
-      cursor.getString(5)!!
+      cursor.getString(5)!!,
+      cursor.getString(6)!!,
+      cursor.getString(7)!!,
+      cursor.getLong(8)!!,
+      cursor.getLong(9)!!,
+      cursor.getLong(10)!!,
+      cursor.getLong(11)!!
     )
   }
 
   public fun selectUserByName(name: String): Query<User> = selectUserByName(name) { id, name_,
-      password, area, permissionLevel, allowedAreas ->
+      email, password, area, workSector, permissionLevel, allowedAreas, createdAt, canRegisterUsers,
+      canCreateActivities, canEditUsers ->
     User(
       id,
       name_,
+      email,
       password,
       area,
+      workSector,
       permissionLevel,
-      allowedAreas
+      allowedAreas,
+      createdAt,
+      canRegisterUsers,
+      canCreateActivities,
+      canEditUsers
+    )
+  }
+
+  public fun <T : Any> selectUserByEmail(email: String, mapper: (
+    id: Long,
+    name: String,
+    email: String,
+    password: String,
+    area: String,
+    workSector: String,
+    permissionLevel: String,
+    allowedAreas: String,
+    createdAt: Long,
+    canRegisterUsers: Long,
+    canCreateActivities: Long,
+    canEditUsers: Long,
+  ) -> T): Query<T> = SelectUserByEmailQuery(email) { cursor ->
+    mapper(
+      cursor.getLong(0)!!,
+      cursor.getString(1)!!,
+      cursor.getString(2)!!,
+      cursor.getString(3)!!,
+      cursor.getString(4)!!,
+      cursor.getString(5)!!,
+      cursor.getString(6)!!,
+      cursor.getString(7)!!,
+      cursor.getLong(8)!!,
+      cursor.getLong(9)!!,
+      cursor.getLong(10)!!,
+      cursor.getLong(11)!!
+    )
+  }
+
+  public fun selectUserByEmail(email: String): Query<User> = selectUserByEmail(email) { id, name,
+      email_, password, area, workSector, permissionLevel, allowedAreas, createdAt,
+      canRegisterUsers, canCreateActivities, canEditUsers ->
+    User(
+      id,
+      name,
+      email_,
+      password,
+      area,
+      workSector,
+      permissionLevel,
+      allowedAreas,
+      createdAt,
+      canRegisterUsers,
+      canCreateActivities,
+      canEditUsers
     )
   }
 
@@ -164,6 +251,100 @@ public class ChecklistDatabaseQueries(
       userId,
       completedAt_,
       imagePath,
+      isLate
+    )
+  }
+
+  public fun <T : Any> selectWorkClockEntriesByUserAndDate(
+    userId: Long,
+    registeredAt: Long,
+    registeredAt_: Long,
+    mapper: (
+      id: Long,
+      userId: Long,
+      type: String,
+      registeredAt: Long,
+      latitude: Double,
+      longitude: Double,
+      distanceFromWorkMeters: Double,
+      isLate: Long,
+    ) -> T,
+  ): Query<T> = SelectWorkClockEntriesByUserAndDateQuery(userId, registeredAt, registeredAt_) {
+      cursor ->
+    mapper(
+      cursor.getLong(0)!!,
+      cursor.getLong(1)!!,
+      cursor.getString(2)!!,
+      cursor.getLong(3)!!,
+      cursor.getDouble(4)!!,
+      cursor.getDouble(5)!!,
+      cursor.getDouble(6)!!,
+      cursor.getLong(7)!!
+    )
+  }
+
+  public fun selectWorkClockEntriesByUserAndDate(
+    userId: Long,
+    registeredAt: Long,
+    registeredAt_: Long,
+  ): Query<WorkClockEntry> = selectWorkClockEntriesByUserAndDate(userId, registeredAt,
+      registeredAt_) { id, userId_, type, registeredAt__, latitude, longitude,
+      distanceFromWorkMeters, isLate ->
+    WorkClockEntry(
+      id,
+      userId_,
+      type,
+      registeredAt__,
+      latitude,
+      longitude,
+      distanceFromWorkMeters,
+      isLate
+    )
+  }
+
+  public fun <T : Any> selectWorkClockEntriesByUserAndPeriod(
+    userId: Long,
+    registeredAt: Long,
+    registeredAt_: Long,
+    mapper: (
+      id: Long,
+      userId: Long,
+      type: String,
+      registeredAt: Long,
+      latitude: Double,
+      longitude: Double,
+      distanceFromWorkMeters: Double,
+      isLate: Long,
+    ) -> T,
+  ): Query<T> = SelectWorkClockEntriesByUserAndPeriodQuery(userId, registeredAt, registeredAt_) {
+      cursor ->
+    mapper(
+      cursor.getLong(0)!!,
+      cursor.getLong(1)!!,
+      cursor.getString(2)!!,
+      cursor.getLong(3)!!,
+      cursor.getDouble(4)!!,
+      cursor.getDouble(5)!!,
+      cursor.getDouble(6)!!,
+      cursor.getLong(7)!!
+    )
+  }
+
+  public fun selectWorkClockEntriesByUserAndPeriod(
+    userId: Long,
+    registeredAt: Long,
+    registeredAt_: Long,
+  ): Query<WorkClockEntry> = selectWorkClockEntriesByUserAndPeriod(userId, registeredAt,
+      registeredAt_) { id, userId_, type, registeredAt__, latitude, longitude,
+      distanceFromWorkMeters, isLate ->
+    WorkClockEntry(
+      id,
+      userId_,
+      type,
+      registeredAt__,
+      latitude,
+      longitude,
+      distanceFromWorkMeters,
       isLate
     )
   }
@@ -284,20 +465,32 @@ public class ChecklistDatabaseQueries(
 
   public fun insertUser(
     name: String,
+    email: String,
     password: String,
     area: String,
+    workSector: String,
     permissionLevel: String,
     allowedAreas: String,
+    createdAt: Long,
+    canRegisterUsers: Long,
+    canCreateActivities: Long,
+    canEditUsers: Long,
   ) {
     driver.execute(-240_167_137, """
-        |INSERT INTO User(name, password, area, permissionLevel, allowedAreas)
-        |VALUES (?, ?, ?, ?, ?)
-        """.trimMargin(), 5) {
+        |INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, canRegisterUsers, canCreateActivities, canEditUsers)
+        |VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """.trimMargin(), 11) {
           bindString(0, name)
-          bindString(1, password)
-          bindString(2, area)
-          bindString(3, permissionLevel)
-          bindString(4, allowedAreas)
+          bindString(1, email)
+          bindString(2, password)
+          bindString(3, area)
+          bindString(4, workSector)
+          bindString(5, permissionLevel)
+          bindString(6, allowedAreas)
+          bindLong(7, createdAt)
+          bindLong(8, canRegisterUsers)
+          bindLong(9, canCreateActivities)
+          bindLong(10, canEditUsers)
         }
     notifyQueries(-240_167_137) { emit ->
       emit("User")
@@ -343,6 +536,53 @@ public class ChecklistDatabaseQueries(
         }
     notifyQueries(1_837_465_648) { emit ->
       emit("ActivityCompletion")
+    }
+  }
+
+  public fun insertWorkClockEntry(
+    userId: Long,
+    type: String,
+    registeredAt: Long,
+    latitude: Double,
+    longitude: Double,
+    distanceFromWorkMeters: Double,
+    isLate: Long,
+  ) {
+    driver.execute(-1_255_298_743, """
+        |INSERT INTO WorkClockEntry(userId, type, registeredAt, latitude, longitude, distanceFromWorkMeters, isLate)
+        |VALUES (?, ?, ?, ?, ?, ?, ?)
+        """.trimMargin(), 7) {
+          bindLong(0, userId)
+          bindString(1, type)
+          bindLong(2, registeredAt)
+          bindDouble(3, latitude)
+          bindDouble(4, longitude)
+          bindDouble(5, distanceFromWorkMeters)
+          bindLong(6, isLate)
+        }
+    notifyQueries(-1_255_298_743) { emit ->
+      emit("WorkClockEntry")
+    }
+  }
+
+  public fun updateUserFeaturePermissions(
+    canRegisterUsers: Long,
+    canCreateActivities: Long,
+    canEditUsers: Long,
+    id: Long,
+  ) {
+    driver.execute(1_698_201_405, """
+        |UPDATE User
+        |SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?
+        |WHERE id = ?
+        """.trimMargin(), 4) {
+          bindLong(0, canRegisterUsers)
+          bindLong(1, canCreateActivities)
+          bindLong(2, canEditUsers)
+          bindLong(3, id)
+        }
+    notifyQueries(1_698_201_405) { emit ->
+      emit("User")
     }
   }
 
@@ -400,12 +640,34 @@ public class ChecklistDatabaseQueries(
 
     override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
         driver.executeQuery(-698_097_148,
-        """SELECT User.id, User.name, User.password, User.area, User.permissionLevel, User.allowedAreas FROM User WHERE name = ?""",
+        """SELECT User.id, User.name, User.email, User.password, User.area, User.workSector, User.permissionLevel, User.allowedAreas, User.createdAt, User.canRegisterUsers, User.canCreateActivities, User.canEditUsers FROM User WHERE name = ?""",
         mapper, 1) {
       bindString(0, name)
     }
 
     override fun toString(): String = "ChecklistDatabase.sq:selectUserByName"
+  }
+
+  private inner class SelectUserByEmailQuery<out T : Any>(
+    public val email: String,
+    mapper: (SqlCursor) -> T,
+  ) : Query<T>(mapper) {
+    override fun addListener(listener: Query.Listener) {
+      driver.addListener("User", listener = listener)
+    }
+
+    override fun removeListener(listener: Query.Listener) {
+      driver.removeListener("User", listener = listener)
+    }
+
+    override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
+        driver.executeQuery(-174_140_605,
+        """SELECT User.id, User.name, User.email, User.password, User.area, User.workSector, User.permissionLevel, User.allowedAreas, User.createdAt, User.canRegisterUsers, User.canCreateActivities, User.canEditUsers FROM User WHERE email = ?""",
+        mapper, 1) {
+      bindString(0, email)
+    }
+
+    override fun toString(): String = "ChecklistDatabase.sq:selectUserByEmail"
   }
 
   private inner class SelectActivitiesByAreaQuery<out T : Any>(
@@ -453,6 +715,62 @@ public class ChecklistDatabaseQueries(
     }
 
     override fun toString(): String = "ChecklistDatabase.sq:selectCompletionsByActivityAndDate"
+  }
+
+  private inner class SelectWorkClockEntriesByUserAndDateQuery<out T : Any>(
+    public val userId: Long,
+    public val registeredAt: Long,
+    public val registeredAt_: Long,
+    mapper: (SqlCursor) -> T,
+  ) : Query<T>(mapper) {
+    override fun addListener(listener: Query.Listener) {
+      driver.addListener("WorkClockEntry", listener = listener)
+    }
+
+    override fun removeListener(listener: Query.Listener) {
+      driver.removeListener("WorkClockEntry", listener = listener)
+    }
+
+    override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
+        driver.executeQuery(-1_931_129_031, """
+    |SELECT WorkClockEntry.id, WorkClockEntry.userId, WorkClockEntry.type, WorkClockEntry.registeredAt, WorkClockEntry.latitude, WorkClockEntry.longitude, WorkClockEntry.distanceFromWorkMeters, WorkClockEntry.isLate FROM WorkClockEntry
+    |WHERE userId = ? AND registeredAt >= ? AND registeredAt < ?
+    |ORDER BY registeredAt ASC
+    """.trimMargin(), mapper, 3) {
+      bindLong(0, userId)
+      bindLong(1, registeredAt)
+      bindLong(2, registeredAt_)
+    }
+
+    override fun toString(): String = "ChecklistDatabase.sq:selectWorkClockEntriesByUserAndDate"
+  }
+
+  private inner class SelectWorkClockEntriesByUserAndPeriodQuery<out T : Any>(
+    public val userId: Long,
+    public val registeredAt: Long,
+    public val registeredAt_: Long,
+    mapper: (SqlCursor) -> T,
+  ) : Query<T>(mapper) {
+    override fun addListener(listener: Query.Listener) {
+      driver.addListener("WorkClockEntry", listener = listener)
+    }
+
+    override fun removeListener(listener: Query.Listener) {
+      driver.removeListener("WorkClockEntry", listener = listener)
+    }
+
+    override fun <R> execute(mapper: (SqlCursor) -> QueryResult<R>): QueryResult<R> =
+        driver.executeQuery(-41_935_220, """
+    |SELECT WorkClockEntry.id, WorkClockEntry.userId, WorkClockEntry.type, WorkClockEntry.registeredAt, WorkClockEntry.latitude, WorkClockEntry.longitude, WorkClockEntry.distanceFromWorkMeters, WorkClockEntry.isLate FROM WorkClockEntry
+    |WHERE userId = ? AND registeredAt >= ? AND registeredAt < ?
+    |ORDER BY registeredAt ASC
+    """.trimMargin(), mapper, 3) {
+      bindLong(0, userId)
+      bindLong(1, registeredAt)
+      bindLong(2, registeredAt_)
+    }
+
+    override fun toString(): String = "ChecklistDatabase.sq:selectWorkClockEntriesByUserAndPeriod"
   }
 
   private inner class SelectCompletionsByAreaAndDateQuery<out T : Any>(

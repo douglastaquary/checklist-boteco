@@ -9,14 +9,22 @@ import com.checklistboteco.domain.model.ActivityCompletion
 import com.checklistboteco.domain.model.ActivityWithCompletion
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.Frequency
+import com.checklistboteco.domain.model.FeaturePermissions
 import com.checklistboteco.domain.model.PermissionLevel
+import com.checklistboteco.domain.model.GeoPoint
 import com.checklistboteco.domain.model.User
+import com.checklistboteco.domain.model.ValidatedUserRegistration
+import com.checklistboteco.domain.model.WorkClockCalculator
+import com.checklistboteco.domain.model.WorkClockEntry
+import com.checklistboteco.domain.model.WorkClockType
+import com.checklistboteco.domain.model.WorkSector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -25,41 +33,91 @@ class ChecklistRepository(database: ChecklistDatabase) {
     private val queries = database.checklistDatabaseQueries
 
     // User operations
-    fun insertUser(name: String, password: String, area: Area, permissionLevel: PermissionLevel, allowedAreas: List<Area>) {
+    fun insertUser(
+        name: String,
+        email: String,
+        password: String,
+        area: Area,
+        workSector: WorkSector,
+        permissionLevel: PermissionLevel,
+        allowedAreas: List<Area>,
+        createdAt: Long = Clock.System.now().toEpochMilliseconds(),
+        featurePermissions: FeaturePermissions = FeaturePermissions()
+    ) {
         val areasStr = allowedAreas.joinToString(",") { it.name }
-        queries.insertUser(name, password, area.name, permissionLevel.name, areasStr)
+        queries.insertUser(
+            name,
+            email,
+            password,
+            area.name,
+            workSector.name,
+            permissionLevel.name,
+            areasStr,
+            createdAt,
+            featurePermissions.canRegisterUsers.toLongFlag(),
+            featurePermissions.canCreateActivities.toLongFlag(),
+            featurePermissions.canEditUsers.toLongFlag()
+        )
+    }
+
+    fun insertRegisteredUser(user: ValidatedUserRegistration) {
+        insertUser(
+            name = user.fullName,
+            email = user.email,
+            password = user.password,
+            area = user.workSector.activityArea,
+            workSector = user.workSector,
+            permissionLevel = user.permissionLevel,
+            allowedAreas = user.allowedAreas,
+            featurePermissions = user.featurePermissions
+        )
     }
 
     fun getUserByName(name: String): User? {
-        return queries.selectUserByName(name).executeAsOneOrNull()?.let { user ->
-            User(
-                id = user.id,
-                name = user.name,
-                password = user.password,
-                area = Area.fromString(user.area),
-                permissionLevel = PermissionLevel.fromString(user.permissionLevel),
-                allowedAreas = user.allowedAreas.split(",").mapNotNull { s ->
-                    Area.entries.find { a -> a.name == s.trim() }
-                }.ifEmpty { Area.entries.toList() }
-            )
-        }
+        return queries.selectUserByName(name).executeAsOneOrNull()?.let(::mapToUser)
+    }
+
+    fun getUserByEmail(email: String): User? {
+        return queries.selectUserByEmail(email).executeAsOneOrNull()?.let(::mapToUser)
     }
 
     fun getAllUsers(): Flow<List<User>> {
         return queries.selectAllUsers().asFlow().mapToList(Dispatchers.IO).map { list ->
-            list.map { user ->
-                User(
-                    id = user.id,
-                    name = user.name,
-                    password = user.password,
-                    area = Area.fromString(user.area),
-                    permissionLevel = PermissionLevel.fromString(user.permissionLevel),
-                    allowedAreas = user.allowedAreas.split(",").mapNotNull { s ->
-                        Area.entries.find { a -> a.name == s.trim() }
-                    }.ifEmpty { Area.entries.toList() }
-                )
-            }
+            list.map(::mapToUser)
         }
+    }
+
+    fun updateUserFeaturePermissions(userId: Long, permissions: FeaturePermissions) {
+        queries.updateUserFeaturePermissions(
+            permissions.canRegisterUsers.toLongFlag(),
+            permissions.canCreateActivities.toLongFlag(),
+            permissions.canEditUsers.toLongFlag(),
+            userId
+        )
+    }
+
+    private fun mapToUser(user: com.checklistboteco.database.User): User {
+        val permissionLevel = PermissionLevel.fromString(user.permissionLevel)
+        val allowedAreas = user.allowedAreas.split(",").mapNotNull { s ->
+            Area.entries.find { a -> a.name == s.trim() }
+        }.ifEmpty { listOf(WorkSector.fromString(user.workSector).activityArea) }
+
+        return User(
+            id = user.id,
+            name = user.name,
+            email = user.email,
+            password = user.password,
+            area = Area.fromString(user.area),
+            workSector = WorkSector.fromString(user.workSector),
+            permissionLevel = permissionLevel,
+            allowedAreas = if (permissionLevel == PermissionLevel.ADMIN) Area.entries.toList() else allowedAreas,
+            createdAt = user.createdAt,
+            featurePermissions = FeaturePermissions(
+                canRegisterUsers = user.canRegisterUsers == 1L,
+                canCreateActivities = user.canCreateActivities == 1L,
+                canEditUsers = user.canEditUsers == 1L
+            )
+        )
     }
 
     // Activity operations
@@ -145,6 +203,56 @@ class ChecklistRepository(database: ChecklistDatabase) {
         }
     }
 
+    // Work clock operations
+    fun insertWorkClockEntry(
+        userId: Long,
+        type: WorkClockType,
+        registeredAt: Long,
+        location: GeoPoint,
+        distanceFromWorkMeters: Double,
+        isLate: Boolean
+    ) {
+        queries.insertWorkClockEntry(
+            userId,
+            type.name,
+            registeredAt,
+            location.latitude,
+            location.longitude,
+            distanceFromWorkMeters,
+            isLate.toLongFlag()
+        )
+    }
+
+    fun getWorkClockEntriesByUserAndDate(userId: Long, date: LocalDate): Flow<List<WorkClockEntry>> {
+        val start = date.startOfDayMillis()
+        val end = start + DAY_MILLIS
+        return queries.selectWorkClockEntriesByUserAndDate(userId, start, end)
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { list -> list.map(::mapToWorkClockEntry) }
+    }
+
+    fun getWorkClockEntriesByUserAndCurrentWeek(userId: Long): List<WorkClockEntry> {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        val start = today.startOfWeekMillis()
+        val end = start + 7L * DAY_MILLIS
+        return queries.selectWorkClockEntriesByUserAndPeriod(userId, start, end)
+            .executeAsList()
+            .map(::mapToWorkClockEntry)
+    }
+
+    private fun mapToWorkClockEntry(row: com.checklistboteco.database.WorkClockEntry): WorkClockEntry {
+        return WorkClockEntry(
+            id = row.id,
+            userId = row.userId,
+            type = WorkClockType.fromString(row.type),
+            registeredAt = row.registeredAt,
+            location = GeoPoint(row.latitude, row.longitude),
+            distanceFromWorkMeters = row.distanceFromWorkMeters,
+            isLate = row.isLate == 1L
+        )
+    }
+
     // Dashboard Stats
     fun getGlobalStats(periodStart: Long): Flow<GlobalDashboardStats> {
         return queries.getGlobalStats(periodStart).asFlow().mapToOne(Dispatchers.IO).map { row ->
@@ -209,10 +317,16 @@ class ChecklistRepository(database: ChecklistDatabase) {
         if (queries.selectUserByName("admin").executeAsOneOrNull() == null) {
             queries.insertUser(
                 "admin",
+                "admin@checklistboteco.com",
                 "admin123",
                 Area.ATENDIMENTO.name,
+                WorkSector.GERENTE.name,
                 PermissionLevel.ADMIN.name,
-                Area.entries.joinToString(",") { it.name }
+                Area.entries.joinToString(",") { it.name },
+                Clock.System.now().toEpochMilliseconds(),
+                1L,
+                1L,
+                1L
             )
         }
         if (queries.selectAllActivities().executeAsList().isEmpty()) {
@@ -226,6 +340,18 @@ class ChecklistRepository(database: ChecklistDatabase) {
             }
         }
     }
+}
+
+private fun Boolean.toLongFlag(): Long = if (this) 1L else 0L
+private const val DAY_MILLIS = 24L * 60L * 60L * 1000L
+
+private fun LocalDate.startOfDayMillis(): Long {
+    return Instant.parse("${this}T00:00:00Z").toEpochMilliseconds()
+}
+
+private fun LocalDate.startOfWeekMillis(): Long {
+    val mondayOffset = dayOfWeek.ordinal
+    return startOfDayMillis() - mondayOffset * DAY_MILLIS
 }
 
 data class GlobalDashboardStats(

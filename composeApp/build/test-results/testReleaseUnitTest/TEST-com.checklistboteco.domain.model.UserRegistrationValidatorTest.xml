@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.checklistboteco.domain.model.UserRegistrationValidatorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-09T04:28:47" hostname="taquarymac.local" time="0.266">
+  <properties/>
+  <testcase name="normalizesFirstLetterOfEachName" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.171"/>
+  <testcase name="publicRegistrationDoesNotGrantFunctionalPermissions" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.058"/>
+  <testcase name="rejectsEmailWithoutAtOrDotCom" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.001"/>
+  <testcase name="mapsWorkSectorToAllowedActivityAreaForRegularUser" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.0"/>
+  <testcase name="validatesStrongPasswordRules" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

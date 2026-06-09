@@ -25,7 +25,13 @@ class ChecklistViewModel(
     private val currentUser: User?,
     private val scope: CoroutineScope
 ) {
-    private val _uiState = MutableStateFlow(ChecklistUiState(currentUser = currentUser))
+    private val initialArea = currentUser?.allowedAreas?.firstOrNull() ?: Area.ATENDIMENTO
+    private val _uiState = MutableStateFlow(
+        ChecklistUiState(
+            selectedArea = initialArea,
+            currentUser = currentUser
+        )
+    )
     val uiState: StateFlow<ChecklistUiState> = _uiState.asStateFlow()
 
     init {

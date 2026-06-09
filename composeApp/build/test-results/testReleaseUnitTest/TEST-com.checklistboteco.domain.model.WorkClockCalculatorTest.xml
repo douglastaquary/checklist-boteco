@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.checklistboteco.domain.model.WorkClockCalculatorTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-09T04:28:47" hostname="taquarymac.local" time="0.117">
+  <properties/>
+  <testcase name="eightWorkedHoursAndOneBreakHourCompletesRegularDay" classname="com.checklistboteco.domain.model.WorkClockCalculatorTest" time="0.109"/>
+  <testcase name="entryIsNotLateWithoutFixedSchedule" classname="com.checklistboteco.domain.model.WorkClockCalculatorTest" time="0.001"/>
+  <testcase name="missingDailyHoursAreCalculatedFromWorkedTimeNotStartTime" classname="com.checklistboteco.domain.model.WorkClockCalculatorTest" time="0.0"/>
+  <testcase name="twelveHourShiftRequiresTwoBreakHours" classname="com.checklistboteco.domain.model.WorkClockCalculatorTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

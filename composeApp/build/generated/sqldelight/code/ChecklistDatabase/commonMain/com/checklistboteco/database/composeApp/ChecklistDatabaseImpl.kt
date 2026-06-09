@@ -24,17 +24,23 @@ private class ChecklistDatabaseImpl(
 
   public object Schema : SqlSchema<QueryResult.Value<Unit>> {
     override val version: Long
-      get() = 1
+      get() = 3
 
     override fun create(driver: SqlDriver): QueryResult.Value<Unit> {
       driver.execute(null, """
           |CREATE TABLE User (
           |    id INTEGER PRIMARY KEY AUTOINCREMENT,
           |    name TEXT NOT NULL,
+          |    email TEXT NOT NULL DEFAULT '',
           |    password TEXT NOT NULL,
           |    area TEXT NOT NULL,
+          |    workSector TEXT NOT NULL DEFAULT 'ATENDIMENTO',
           |    permissionLevel TEXT NOT NULL,
-          |    allowedAreas TEXT NOT NULL
+          |    allowedAreas TEXT NOT NULL,
+          |    createdAt INTEGER NOT NULL DEFAULT 0,
+          |    canRegisterUsers INTEGER NOT NULL DEFAULT 0,
+          |    canCreateActivities INTEGER NOT NULL DEFAULT 0,
+          |    canEditUsers INTEGER NOT NULL DEFAULT 0
           |)
           """.trimMargin(), 0)
       driver.execute(null, """
@@ -58,6 +64,54 @@ private class ChecklistDatabaseImpl(
           |    FOREIGN KEY (userId) REFERENCES User(id)
           |)
           """.trimMargin(), 0)
+      driver.execute(null, """
+          |CREATE TABLE WorkClockEntry (
+          |    id INTEGER PRIMARY KEY AUTOINCREMENT,
+          |    userId INTEGER NOT NULL,
+          |    type TEXT NOT NULL,
+          |    registeredAt INTEGER NOT NULL,
+          |    latitude REAL NOT NULL,
+          |    longitude REAL NOT NULL,
+          |    distanceFromWorkMeters REAL NOT NULL,
+          |    isLate INTEGER NOT NULL DEFAULT 0,
+          |    FOREIGN KEY (userId) REFERENCES User(id)
+          |)
+          """.trimMargin(), 0)
+      return QueryResult.Unit
+    }
+
+    private fun migrateInternal(
+      driver: SqlDriver,
+      oldVersion: Long,
+      newVersion: Long,
+    ): QueryResult.Value<Unit> {
+      if (oldVersion <= 1 && newVersion > 1) {
+        driver.execute(null, "ALTER TABLE User ADD COLUMN email TEXT NOT NULL DEFAULT ''", 0)
+        driver.execute(null,
+            "ALTER TABLE User ADD COLUMN workSector TEXT NOT NULL DEFAULT 'ATENDIMENTO'", 0)
+        driver.execute(null, "ALTER TABLE User ADD COLUMN createdAt INTEGER NOT NULL DEFAULT 0", 0)
+        driver.execute(null,
+            "ALTER TABLE User ADD COLUMN canRegisterUsers INTEGER NOT NULL DEFAULT 0", 0)
+        driver.execute(null,
+            "ALTER TABLE User ADD COLUMN canCreateActivities INTEGER NOT NULL DEFAULT 0", 0)
+        driver.execute(null, "ALTER TABLE User ADD COLUMN canEditUsers INTEGER NOT NULL DEFAULT 0",
+            0)
+      }
+      if (oldVersion <= 2 && newVersion > 2) {
+        driver.execute(null, """
+            |CREATE TABLE WorkClockEntry (
+            |    id INTEGER PRIMARY KEY AUTOINCREMENT,
+            |    userId INTEGER NOT NULL,
+            |    type TEXT NOT NULL,
+            |    registeredAt INTEGER NOT NULL,
+            |    latitude REAL NOT NULL,
+            |    longitude REAL NOT NULL,
+            |    distanceFromWorkMeters REAL NOT NULL,
+            |    isLate INTEGER NOT NULL DEFAULT 0,
+            |    FOREIGN KEY (userId) REFERENCES User(id)
+            |)
+            """.trimMargin(), 0)
+      }
       return QueryResult.Unit
     }
 
@@ -66,6 +120,21 @@ private class ChecklistDatabaseImpl(
       oldVersion: Long,
       newVersion: Long,
       vararg callbacks: AfterVersion,
-    ): QueryResult.Value<Unit> = QueryResult.Unit
+    ): QueryResult.Value<Unit> {
+      var lastVersion = oldVersion
+
+      callbacks.filter { it.afterVersion in oldVersion until newVersion }
+      .sortedBy { it.afterVersion }
+      .forEach { callback ->
+        migrateInternal(driver, oldVersion = lastVersion, newVersion = callback.afterVersion + 1)
+        callback.block(driver)
+        lastVersion = callback.afterVersion + 1
+      }
+
+      if (lastVersion < newVersion) {
+        migrateInternal(driver, lastVersion, newVersion)
+      }
+      return QueryResult.Unit
+    }
   }
 }

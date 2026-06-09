@@ -1,10 +1,16 @@
 CREATE TABLE User (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT '',
     password TEXT NOT NULL,
     area TEXT NOT NULL,
+    workSector TEXT NOT NULL DEFAULT 'ATENDIMENTO',
     permissionLevel TEXT NOT NULL,
-    allowedAreas TEXT NOT NULL
+    allowedAreas TEXT NOT NULL,
+    createdAt INTEGER NOT NULL DEFAULT 0,
+    canRegisterUsers INTEGER NOT NULL DEFAULT 0,
+    canCreateActivities INTEGER NOT NULL DEFAULT 0,
+    canEditUsers INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE Activity (
@@ -26,9 +32,21 @@ CREATE TABLE ActivityCompletion (
     FOREIGN KEY (userId) REFERENCES User(id)
 );
 
+CREATE TABLE WorkClockEntry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    registeredAt INTEGER NOT NULL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
+    distanceFromWorkMeters REAL NOT NULL,
+    isLate INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (userId) REFERENCES User(id)
+);
+
 insertUser:
-INSERT INTO User(name, password, area, permissionLevel, allowedAreas)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, canRegisterUsers, canCreateActivities, canEditUsers)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertActivity:
 INSERT INTO Activity(name, area, frequency, effort)
@@ -38,11 +56,23 @@ insertCompletion:
 INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath, isLate)
 VALUES (?, ?, ?, ?, ?);
 
+insertWorkClockEntry:
+INSERT INTO WorkClockEntry(userId, type, registeredAt, latitude, longitude, distanceFromWorkMeters, isLate)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
 selectAllUsers:
 SELECT * FROM User;
 
 selectUserByName:
 SELECT * FROM User WHERE name = ?;
+
+selectUserByEmail:
+SELECT * FROM User WHERE email = ?;
+
+updateUserFeaturePermissions:
+UPDATE User
+SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?
+WHERE id = ?;
 
 selectAllActivities:
 SELECT * FROM Activity;
@@ -53,6 +83,16 @@ SELECT * FROM Activity WHERE area = ?;
 selectCompletionsByActivityAndDate:
 SELECT * FROM ActivityCompletion 
 WHERE activityId = ? AND completedAt >= ?;
+
+selectWorkClockEntriesByUserAndDate:
+SELECT * FROM WorkClockEntry
+WHERE userId = ? AND registeredAt >= ? AND registeredAt < ?
+ORDER BY registeredAt ASC;
+
+selectWorkClockEntriesByUserAndPeriod:
+SELECT * FROM WorkClockEntry
+WHERE userId = ? AND registeredAt >= ? AND registeredAt < ?
+ORDER BY registeredAt ASC;
 
 selectCompletionsByAreaAndDate:
 SELECT ac.* FROM ActivityCompletion ac
