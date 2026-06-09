@@ -1,5 +1,6 @@
 package com.checklistboteco.presentation.viewmodel
 
+import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.domain.model.GeoPoint
 import com.checklistboteco.domain.model.PermissionLevel
@@ -9,6 +10,7 @@ import com.checklistboteco.domain.model.WorkClockEntry
 import com.checklistboteco.domain.model.WorkClockSummary
 import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorksiteLocation
+import com.checklistboteco.platform.DeviceIdentity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,8 @@ data class WorkClockUiState(
     val currentTimestamp: Long = Clock.System.now().toEpochMilliseconds(),
     val canClockIn: Boolean = false,
     val isAdmin: Boolean = false,
+    val deviceId: String = "",
+    val deviceName: String = "",
     val showDetails: Boolean = false,
     val feedback: String? = null
 )
@@ -35,13 +39,18 @@ data class WorkClockUiState(
 class WorkClockViewModel(
     private val repository: ChecklistRepository,
     private val user: User,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val backendApiClient: BackendApiClient? = null,
+    private val authToken: String? = null,
+    private val remoteUserId: String? = null
 ) {
     private val timeZone = TimeZone.currentSystemDefault()
     private val _uiState = MutableStateFlow(
         WorkClockUiState(
             isAdmin = user.permissionLevel == PermissionLevel.ADMIN,
-            canClockIn = canUseClock(WorksiteLocation.point)
+            canClockIn = canUseClock(WorksiteLocation.point),
+            deviceId = DeviceIdentity.getOrCreateDeviceId(),
+            deviceName = DeviceIdentity.deviceName()
         )
     )
     val uiState: StateFlow<WorkClockUiState> = _uiState.asStateFlow()
@@ -96,6 +105,7 @@ class WorkClockViewModel(
         _uiState.update {
             it.copy(feedback = "${state.nextType.displayName} registrada")
         }
+        syncWorkClockEntry(state, now, isLate)
     }
 
     fun showDetails() {
@@ -113,6 +123,30 @@ class WorkClockViewModel(
     private fun canUseClock(location: GeoPoint): Boolean {
         if (user.permissionLevel == PermissionLevel.ADMIN) return false
         return WorkClockCalculator.distanceMeters(location, WorksiteLocation.point) <= WorksiteLocation.allowedRadiusMeters
+    }
+
+    private fun syncWorkClockEntry(state: WorkClockUiState, registeredAt: Long, isLate: Boolean) {
+        val api = backendApiClient ?: return
+        val token = authToken ?: return
+        val backendUserId = remoteUserId ?: return
+        scope.launch {
+            runCatching {
+                api.pushWorkClockEntry(
+                    token = token,
+                    remoteUserId = backendUserId,
+                    type = state.nextType,
+                    registeredAt = registeredAt,
+                    latitude = state.currentLocation.latitude,
+                    longitude = state.currentLocation.longitude,
+                    distanceFromWorkMeters = state.distanceFromWorkMeters,
+                    isLate = isLate
+                )
+            }.onFailure {
+                _uiState.update { current ->
+                    current.copy(feedback = "${state.nextType.displayName} registrada localmente. Sincronização pendente.")
+                }
+            }
+        }
     }
 
     private fun Long.toLocalDateKey(): String {

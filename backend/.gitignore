@@ -1,0 +1,5 @@
+build/
+backend-data/
+*.db
+*.db-shm
+*.db-wal

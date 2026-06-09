@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.checklistboteco.domain.model.UserRegistrationValidatorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-09T04:28:43" hostname="taquarymac.local" time="0.199">
+<testsuite name="com.checklistboteco.domain.model.UserRegistrationValidatorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-09T14:47:04" hostname="taquarymac.local" time="0.094">
   <properties/>
-  <testcase name="normalizesFirstLetterOfEachName" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.071"/>
-  <testcase name="publicRegistrationDoesNotGrantFunctionalPermissions" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.121"/>
-  <testcase name="rejectsEmailWithoutAtOrDotCom" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.003"/>
+  <testcase name="normalizesFirstLetterOfEachName" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.064"/>
+  <testcase name="publicRegistrationDoesNotGrantFunctionalPermissions" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.025"/>
+  <testcase name="rejectsEmailWithoutAtOrDotCom" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.001"/>
   <testcase name="mapsWorkSectorToAllowedActivityAreaForRegularUser" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.001"/>
   <testcase name="validatesStrongPasswordRules" classname="com.checklistboteco.domain.model.UserRegistrationValidatorTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>

@@ -36,6 +36,8 @@ Aplicativo de checklist para bares e restaurantes desenvolvido com **Kotlin Mult
 - SQLDelight (banco de dados local)
 - MVVM
 - Coroutines & Flow
+- Ktor Server (backend Kotlin)
+- SQLite (backend MVP)
 
 ## Estrutura do projeto
 
@@ -71,6 +73,26 @@ Ou execute pela IDE: Run > composeApp (Android)
 ```bash
 ./gradlew :composeApp:runDesktop
 ```
+
+### Backend local
+
+```bash
+./gradlew :backend:run
+```
+
+Admin web: `http://localhost:8080`
+
+Guia completo de backend e deploy: [docs/backend-deploy.md](docs/backend-deploy.md)
+
+Em produção, configure a API somente com HTTPS. O backend suporta deploy atrás de proxies TLS como Render, Railway e Cloud Run; para desenvolvimento local, use `http://localhost:8080`.
+
+Para apontar o app Android para o backend, informe a URL da API no build:
+
+```bash
+./gradlew :composeApp:assembleDebug -PCHECKLIST_API_BASE_URL=https://sua-api.exemplo.com
+```
+
+O app rejeita `http://` fora de hosts locais de desenvolvimento.
 
 ### iOS
 
