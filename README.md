@@ -1,6 +1,6 @@
 # Checklist Boteco
 
-Aplicativo de checklist para bares e restaurantes desenvolvido com **Kotlin Multiplatform (KMP)**, **Compose Multiplatform** e arquitetura **MVVM**.
+Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform**, backend **Quarkus serverless** e administração web em **Qute + JavaScript vanilla**.
 
 ## Funcionalidades
 
@@ -12,15 +12,15 @@ Aplicativo de checklist para bares e restaurantes desenvolvido com **Kotlin Mult
 - **Permissões**: Cada usuário acessa apenas suas áreas configuradas
 - **Admin**: Gráficos de atividades realizadas e pendentes por área
 - **Cadastro de atividades**: Admins podem adicionar novas atividades (nome, área, frequência)
-- **Cadastro de novos usuários**: Fluxo público a partir da tela de login com nome, sobrenome, email, setor de trabalho em lista única, senha forte e confirmação
+- **Gestão de usuários no Web Admin**: Aba Equipe com criação, edição, remoção e reset de senha
 - **Setores de trabalho**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente e Barman
 - **Permissões por funcionalidade**: Módulo apartado para admin configurar cadastro de novos funcionários, criação de atividades e edição de usuários
-- **Administração de permissões**: Lista usuários por setor, mostra detalhes do cadastro e permite ao admin ajustar acessos gerenciais por usuário
+- **Administração de permissões**: Admin pode delegar cadastro de usuários, gestão de atividades e edição de usuários para perfis não-admin
 - **Ponto de colaboradores**: Usuários comuns podem registrar entrada, almoço, descanso e saída com cálculo de horas trabalhadas, descanso e horas devidas
 
 ## Credenciais padrão
 
-- **Usuário**: admin
+- **Usuário**: admin@checklistboteco.com
 - **Senha**: admin123
 
 ## Plataformas suportadas
@@ -36,8 +36,10 @@ Aplicativo de checklist para bares e restaurantes desenvolvido com **Kotlin Mult
 - SQLDelight (banco de dados local)
 - MVVM
 - Coroutines & Flow
-- Ktor Server (backend Kotlin)
-- SQLite (backend MVP)
+- Quarkus REST + Qute (API e web no mesmo JAR)
+- JavaScript vanilla (sem Node.js ou bundler)
+- AWS Lambda + API Gateway HTTP API
+- DynamoDB on-demand em produção
 
 ## Estrutura do projeto
 
@@ -50,6 +52,11 @@ composeApp/
 │   ├── androidMain/         # Implementações Android (câmera, etc)
 │   ├── desktopMain/         # Implementações Desktop
 │   └── iosMain/             # Implementações iOS
+backend/
+├── src/main/java/            # API, segurança e stores
+├── src/main/resources/       # Qute, CSS, JS e configuração
+├── pom.xml                    # Build único do backend + web
+└── template.yaml              # Lambda, HTTP API e DynamoDB (SAM)
 ```
 
 ## Como executar
@@ -77,22 +84,29 @@ Ou execute pela IDE: Run > composeApp (Android)
 ### Backend local
 
 ```bash
-./gradlew :backend:run
+cd backend
+./mvnw quarkus:dev
 ```
 
 Admin web: `http://localhost:8080`
 
 Guia completo de backend e deploy: [docs/backend-deploy.md](docs/backend-deploy.md)
 
-Em produção, configure a API somente com HTTPS. O backend suporta deploy atrás de proxies TLS como Render, Railway e Cloud Run; para desenvolvimento local, use `http://localhost:8080`.
+Plano do módulo de compras com importação CSV e MCP: [docs/finance-module-plan.md](docs/finance-module-plan.md)
+
+Plano de sincronização Android offline-first com o backend Quarkus: [docs/android-quarkus-sync-plan.md](docs/android-quarkus-sync-plan.md)
+
+O perfil local usa memória e não precisa de Docker ou AWS. Em produção, o template SAM publica o mesmo artefato em Lambda com DynamoDB.
 
 Para apontar o app Android para o backend, informe a URL da API no build:
 
 ```bash
-./gradlew :composeApp:assembleDebug -PCHECKLIST_API_BASE_URL=https://sua-api.exemplo.com
+./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8080
 ```
 
-O app rejeita `http://` fora de hosts locais de desenvolvimento.
+`10.0.2.2` aponta o Android Emulator para o backend da máquina. Para AWS, troque pela URL HTTPS exibida no output `ApiUrl` do SAM. O app rejeita HTTP fora dos hosts locais de desenvolvimento.
+
+No Android, o build `debug` libera tráfego HTTP claro apenas para `10.0.2.2`, `127.0.0.1` e `localhost`, facilitando testes locais. Builds destinados à AWS continuam usando HTTPS.
 
 ### iOS
 
@@ -107,17 +121,23 @@ Abra o projeto no Xcode e execute no simulador ou dispositivo.
 
 ## Cadastro e permissões
 
-O botão **Novo usuário** fica abaixo do botão **Entrar** na tela de login. O cadastro exige:
+O gerenciamento de acessos acontece na aba **Equipe** do painel web.
 
-- Nome e sobrenome normalizados com a primeira letra de cada nome em maiúscula
-- Email com `@` e final `.com`
-- Setor de trabalho selecionado em lista de escolha única
-- Senha com no mínimo 8 caracteres, letra maiúscula, letra minúscula, número e caractere especial
-- Confirmação de senha igual à senha informada
+- `ADMIN` tem acesso total ao sistema e aos checkboxes de permissões
+- `canRegisterUsers` permite visualizar a aba Equipe e criar novos usuários
+- `canEditUsers` permite editar usuários existentes, remover usuários e resetar senha
+- `canCreateActivities` permite acessar a aba **Atividades** e cadastrar novas atividades
 
-Usuários comuns recebem acesso às atividades vinculadas à área do seu setor de trabalho. Usuários admin recebem acesso total. A tela **Permissões por usuário** organiza os usuários por setor, abre os detalhes ao clicar no nome e permite ativar ou desativar permissões gerenciais.
+No cadastro e edição de usuários, os campos obrigatórios são:
 
-O cadastro público sempre cria usuários comuns, sem permissões gerenciais. A concessão de permissões fica isolada no módulo **Permissões**, visível por padrão para o usuário admin. Somente admin pode alterar permissões específicas de cada usuário.
+- Nome
+- Email válido
+- Setor de trabalho
+- Perfil (`USER` ou `ADMIN`)
+
+Na criação, a senha também é obrigatória e deve ter no mínimo 8 caracteres. No reset de senha, os dispositivos confiáveis e desafios pendentes do usuário são invalidados, forçando um novo fluxo de confirmação no próximo acesso.
+
+Usuários comuns recebem acesso às atividades vinculadas à área derivada do seu setor. Usuários `ADMIN` recebem acesso total às áreas e permissões gerenciais.
 
 ## Ponto de colaboradores
 

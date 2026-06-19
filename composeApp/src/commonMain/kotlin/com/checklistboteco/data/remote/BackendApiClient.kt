@@ -84,6 +84,7 @@ class BackendApiClient private constructor(
             contentType(ContentType.Application.Json)
             setBody(
                 SyncPushRequestDto(
+                    deviceId = remoteUserId,
                     workClockEntries = listOf(
                         WorkClockEntryDto(
                             id = "$remoteUserId-${type.name}-$registeredAt",
@@ -228,8 +229,7 @@ private data class FeaturePermissionsDto(
 
 @Serializable
 private data class SyncPushRequestDto(
-    val activities: List<String> = emptyList(),
-    val completions: List<String> = emptyList(),
+    val deviceId: String? = null,
     val workClockEntries: List<WorkClockEntryDto> = emptyList()
 )
 

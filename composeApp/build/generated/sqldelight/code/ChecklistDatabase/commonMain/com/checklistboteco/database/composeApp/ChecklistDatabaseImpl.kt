@@ -24,7 +24,7 @@ private class ChecklistDatabaseImpl(
 
   public object Schema : SqlSchema<QueryResult.Value<Unit>> {
     override val version: Long
-      get() = 3
+      get() = 4
 
     override fun create(driver: SqlDriver): QueryResult.Value<Unit> {
       driver.execute(null, """
@@ -38,6 +38,7 @@ private class ChecklistDatabaseImpl(
           |    permissionLevel TEXT NOT NULL,
           |    allowedAreas TEXT NOT NULL,
           |    createdAt INTEGER NOT NULL DEFAULT 0,
+          |    remoteId TEXT,
           |    canRegisterUsers INTEGER NOT NULL DEFAULT 0,
           |    canCreateActivities INTEGER NOT NULL DEFAULT 0,
           |    canEditUsers INTEGER NOT NULL DEFAULT 0
@@ -46,22 +47,49 @@ private class ChecklistDatabaseImpl(
       driver.execute(null, """
           |CREATE TABLE Activity (
           |    id INTEGER PRIMARY KEY AUTOINCREMENT,
+          |    syncId TEXT,
           |    name TEXT NOT NULL,
           |    area TEXT NOT NULL,
           |    frequency TEXT NOT NULL,
-          |    effort INTEGER NOT NULL DEFAULT 1
+          |    effort INTEGER NOT NULL DEFAULT 1,
+          |    serverRevision INTEGER NOT NULL DEFAULT 0,
+          |    syncState TEXT NOT NULL DEFAULT 'SYNCED',
+          |    deletedAt INTEGER
           |)
           """.trimMargin(), 0)
       driver.execute(null, """
           |CREATE TABLE ActivityCompletion (
           |    id INTEGER PRIMARY KEY AUTOINCREMENT,
+          |    syncId TEXT,
           |    activityId INTEGER NOT NULL,
           |    userId INTEGER NOT NULL,
           |    completedAt INTEGER NOT NULL,
           |    imagePath TEXT,
           |    isLate INTEGER NOT NULL DEFAULT 0,
+          |    serverRevision INTEGER NOT NULL DEFAULT 0,
+          |    syncState TEXT NOT NULL DEFAULT 'SYNCED',
           |    FOREIGN KEY (activityId) REFERENCES Activity(id),
           |    FOREIGN KEY (userId) REFERENCES User(id)
+          |)
+          """.trimMargin(), 0)
+      driver.execute(null, """
+          |CREATE TABLE SyncOutbox (
+          |    operationId TEXT PRIMARY KEY,
+          |    entityType TEXT NOT NULL,
+          |    entitySyncId TEXT NOT NULL,
+          |    operationType TEXT NOT NULL,
+          |    payload TEXT NOT NULL,
+          |    createdAt INTEGER NOT NULL,
+          |    attemptCount INTEGER NOT NULL DEFAULT 0,
+          |    nextAttemptAt INTEGER NOT NULL,
+          |    lastError TEXT,
+          |    status TEXT NOT NULL DEFAULT 'PENDING'
+          |)
+          """.trimMargin(), 0)
+      driver.execute(null, """
+          |CREATE TABLE SyncMetadata (
+          |    key TEXT PRIMARY KEY,
+          |    value TEXT NOT NULL
           |)
           """.trimMargin(), 0)
       driver.execute(null, """
@@ -109,6 +137,41 @@ private class ChecklistDatabaseImpl(
             |    distanceFromWorkMeters REAL NOT NULL,
             |    isLate INTEGER NOT NULL DEFAULT 0,
             |    FOREIGN KEY (userId) REFERENCES User(id)
+            |)
+            """.trimMargin(), 0)
+      }
+      if (oldVersion <= 3 && newVersion > 3) {
+        driver.execute(null, "ALTER TABLE User ADD COLUMN remoteId TEXT", 0)
+        driver.execute(null, "ALTER TABLE Activity ADD COLUMN syncId TEXT", 0)
+        driver.execute(null,
+            "ALTER TABLE Activity ADD COLUMN serverRevision INTEGER NOT NULL DEFAULT 0", 0)
+        driver.execute(null,
+            "ALTER TABLE Activity ADD COLUMN syncState TEXT NOT NULL DEFAULT 'SYNCED'", 0)
+        driver.execute(null, "ALTER TABLE Activity ADD COLUMN deletedAt INTEGER", 0)
+        driver.execute(null, "ALTER TABLE ActivityCompletion ADD COLUMN syncId TEXT", 0)
+        driver.execute(null,
+            "ALTER TABLE ActivityCompletion ADD COLUMN serverRevision INTEGER NOT NULL DEFAULT 0",
+            0)
+        driver.execute(null,
+            "ALTER TABLE ActivityCompletion ADD COLUMN syncState TEXT NOT NULL DEFAULT 'SYNCED'", 0)
+        driver.execute(null, """
+            |CREATE TABLE SyncOutbox (
+            |    operationId TEXT PRIMARY KEY,
+            |    entityType TEXT NOT NULL,
+            |    entitySyncId TEXT NOT NULL,
+            |    operationType TEXT NOT NULL,
+            |    payload TEXT NOT NULL,
+            |    createdAt INTEGER NOT NULL,
+            |    attemptCount INTEGER NOT NULL DEFAULT 0,
+            |    nextAttemptAt INTEGER NOT NULL,
+            |    lastError TEXT,
+            |    status TEXT NOT NULL DEFAULT 'PENDING'
+            |)
+            """.trimMargin(), 0)
+        driver.execute(null, """
+            |CREATE TABLE SyncMetadata (
+            |    key TEXT PRIMARY KEY,
+            |    value TEXT NOT NULL
             |)
             """.trimMargin(), 0)
       }

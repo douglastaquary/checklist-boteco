@@ -10,6 +10,7 @@ data class User(
     val permissionLevel: PermissionLevel,
     val allowedAreas: List<Area>,
     val createdAt: Long = 0L,
+    val remoteId: String? = null,
     val featurePermissions: FeaturePermissions = FeaturePermissions()
 ) {
     fun canAccessArea(area: Area): Boolean {

@@ -1,0 +1,4 @@
+Data;Mercadoria;Categoria;Local;Fornecedor;Quantidade;Unidade;Valor Unitário;Valor Total;Marca;Centro de Custo
+03/06/2026;Cerveja Pilsen 600ml;Bebidas;Bar;Distribuidora Litoral;24;UN;10,50;252,00;Costa Sul;Bar
+05/06/2026;Carne bovina;Alimentos;Cozinha;Frigorífico Bertioga;12;KG;35,90;430,80;Linha Premium;Cozinha
+08/06/2026;Detergente neutro;Limpeza;Serviços Gerais;Atacado Praia;6;UN;4,75;28,50;Limpa Mais;Serviços Gerais

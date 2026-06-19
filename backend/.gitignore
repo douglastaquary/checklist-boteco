@@ -1,4 +1,6 @@
 build/
+target/
+.aws-sam/
 backend-data/
 *.db
 *.db-shm

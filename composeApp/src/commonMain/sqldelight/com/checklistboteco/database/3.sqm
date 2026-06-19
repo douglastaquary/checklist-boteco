@@ -1,0 +1,28 @@
+ALTER TABLE User ADD COLUMN remoteId TEXT;
+
+ALTER TABLE Activity ADD COLUMN syncId TEXT;
+ALTER TABLE Activity ADD COLUMN serverRevision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE Activity ADD COLUMN syncState TEXT NOT NULL DEFAULT 'SYNCED';
+ALTER TABLE Activity ADD COLUMN deletedAt INTEGER;
+
+ALTER TABLE ActivityCompletion ADD COLUMN syncId TEXT;
+ALTER TABLE ActivityCompletion ADD COLUMN serverRevision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ActivityCompletion ADD COLUMN syncState TEXT NOT NULL DEFAULT 'SYNCED';
+
+CREATE TABLE SyncOutbox (
+    operationId TEXT PRIMARY KEY,
+    entityType TEXT NOT NULL,
+    entitySyncId TEXT NOT NULL,
+    operationType TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    attemptCount INTEGER NOT NULL DEFAULT 0,
+    nextAttemptAt INTEGER NOT NULL,
+    lastError TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING'
+);
+
+CREATE TABLE SyncMetadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

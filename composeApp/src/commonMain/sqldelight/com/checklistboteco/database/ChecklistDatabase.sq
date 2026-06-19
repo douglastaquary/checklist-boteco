@@ -8,6 +8,7 @@ CREATE TABLE User (
     permissionLevel TEXT NOT NULL,
     allowedAreas TEXT NOT NULL,
     createdAt INTEGER NOT NULL DEFAULT 0,
+    remoteId TEXT,
     canRegisterUsers INTEGER NOT NULL DEFAULT 0,
     canCreateActivities INTEGER NOT NULL DEFAULT 0,
     canEditUsers INTEGER NOT NULL DEFAULT 0
@@ -15,21 +16,46 @@ CREATE TABLE User (
 
 CREATE TABLE Activity (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    syncId TEXT,
     name TEXT NOT NULL,
     area TEXT NOT NULL,
     frequency TEXT NOT NULL,
-    effort INTEGER NOT NULL DEFAULT 1
+    effort INTEGER NOT NULL DEFAULT 1,
+    serverRevision INTEGER NOT NULL DEFAULT 0,
+    syncState TEXT NOT NULL DEFAULT 'SYNCED',
+    deletedAt INTEGER
 );
 
 CREATE TABLE ActivityCompletion (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    syncId TEXT,
     activityId INTEGER NOT NULL,
     userId INTEGER NOT NULL,
     completedAt INTEGER NOT NULL,
     imagePath TEXT,
     isLate INTEGER NOT NULL DEFAULT 0,
+    serverRevision INTEGER NOT NULL DEFAULT 0,
+    syncState TEXT NOT NULL DEFAULT 'SYNCED',
     FOREIGN KEY (activityId) REFERENCES Activity(id),
     FOREIGN KEY (userId) REFERENCES User(id)
+);
+
+CREATE TABLE SyncOutbox (
+    operationId TEXT PRIMARY KEY,
+    entityType TEXT NOT NULL,
+    entitySyncId TEXT NOT NULL,
+    operationType TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    attemptCount INTEGER NOT NULL DEFAULT 0,
+    nextAttemptAt INTEGER NOT NULL,
+    lastError TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING'
+);
+
+CREATE TABLE SyncMetadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 
 CREATE TABLE WorkClockEntry (
@@ -45,16 +71,16 @@ CREATE TABLE WorkClockEntry (
 );
 
 insertUser:
-INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, canRegisterUsers, canCreateActivities, canEditUsers)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId, canRegisterUsers, canCreateActivities, canEditUsers)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertActivity:
-INSERT INTO Activity(name, area, frequency, effort)
-VALUES (?, ?, ?, ?);
+INSERT INTO Activity(syncId, name, area, frequency, effort, serverRevision, syncState, deletedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 insertCompletion:
-INSERT INTO ActivityCompletion(activityId, userId, completedAt, imagePath, isLate)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serverRevision, syncState)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 insertWorkClockEntry:
 INSERT INTO WorkClockEntry(userId, type, registeredAt, latitude, longitude, distanceFromWorkMeters, isLate)
@@ -69,16 +95,28 @@ SELECT * FROM User WHERE name = ?;
 selectUserByEmail:
 SELECT * FROM User WHERE email = ?;
 
+selectUserByRemoteId:
+SELECT * FROM User WHERE remoteId = ?;
+
 updateUserFeaturePermissions:
 UPDATE User
 SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?
 WHERE id = ?;
 
 selectAllActivities:
-SELECT * FROM Activity;
+SELECT * FROM Activity WHERE deletedAt IS NULL;
 
 selectActivitiesByArea:
-SELECT * FROM Activity WHERE area = ?;
+SELECT * FROM Activity WHERE area = ? AND deletedAt IS NULL;
+
+selectActivityById:
+SELECT * FROM Activity WHERE id = ?;
+
+selectActivityBySyncId:
+SELECT * FROM Activity WHERE syncId = ?;
+
+selectCompletionBySyncId:
+SELECT * FROM ActivityCompletion WHERE syncId = ?;
 
 selectCompletionsByActivityAndDate:
 SELECT * FROM ActivityCompletion 
@@ -100,7 +138,7 @@ JOIN Activity a ON ac.activityId = a.id
 WHERE a.area = ? AND ac.completedAt >= ?;
 
 countActivitiesByArea:
-SELECT area, COUNT(*) AS total FROM Activity GROUP BY area;
+SELECT area, COUNT(*) AS total FROM Activity WHERE deletedAt IS NULL GROUP BY area;
 
 countCompletionsByAreaAndDate:
 SELECT a.area, COUNT(ac.id) AS completed FROM Activity a
@@ -108,18 +146,86 @@ LEFT JOIN ActivityCompletion ac ON a.id = ac.activityId AND ac.completedAt >= ?
 GROUP BY a.area;
 
 updateActivity:
-UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?
+UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?, serverRevision = ?, syncState = ?, deletedAt = ?
 WHERE id = ?;
 
 deleteActivity:
+UPDATE Activity SET deletedAt = ?, syncState = ?, serverRevision = ?
+WHERE id = ?;
+
+hardDeleteActivity:
 DELETE FROM Activity WHERE id = ?;
 
 deleteCompletionsByActivity:
 DELETE FROM ActivityCompletion WHERE activityId = ?;
 
+markActivitySync:
+UPDATE Activity
+SET serverRevision = ?, syncState = ?, deletedAt = ?
+WHERE syncId = ?;
+
+markCompletionSync:
+UPDATE ActivityCompletion
+SET serverRevision = ?, syncState = ?
+WHERE syncId = ?;
+
+insertSyncOutbox:
+INSERT INTO SyncOutbox(operationId, entityType, entitySyncId, operationType, payload, createdAt, attemptCount, nextAttemptAt, lastError, status)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteSyncOutboxByOperationId:
+DELETE FROM SyncOutbox WHERE operationId = ?;
+
+deleteSyncOutboxByEntity:
+DELETE FROM SyncOutbox WHERE entityType = ? AND entitySyncId = ?;
+
+selectSyncOutboxByEntity:
+SELECT * FROM SyncOutbox
+WHERE entityType = ? AND entitySyncId = ?
+ORDER BY createdAt ASC;
+
+selectPendingSyncOutbox:
+SELECT * FROM SyncOutbox
+WHERE status = 'PENDING' AND nextAttemptAt <= ?
+ORDER BY createdAt ASC
+LIMIT ?;
+
+updateSyncOutboxAttempt:
+UPDATE SyncOutbox
+SET attemptCount = ?, nextAttemptAt = ?, lastError = ?, status = ?
+WHERE operationId = ?;
+
+upsertSyncMetadata:
+INSERT OR REPLACE INTO SyncMetadata(key, value)
+VALUES (?, ?);
+
+selectSyncMetadata:
+SELECT value FROM SyncMetadata WHERE key = ?;
+
+selectActivitiesMissingSyncId:
+SELECT * FROM Activity WHERE syncId IS NULL OR syncId = '';
+
+selectCompletionsMissingSyncId:
+SELECT * FROM ActivityCompletion WHERE syncId IS NULL OR syncId = '';
+
+setActivitySyncId:
+UPDATE Activity
+SET syncId = ?
+WHERE id = ?;
+
+setCompletionSyncId:
+UPDATE ActivityCompletion
+SET syncId = ?
+WHERE id = ?;
+
+setUserRemoteId:
+UPDATE User
+SET remoteId = ?
+WHERE id = ?;
+
 getGlobalStats:
 SELECT
-    (SELECT COUNT(*) FROM Activity) AS totalActivities,
+    (SELECT COUNT(*) FROM Activity WHERE deletedAt IS NULL) AS totalActivities,
     (SELECT COUNT(*) FROM ActivityCompletion WHERE completedAt >= :periodStart) AS totalCompleted,
     (SELECT COUNT(*) FROM ActivityCompletion WHERE completedAt >= :periodStart AND isLate = 1) AS lateCompletions;
 
@@ -131,6 +237,6 @@ SELECT
     SUM(a.effort) AS totalEffort
 FROM User AS u
 LEFT JOIN ActivityCompletion AS ac ON u.id = ac.userId AND ac.completedAt >= :periodStart
-LEFT JOIN Activity AS a ON ac.activityId = a.id
+LEFT JOIN Activity AS a ON ac.activityId = a.id AND a.deletedAt IS NULL
 GROUP BY u.id, u.name
 ORDER BY totalEffort DESC;

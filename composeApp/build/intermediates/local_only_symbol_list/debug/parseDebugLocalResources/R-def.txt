@@ -3,3 +3,4 @@ local
 string app_name
 style Theme.ChecklistBoteco
 xml file_paths
+xml network_security_config

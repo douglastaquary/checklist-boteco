@@ -43,6 +43,7 @@ kotlin {
             dependencies {
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.lifecycle.viewmodel.compose)
+                implementation(libs.androidx.work.runtime)
                 implementation(libs.ktor.client.android)
                 implementation(libs.sqldelight.android)
             }

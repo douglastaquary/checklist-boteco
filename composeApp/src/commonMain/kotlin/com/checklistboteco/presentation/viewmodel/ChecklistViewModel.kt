@@ -35,7 +35,6 @@ class ChecklistViewModel(
     val uiState: StateFlow<ChecklistUiState> = _uiState.asStateFlow()
 
     init {
-        repository.seedInitialData()
         loadActivities()
     }
 

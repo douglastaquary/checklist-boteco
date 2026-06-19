@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Checklist Boteco - Quarkus, Lambda HTTP API e DynamoDB
+
+Parameters:
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 24
+  PurchasesMcpToken:
+    Type: String
+    NoEcho: true
+    MinLength: 24
+
+Globals:
+  Function:
+    Runtime: java17
+    MemorySize: 768
+    Timeout: 20
+    Architectures: [arm64]
+    Environment:
+      Variables:
+        JWT_SECRET: !Ref JwtSecret
+        CHECKLIST_TABLE: !Ref ChecklistTable
+        PURCHASES_TABLE: !Ref PurchasesTable
+        PURCHASES_MCP_TOKEN: !Ref PurchasesMcpToken
+
+Resources:
+  ChecklistApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: target/function.zip
+      Handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChecklistTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PurchasesTable
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+  ChecklistTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  PurchasesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/
+  TableName:
+    Value: !Ref ChecklistTable
+  PurchasesTableName:
+    Value: !Ref PurchasesTable
