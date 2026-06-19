@@ -6,6 +6,8 @@ let currentUser = null;
 let currentUsers = [];
 let purchasePreview = null;
 let purchaseSchema = null;
+let salesPreview = null;
+let salesSchema = null;
 
 const deviceId = localStorage.getItem('checklist-device') || crypto.randomUUID();
 localStorage.setItem('checklist-device', deviceId);
@@ -20,6 +22,18 @@ const mappingFields = [
   ['supplier', 'Fornecedor'],
   ['documentNumber', 'Documento'],
   ['quantity', 'Quantidade'],
+  ['unit', 'Unidade'],
+  ['unitPriceInCents', 'Valor unitário']
+];
+const requiredSalesMappingFields = new Set(['description', 'quantity']);
+const salesMappingFields = [
+  ['saleDate', 'Data'],
+  ['description', 'Produto'],
+  ['location', 'Local'],
+  ['quantity', 'Quantidade'],
+  ['category', 'Categoria'],
+  ['totalInCents', 'Valor'],
+  ['documentNumber', 'Documento'],
   ['unit', 'Unidade'],
   ['unitPriceInCents', 'Valor unitário']
 ];
@@ -87,6 +101,7 @@ function accessibleViews(user = currentUser) {
   if (canManageUsers(user)) views.push('users');
   if (canManageActivities(user)) views.push('activities');
   if (isAdmin(user)) views.push('purchases');
+  if (isAdmin(user)) views.push('sales');
   return views;
 }
 
@@ -111,6 +126,7 @@ function activateView(viewId) {
   const selectedButton = document.querySelector(`[data-view="${viewId}"]`);
   $('pageTitle').textContent = selectedButton?.textContent || 'Painel';
   if (viewId === 'purchases' && token) loadPurchases();
+  if (viewId === 'sales' && token) loadSales();
 }
 
 async function load() {
@@ -394,6 +410,14 @@ function setPurchaseDates() {
   $('purchaseTo').value = isoDate(now);
 }
 
+function setSalesDates() {
+  const now = new Date();
+  const from = new Date(now);
+  from.setMonth(now.getMonth() - 1);
+  $('salesFrom').value = isoDate(from);
+  $('salesTo').value = isoDate(now);
+}
+
 function renderPurchasePreview(data) {
   purchasePreview = data;
   $('purchasePreview').classList.remove('hidden');
@@ -411,9 +435,31 @@ function renderPurchasePreview(data) {
   $('purchaseImportMessage').textContent = data.errors?.map(error => error.message).join(' · ') || 'Todas as colunas serão preservadas; os quatro campos destacados habilitam as consultas padronizadas.';
 }
 
+function renderSalesPreview(data) {
+  salesPreview = data;
+  $('salesPreview').classList.remove('hidden');
+  $('salesPreviewTitle').textContent = `${data.fileName} · ${data.totalRows} linhas`;
+  $('salesMapping').innerHTML = salesMappingFields.map(([key, label]) => `
+    <label>${label} <small>${requiredSalesMappingFields.has(key) ? '(obrigatório)' : '(opcional)'}</small>
+      <select data-sales-map="${key}">
+        <option value="">Não mapear</option>
+        ${data.headers.map(header => `<option value="${escapeHtml(header)}" ${data.suggestedMapping?.[key] === header ? 'selected' : ''}>${escapeHtml(header)}</option>`).join('')}
+      </select>
+    </label>
+  `).join('');
+  $('salesPreviewHead').innerHTML = `<tr>${data.headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr>`;
+  $('salesPreviewBody').innerHTML = data.sampleRows.map(row => `<tr>${data.headers.map(header => `<td>${escapeHtml(row[header])}</td>`).join('')}</tr>`).join('');
+  $('salesImportMessage').textContent = data.errors?.map(error => error.message).join(' · ') || 'Mapeie ao menos produto e quantidade. Data e local podem ser preenchidos automaticamente quando não vierem no relatório.';
+}
+
 async function loadPurchaseSchema() {
   purchaseSchema = await api('/api/purchases/schema');
   return purchaseSchema;
+}
+
+async function loadSalesSchema() {
+  salesSchema = await api('/api/sales/schema');
+  return salesSchema;
 }
 
 function purchaseQuery(schema) {
@@ -436,6 +482,26 @@ function purchaseQuery(schema) {
   return query;
 }
 
+function salesQuery(schema) {
+  const query = {
+    categories: $('salesCategory').value ? [$('salesCategory').value] : [],
+    locations: $('salesLocation').value ? [$('salesLocation').value] : [],
+    text: $('salesText').value,
+    page: 0,
+    pageSize: 100,
+    sort: [{ field: schema.coverageFrom ? 'saleDate' : 'importedAt', direction: 'DESC' }]
+  };
+  const min = currencyToCents($('salesMinTotal').value);
+  const max = currencyToCents($('salesMaxTotal').value);
+  if (min !== null) query.minTotalInCents = min;
+  if (max !== null) query.maxTotalInCents = max;
+  if (schema.coverageFrom) {
+    query.from = $('salesFrom').value;
+    query.to = $('salesTo').value;
+  }
+  return query;
+}
+
 async function loadPurchases() {
   try {
     $('purchaseFilterMessage').textContent = 'Buscando…';
@@ -448,6 +514,22 @@ async function loadPurchases() {
     $('purchasesBody').innerHTML = '';
     $('purchaseMetrics').innerHTML = '';
     $('purchasesEmpty').classList.remove('hidden');
+  }
+}
+
+async function loadSales() {
+  try {
+    $('salesFilterMessage').textContent = 'Buscando…';
+    const schema = await loadSalesSchema();
+    const data = await api('/api/sales/query', { method: 'POST', body: JSON.stringify(salesQuery(schema)) });
+    renderSales(schema, data);
+    $('salesFilterMessage').textContent = data.filtersApplied?.length ? `Filtros ativos: ${data.filtersApplied.join(' · ')}` : '';
+    await loadSalesAudit();
+  } catch (error) {
+    $('salesFilterMessage').textContent = error.message;
+    $('salesBody').innerHTML = '';
+    $('salesMetrics').innerHTML = '';
+    $('salesEmpty').classList.remove('hidden');
   }
 }
 
@@ -476,6 +558,67 @@ function renderPurchases(schema, data) {
     <span><strong>${money(data.totalInCents)}</strong> total mapeado</span>
     <span><strong>${dynamic.length}</strong> campos dinâmicos</span>
   `;
+}
+
+function renderSales(schema, data) {
+  const dynamic = (schema.fields || []).filter(field => !field.normalized).slice(0, 12);
+  const normalized = [
+    ['saleDate', 'Data'],
+    ['description', 'Produto'],
+    ['category', 'Categoria'],
+    ['location', 'Local'],
+    ['quantity', 'Qtd.'],
+    ['unit', 'Unidade'],
+    ['unitPriceInCents', 'Valor unit.'],
+    ['totalInCents', 'Valor']
+  ].filter(([key]) => (data.items || []).some(item => item[key] !== null && item[key] !== undefined && item[key] !== '' && (!key.endsWith('InCents') || item[key] !== 0)));
+  const columns = [...normalized, ...dynamic.map(field => [field.key, field.label])];
+  $('salesHead').innerHTML = `<tr>${columns.map(column => `<th>${escapeHtml(column[1])}</th>`).join('')}</tr>`;
+  $('salesBody').innerHTML = (data.items || []).map(item => `
+    <tr>${columns.map(([key]) => {
+      const value = key in item ? item[key] : item.attributes?.[key];
+      return `<td class="${key.endsWith('InCents') ? 'money' : ''}">${key.endsWith('InCents') ? money(value) : escapeHtml(value)}</td>`;
+    }).join('')}</tr>
+  `).join('');
+  $('salesEmpty').classList.toggle('hidden', data.totalItems > 0);
+  $('salesMetrics').innerHTML = `
+    <span><strong>${data.totalItems}</strong> registros</span>
+    <span><strong>${money(data.totalInCents)}</strong> vendido</span>
+    <span><strong>${dynamic.length}</strong> campos dinâmicos</span>
+  `;
+}
+
+async function loadSalesAudit() {
+  if (!$('salesFrom').value || !$('salesTo').value) return;
+  try {
+    $('salesAuditMessage').textContent = 'Gerando auditoria…';
+    const body = {
+      from: $('salesFrom').value,
+      to: $('salesTo').value,
+      purchaseDatasetId: 'purchases',
+      salesDatasetId: 'sales',
+      text: $('salesText').value || undefined,
+      locations: $('salesLocation').value ? [$('salesLocation').value] : []
+    };
+    const data = await api('/api/sales/audit/stock', { method: 'POST', body: JSON.stringify(body) });
+    $('salesAuditBody').innerHTML = (data.items || []).map(item => `
+      <tr>
+        <td><strong>${escapeHtml(item.status)}</strong></td>
+        <td>${escapeHtml(item.description)}</td>
+        <td>${escapeHtml(item.location)}</td>
+        <td>${escapeHtml(item.stockedQuantity)}</td>
+        <td>${escapeHtml(item.soldQuantity)}</td>
+        <td>${escapeHtml(item.differenceQuantity)}</td>
+        <td>${escapeHtml(item.notes)}</td>
+      </tr>
+    `).join('');
+    $('salesAuditEmpty').classList.toggle('hidden', (data.totalItems || 0) > 0);
+    $('salesAuditMessage').textContent = data.filtersApplied?.length ? `Auditoria com filtros: ${data.filtersApplied.join(' · ')}` : 'Auditoria atualizada.';
+  } catch (error) {
+    $('salesAuditMessage').textContent = error.message;
+    $('salesAuditBody').innerHTML = '';
+    $('salesAuditEmpty').classList.remove('hidden');
+  }
 }
 
 $('purchaseImportForm').addEventListener('submit', async event => {
@@ -524,6 +667,52 @@ $('commitPurchaseImport').addEventListener('click', async () => {
   }
 });
 
+$('salesImportForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const file = $('salesFile').files[0];
+  const pasted = $('salesCsvText').value.trim();
+  if (!file && !pasted) {
+    $('salesImportMessage').textContent = 'Selecione um arquivo ou cole o conteúdo CSV.';
+    return;
+  }
+  $('salesImportMessage').textContent = 'Analisando arquivo…';
+  try {
+    const data = await api('/api/sales/imports/preview', {
+      method: 'POST',
+      body: JSON.stringify({ fileName: file?.name || 'vendas-coladas.csv', csv: file ? await file.text() : pasted })
+    });
+    renderSalesPreview(data);
+  } catch (error) {
+    $('salesImportMessage').textContent = error.message;
+  }
+});
+
+$('commitSalesImport').addEventListener('click', async () => {
+  if (!salesPreview) return;
+  const mapping = {};
+  document.querySelectorAll('[data-sales-map]').forEach(select => {
+    if (select.value) mapping[select.dataset.salesMap] = select.value;
+  });
+  const missing = [...requiredSalesMappingFields].filter(key => !mapping[key]);
+  if (missing.length) {
+    $('salesImportMessage').textContent = 'Mapeie produto e quantidade antes de importar.';
+    return;
+  }
+  $('salesImportMessage').textContent = 'Importando…';
+  try {
+    const data = await api(`/api/sales/imports/${salesPreview.id}/commit`, {
+      method: 'POST',
+      body: JSON.stringify({ datasetId: 'sales', mapping, preserveColumns: salesPreview.headers })
+    });
+    $('salesImportMessage').innerHTML = `<span class="import-ok">${data.importedRows} linhas importadas, ${data.duplicateRows} duplicadas e ${data.rejectedRows} rejeitadas.</span>`;
+    $('salesPreview').classList.add('hidden');
+    salesPreview = null;
+    await loadSales();
+  } catch (error) {
+    $('salesImportMessage').textContent = error.message;
+  }
+});
+
 $('purchaseFilters').addEventListener('submit', event => {
   event.preventDefault();
   loadPurchases();
@@ -540,6 +729,23 @@ $('clearPurchaseFilters').addEventListener('click', () => {
 });
 
 setPurchaseDates();
+setSalesDates();
+
+$('salesFilters').addEventListener('submit', event => {
+  event.preventDefault();
+  loadSales();
+});
+$('refreshSales').addEventListener('click', loadSales);
+$('refreshSalesAudit').addEventListener('click', loadSalesAudit);
+$('clearSalesFilters').addEventListener('click', () => {
+  $('salesCategory').value = '';
+  $('salesLocation').value = '';
+  $('salesMinTotal').value = '';
+  $('salesMaxTotal').value = '';
+  $('salesText').value = '';
+  setSalesDates();
+  loadSales();
+});
 
 document.querySelectorAll('[data-view]').forEach(button => {
   button.addEventListener('click', () => activateView(button.dataset.view));

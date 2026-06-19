@@ -1,6 +1,6 @@
 # Backend serverless e Web Admin
 
-O backend agora é uma aplicação **Quarkus 3**. A API REST, o endpoint MCP, o template Qute, o CSS e o JavaScript vanilla são empacotados no mesmo JAR. Em desenvolvimento o estado fica em memória; no perfil de produção a aplicação usa tabelas DynamoDB separadas para a operação e para compras.
+O backend agora é uma aplicação **Quarkus 3**. A API REST, o endpoint MCP, o template Qute, o CSS e o JavaScript vanilla são empacotados no mesmo JAR. Em desenvolvimento o estado fica em memória; no perfil de produção a aplicação usa tabelas DynamoDB separadas para a operação, compras e vendas.
 
 ## Arquitetura
 
@@ -22,7 +22,7 @@ Admin Qute ──┘              │
 - **HTTP API (API Gateway v2):** produz URLs limpas, sem o prefixo de stage `/Prod` usado normalmente pelas REST APIs v1.
 - **Cobrança `PAY_PER_REQUEST`:** o DynamoDB cobra conforme o uso, sem capacidade provisionada enquanto a aplicação está ociosa.
 - **Roteamento proxy:** `/{proxy+}` captura todas as rotas internas, como `/api/auth/login`, e as encaminha ao Quarkus. O evento separado para `/` garante que a página inicial Qute também seja atendida.
-- **Tabelas automáticas:** os recursos `ChecklistTable` e `PurchasesTable` são criados pelo CloudFormation durante `sam deploy`; não há configuração manual do banco.
+- **Tabelas automáticas:** os recursos `ChecklistTable`, `PurchasesTable` e `SalesTable` são criados pelo CloudFormation durante `sam deploy`; não há configuração manual do banco.
 - **Sem rede privada:** a Lambda não declara VPC, subnets ou security groups. Ela acessa o DynamoDB pela API gerenciada da AWS usando a permissão criada pelo SAM.
 
 ## Rodar localmente
@@ -40,6 +40,17 @@ Abra:
 - Health check: `http://localhost:8080/api/health`
 
 Credenciais seed: `admin@checklistboteco.com` / `admin123`. No primeiro login, a tela mostra o código de confirmação do dispositivo. O store local é recriado quando o processo reinicia.
+
+Observação atualizada para módulos de compras e vendas:
+
+- os uploads confirmados de CSV em `Compras` e `Vendas` são persistidos localmente em arquivos JSON estáveis no diretório `backend/.data/`;
+- isso mantém os dados disponíveis após reiniciar o backend local;
+- o MCP continua lendo esses dados persistidos normalmente.
+
+Arquivos usados no dev local:
+
+- `backend/.data/purchases-local.json`
+- `backend/.data/sales-local.json`
 
 ## Web Admin: equipe, permissões e senha
 
@@ -64,6 +75,35 @@ Comportamentos importantes:
 - não é permitido remover o último administrador do sistema;
 - ao promover um usuário para `ADMIN`, ele recebe todas as permissões automaticamente;
 - ao rebaixar um `ADMIN` para `USER`, as permissões delegadas são zeradas por segurança e podem ser reatribuídas manualmente por um administrador.
+
+## Módulos admin de compras e vendas
+
+As abas `Compras` e `Vendas` ficam disponíveis somente para administradores.
+
+- `Compras` importa CSVs de abastecimento/compras e normaliza os campos mais úteis para consulta.
+- `Vendas` importa CSVs de relatório de vendas e exige como mapeamento mínimo `data`, `produto`, `local` e `quantidade`.
+- Ambas preservam colunas extras como atributos dinâmicos, úteis para filtros e leitura por agentes.
+- A auditoria `vendido x abastecido` cruza os datasets para apontar extravio potencial, consumo sem registro, venda sem entrada correspondente e perdas.
+
+Rotas principais:
+
+- `POST /api/purchases/imports/preview`
+- `POST /api/purchases/imports/{id}/commit`
+- `POST /api/purchases/query`
+- `POST /api/purchases/aggregate`
+- `POST /api/sales/imports/preview`
+- `POST /api/sales/imports/{id}/commit`
+- `POST /api/sales/query`
+- `POST /api/sales/aggregate`
+- `POST /api/sales/audit/stock`
+
+O endpoint MCP local continua em `POST /mcp` e agora expõe ferramentas de compras e vendas somente leitura.
+
+Para perguntas por produto, o MCP expõe a tool `sales_by_product`, útil para frases como:
+
+- `quantas águas vendeu?`
+- `qual a quantidade de amstel 600ml vendida no beco?`
+- `quanto vendeu de batata frita no período?`
 
 ## Conectar o app
 
@@ -114,6 +154,7 @@ Variáveis da Lambda definidas pelo template:
 - `JWT_SECRET`: segredo HMAC dos tokens.
 - `CHECKLIST_TABLE`: nome da tabela criada.
 - `PURCHASES_TABLE`: tabela separada de compras e importações.
+- `SALES_TABLE`: tabela separada de vendas e importações.
 - `PURCHASES_MCP_TOKEN`: token de serviço enviado por clientes MCP com `Authorization: Bearer`.
 - `AWS_REGION`: fornecida pelo runtime da Lambda.
 - `EXPOSE_DEVICE_CODE`: por padrão `true` para o MVP continuar funcional; defina `false` quando integrar o envio do código por email, SMS ou autenticador.
@@ -140,6 +181,50 @@ Opcionalmente, `CORS_ORIGINS` restringe as origens da interface web. O valor pad
 - `GET /api/purchases/schema`
 - `POST /api/purchases/query`
 - `POST /api/purchases/aggregate`
-- `POST /mcp` (MCP Streamable HTTP, tools de compras somente leitura)
+- `POST /api/sales/imports/preview`
+- `POST /api/sales/imports/{id}/commit`
+- `GET /api/sales/schema`
+- `POST /api/sales/query`
+- `POST /api/sales/aggregate`
+- `POST /api/sales/audit/stock`
+- `POST /mcp` (MCP Streamable HTTP, tools de compras e vendas somente leitura)
 
 As marcações de ponto continuam filtradas pelo `userId` do token, impedindo que um colaborador envie ponto em nome de outro.
+
+## Teste local com MCP
+
+Suba o backend:
+
+```bash
+cd backend
+./mvnw quarkus:dev
+```
+
+Depois conecte um cliente MCP HTTP apontando para:
+
+- URL: `http://localhost:8080/mcp`
+- Header: `Authorization: Bearer local-purchases-token`
+
+Exemplo de configuração para Cursor/Codex:
+
+```json
+{
+  "mcpServers": {
+    "checklist-boteco-analytics": {
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer local-purchases-token"
+      }
+    }
+  }
+}
+```
+
+Arquivos prontos no repositório:
+
+- Cursor: [.cursor/mcp.json](/Users/douglastaquary/ChecklistBoteco/.cursor/mcp.json)
+- Codex: [.codex/mcp.json](/Users/douglastaquary/ChecklistBoteco/.codex/mcp.json)
+
+Passo a passo de uso via chat:
+
+- [docs/mcp-local-test.md](/Users/douglastaquary/ChecklistBoteco/docs/mcp-local-test.md)

@@ -17,6 +17,8 @@ Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform
 - **Permissões por funcionalidade**: Módulo apartado para admin configurar cadastro de novos funcionários, criação de atividades e edição de usuários
 - **Administração de permissões**: Admin pode delegar cadastro de usuários, gestão de atividades e edição de usuários para perfis não-admin
 - **Ponto de colaboradores**: Usuários comuns podem registrar entrada, almoço, descanso e saída com cálculo de horas trabalhadas, descanso e horas devidas
+- **Compras**: Importação CSV com mapeamento dinâmico, consulta e exposição via MCP somente leitura
+- **Vendas e auditoria**: Importação CSV de vendas, cruzamento vendido x abastecido e exposição via MCP somente leitura para agentes
 
 ## Credenciais padrão
 
@@ -96,7 +98,16 @@ Plano do módulo de compras com importação CSV e MCP: [docs/finance-module-pla
 
 Plano de sincronização Android offline-first com o backend Quarkus: [docs/android-quarkus-sync-plan.md](docs/android-quarkus-sync-plan.md)
 
+Guia do módulo de auditoria de vendas x abastecimento: [docs/sales-audit-module.md](docs/sales-audit-module.md)
+
 O perfil local usa memória e não precisa de Docker ou AWS. Em produção, o template SAM publica o mesmo artefato em Lambda com DynamoDB.
+
+Em desenvolvimento, os uploads confirmados de `Compras` e `Vendas` passam a ser persistidos em arquivos locais estáveis:
+
+- [backend/.data/purchases-local.json](/Users/douglastaquary/ChecklistBoteco/backend/.data/purchases-local.json)
+- [backend/.data/sales-local.json](/Users/douglastaquary/ChecklistBoteco/backend/.data/sales-local.json)
+
+Assim, os dados importados continuam disponíveis após reiniciar o backend local e seguem acessíveis via MCP.
 
 Para apontar o app Android para o backend, informe a URL da API no build:
 
@@ -138,6 +149,56 @@ No cadastro e edição de usuários, os campos obrigatórios são:
 Na criação, a senha também é obrigatória e deve ter no mínimo 8 caracteres. No reset de senha, os dispositivos confiáveis e desafios pendentes do usuário são invalidados, forçando um novo fluxo de confirmação no próximo acesso.
 
 Usuários comuns recebem acesso às atividades vinculadas à área derivada do seu setor. Usuários `ADMIN` recebem acesso total às áreas e permissões gerenciais.
+
+## Módulos administrativos de compras e vendas
+
+Os módulos `Compras` e `Vendas` ficam disponíveis apenas para usuários `ADMIN`.
+
+- `Compras`: importa CSV de abastecimento/compras, normaliza campos principais, preserva colunas dinâmicas e expõe consultas por REST e MCP.
+- `Vendas`: importa CSV de relatório de vendas, exige mapeamento mínimo de `produto` e `quantidade`, preenche data/local automaticamente quando o relatório não trouxer esses campos, preserva colunas dinâmicas e expõe consultas por REST e MCP.
+- `Auditoria vendido x abastecido`: cruza os datasets de compras e vendas para destacar itens com venda sem entrada correspondente, venda acima do abastecido e abastecimento sem saída registrada.
+
+Ferramentas MCP disponíveis localmente em `http://localhost:8080/mcp`:
+
+- `purchases_get_schema`
+- `purchases_list`
+- `purchases_aggregate`
+- `purchases_get_imports`
+- `sales_get_schema`
+- `sales_list`
+- `sales_aggregate`
+- `sales_by_product`
+- `sales_get_imports`
+- `sales_audit_stock`
+
+Exemplo de configuração MCP para Cursor/Codex em ambiente local:
+
+```json
+{
+  "mcpServers": {
+    "checklist-boteco-analytics": {
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer local-purchases-token"
+      }
+    }
+  }
+}
+```
+
+Arquivos já prontos no projeto:
+
+- Cursor: [.cursor/mcp.json](/Users/douglastaquary/ChecklistBoteco/.cursor/mcp.json)
+- Codex: [.codex/mcp.json](/Users/douglastaquary/ChecklistBoteco/.codex/mcp.json)
+
+Guia de uso e testes via chat:
+
+- [docs/mcp-local-test.md](docs/mcp-local-test.md)
+
+Snippets de instruções para agentes:
+
+- Cursor: [.cursor/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.cursor/checklist-boteco-agent-instructions.md)
+- Codex: [.codex/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.codex/checklist-boteco-agent-instructions.md)
 
 ## Ponto de colaboradores
 

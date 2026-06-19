@@ -23,6 +23,7 @@ Globals:
         JWT_SECRET: !Ref JwtSecret
         CHECKLIST_TABLE: !Ref ChecklistTable
         PURCHASES_TABLE: !Ref PurchasesTable
+        SALES_TABLE: !Ref SalesTable
         PURCHASES_MCP_TOKEN: !Ref PurchasesMcpToken
 
 Resources:
@@ -36,6 +37,8 @@ Resources:
             TableName: !Ref ChecklistTable
         - DynamoDBCrudPolicy:
             TableName: !Ref PurchasesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SalesTable
       Events:
         HttpApi:
           Type: HttpApi
@@ -79,6 +82,24 @@ Resources:
           KeyType: RANGE
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+  SalesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
 
 Outputs:
   ApiUrl:
@@ -87,3 +108,5 @@ Outputs:
     Value: !Ref ChecklistTable
   PurchasesTableName:
     Value: !Ref PurchasesTable
+  SalesTableName:
+    Value: !Ref SalesTable

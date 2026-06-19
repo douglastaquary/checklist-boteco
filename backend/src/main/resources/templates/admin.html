@@ -7,7 +7,7 @@
 <body>
   <aside class="sidebar">
     <a class="brand" href="/"><span>✓</span><strong>{title}</strong></a>
-    <nav><button data-view="dashboard" class="active">Visão geral</button><button data-view="users">Equipe</button><button data-view="activities">Atividades</button><button data-view="purchases">Compras</button></nav>
+    <nav><button data-view="dashboard" class="active">Visão geral</button><button data-view="users">Equipe</button><button data-view="activities">Atividades</button><button data-view="purchases">Compras</button><button data-view="sales">Vendas</button></nav>
     <button id="logout" class="ghost">Sair</button>
   </aside>
   <main>
@@ -44,6 +44,37 @@
           <div id="purchaseMetrics" class="purchase-metrics"></div>
           <div class="table-wrap"><table><thead id="purchasesHead"></thead><tbody id="purchasesBody"></tbody></table></div>
           <div id="purchasesEmpty" class="empty-state">Importe um CSV para começar.</div>
+        </article>
+      </section>
+      <section id="sales" class="view hidden">
+        <article class="purchase-import">
+          <div class="section-title"><div><p class="eyebrow">DADOS DE VENDAS</p><h2>Importar relatório de vendas</h2><p>Envie um CSV, confira o mapeamento e grave o histórico de vendas para auditoria.</p></div></div>
+          <form id="salesImportForm" class="import-form"><label>Arquivo CSV<input id="salesFile" type="file" accept=".csv,text/csv"></label><label>Ou cole o conteúdo CSV<textarea id="salesCsvText" rows="4" placeholder="Produto;Quantidade;Data;Local"></textarea></label><button>Analisar CSV</button></form>
+          <div id="salesImportMessage" class="message"></div>
+          <div id="salesPreview" class="hidden">
+            <div class="section-title compact"><div><p class="eyebrow">PRÉVIA</p><h3 id="salesPreviewTitle"></h3></div><button id="commitSalesImport" type="button">Confirmar importação</button></div>
+            <div id="salesMapping" class="mapping-grid"></div>
+            <div class="table-wrap"><table><thead id="salesPreviewHead"></thead><tbody id="salesPreviewBody"></tbody></table></div>
+          </div>
+        </article>
+        <article>
+          <div class="section-title"><div><p class="eyebrow">CONSULTA</p><h2>Relatório de vendas</h2></div><button id="refreshSales" type="button">Atualizar</button></div>
+          <form id="salesFilters" class="purchase-filters">
+            <label>De<input id="salesFrom" type="date" required></label><label>Até<input id="salesTo" type="date" required></label>
+            <label>Categoria<input id="salesCategory" placeholder="Todas"></label><label>Local<input id="salesLocation" placeholder="Todos"></label>
+            <label>Valor mínimo<input id="salesMinTotal" inputmode="decimal" placeholder="0,00"></label><label>Valor máximo<input id="salesMaxTotal" inputmode="decimal" placeholder="Sem limite"></label>
+            <label>Busca livre<input id="salesText" placeholder="Pesquisar nos campos"></label><button>Filtrar</button><button id="clearSalesFilters" type="button" class="secondary">Limpar filtros</button>
+          </form>
+          <div id="salesFilterMessage" class="message"></div>
+          <div id="salesMetrics" class="purchase-metrics"></div>
+          <div class="table-wrap"><table><thead id="salesHead"></thead><tbody id="salesBody"></tbody></table></div>
+          <div id="salesEmpty" class="empty-state">Importe um CSV de vendas para começar.</div>
+        </article>
+        <article>
+          <div class="section-title"><div><p class="eyebrow">AUDITORIA</p><h2>Vendido x abastecido</h2><p>Compare quantidades vendidas com quantidades abastecidas para investigar extravio, perdas e consumo sem registro.</p></div><button id="refreshSalesAudit" type="button">Gerar auditoria</button></div>
+          <div id="salesAuditMessage" class="message"></div>
+          <div class="table-wrap"><table><thead><tr><th>Status</th><th>Produto</th><th>Local</th><th>Abastecido</th><th>Vendido</th><th>Diferença</th><th>Observação</th></tr></thead><tbody id="salesAuditBody"></tbody></table></div>
+          <div id="salesAuditEmpty" class="empty-state">Gere a auditoria após importar compras e vendas.</div>
         </article>
       </section>
     </div>
