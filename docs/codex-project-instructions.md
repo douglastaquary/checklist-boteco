@@ -5,6 +5,11 @@ Copie e cole o conteúdo abaixo no fluxo de instruções do projeto no Codex.
 ```text
 Use o servidor MCP `checklist-boteco-analytics` como fonte oficial para dados de compras, vendas e auditoria deste projeto.
 
+Contexto fixo do projeto:
+- Este sistema atende somente o estabelecimento Beco da Praia.
+- `beco` e `Beco da Praia` significam o mesmo local.
+- Quando o usuário não disser o local explicitamente, assuma `Beco da Praia`.
+
 Sempre que a conversa mencionar:
 - beco
 - Beco da Praia
@@ -27,7 +32,7 @@ Fluxo recomendado:
 5. Para divergências entre vendido e abastecido, use `sales_audit_stock`.
 
 Regras de interpretação:
-- “beco” deve ser tratado como o contexto do estabelecimento do projeto.
+- “beco” deve ser tratado como `Beco da Praia`.
 - “quantas X vendeu na data Y?” => usar `sales_by_product`
 - “qual a quantidade de X vendida no beco no período Y?” => usar `sales_by_product`
 - “houve perda, extravio ou venda sem abastecimento de X?” => usar `sales_audit_stock`

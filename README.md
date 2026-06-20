@@ -168,6 +168,7 @@ Ferramentas MCP disponíveis localmente em `http://localhost:8080/mcp`:
 - `sales_list`
 - `sales_aggregate`
 - `sales_by_product`
+- `sales_quantity_by_product_in_period`
 - `sales_get_imports`
 - `sales_audit_stock`
 

@@ -85,6 +85,7 @@ Se quiser orientar o agente do Codex a usar automaticamente o MCP do projeto par
 - `sales_list`
 - `sales_aggregate`
 - `sales_by_product`
+- `sales_quantity_by_product_in_period`
 - `sales_get_imports`
 - `sales_audit_stock`
 
@@ -116,6 +117,7 @@ Exemplos mais objetivos para validar o fluxo:
 - `Use o MCP checklist-boteco-analytics e liste os imports de sales.`
 - `Use o MCP checklist-boteco-analytics e responda quantas unidades de água com gás vendeu em 2026-06-19.`
 - `Use o MCP checklist-boteco-analytics e responda qual a quantidade de amstel 600ml vendida no beco entre 2026-06-01 e 2026-06-30.`
+- `Use o MCP checklist-boteco-analytics e responda quantas heinekens foram vendidas no beco entre 2026-05-01 e 2026-05-31 e qual o total em reais.`
 - `Use o MCP checklist-boteco-analytics e agregue vendas por category entre 2026-06-01 e 2026-06-30.`
 - `Use o MCP checklist-boteco-analytics e faça sales_audit_stock de 2026-06-01 a 2026-06-30.`
 
@@ -126,6 +128,7 @@ Use uma instrução de projeto com estas regras:
 - sempre que o usuário mencionar `beco`, tratar como contexto do estabelecimento Beco da Praia;
 - sempre que perguntar `quantas X vendeu`, `quanto vendeu de X`, `qual a quantidade de X vendida`, usar o MCP `checklist-boteco-analytics`;
 - para perguntas por produto, usar primeiro `sales_by_product`;
+- para perguntas por produto com período explícito, preferir `sales_quantity_by_product_in_period`;
 - para perguntas de divergência, extravio ou perdas, usar `sales_audit_stock`;
 - se o CSV importado não tiver um campo de local explícito, ainda assim responder a pergunta como referente ao dataset do Beco importado no projeto.
 

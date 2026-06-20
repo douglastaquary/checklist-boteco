@@ -25,6 +25,7 @@ import org.jboss.logging.Logger;
 @Produces(MediaType.APPLICATION_JSON)
 public class PurchaseMcpResource {
     private static final Logger LOG=Logger.getLogger(PurchaseMcpResource.class);
+    private static final String DEFAULT_LOCATION="Beco da Praia";
     @Inject PurchaseQueryService purchaseQueries;
     @Inject PurchaseImportService purchaseImports;
     @Inject SalesQueryService salesQueries;
@@ -40,7 +41,7 @@ public class PurchaseMcpResource {
         try {
             if(request==null||request.method==null) return rpcError(id,-32600,"Requisição MCP inválida");
             Object result=switch(request.method){
-                case "initialize" -> Map.of("protocolVersion","2025-03-26","capabilities",Map.of("tools",Map.of("listChanged",false)),"serverInfo",Map.of("name","checklist-boteco-analytics","version","1.2.0"));
+                case "initialize" -> Map.of("protocolVersion","2025-03-26","capabilities",Map.of("tools",Map.of("listChanged",false)),"serverInfo",Map.of("name","checklist-boteco-analytics","version","1.2.0","defaultLocation",DEFAULT_LOCATION));
                 case "notifications/initialized" -> null;
                 case "ping" -> Map.of();
                 case "tools/list" -> Map.of("tools",tools());
@@ -64,6 +65,7 @@ public class PurchaseMcpResource {
             case "sales_list" -> salesQueries.query(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),SaleQuery.class));
             case "sales_aggregate" -> salesQueries.aggregate(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),com.checklistboteco.backend.sales.domain.SalesModels.AggregateRequest.class));
             case "sales_by_product" -> salesQueries.byProduct(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),ProductSearchRequest.class));
+            case "sales_quantity_by_product_in_period" -> salesQueries.byProduct(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),ProductSearchRequest.class));
             case "sales_get_imports" -> salesImports.list();
             case "sales_audit_stock" -> salesAudits.audit(mapper.convertValue(normalizeSalesArgs(args),SalesAuditRequest.class));
             default -> throw new NoSuchMethodException("Tool desconhecida: "+name);
@@ -81,9 +83,10 @@ public class PurchaseMcpResource {
             tool("purchases_aggregate","Soma compras e agrupa por categoria, fornecedor, mercadoria, período ou atributo dinâmico",Map.of("type","object","properties",merge(purchasePeriodProps,Map.of("groupBy",Map.of("type","string"))),"required",List.of("from","to","groupBy"))),
             tool("purchases_get_imports","Lista lotes importados de compras e sua cobertura",Map.of("type","object","properties",Map.of())),
             tool("sales_get_schema","Descobre campos, atributos dinâmicos, tipos e cobertura dos dados de vendas",Map.of("type","object","properties",Map.of("datasetId",Map.of("type","string")))),
-            tool("sales_list","Lista vendas com período obrigatório, filtros e paginação",Map.of("type","object","properties",salesPeriodProps,"required",List.of("from","to"))),
-            tool("sales_aggregate","Soma vendas e agrupa por categoria, produto, local, período ou atributo dinâmico",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("groupBy",Map.of("type","string"))),"required",List.of("from","to","groupBy"))),
-            tool("sales_by_product","Busca vendas por produto e retorna quantidade vendida, valor total e quebra por produto/local. Use para perguntas como 'quantas cervejas vendeu?' ou 'quanto vendeu no beco?'",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product"))),
+            tool("sales_list","Lista vendas do Beco da Praia com período obrigatório, filtros e paginação. Quando o local não for informado, assuma Beco da Praia.",Map.of("type","object","properties",salesPeriodProps,"required",List.of("from","to"))),
+            tool("sales_aggregate","Soma vendas do Beco da Praia e agrupa por categoria, produto, local, período ou atributo dinâmico",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("groupBy",Map.of("type","string"))),"required",List.of("from","to","groupBy"))),
+            tool("sales_by_product","Busca vendas por produto no Beco da Praia e retorna quantidade vendida, valor total e quebra por produto/local. Use para perguntas como 'quantas cervejas vendeu?' ou 'quanto vendeu no beco?'",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product"))),
+            tool("sales_quantity_by_product_in_period","Retorna a quantidade vendida e o total em reais de um produto no Beco da Praia em um período específico. Use para perguntas como 'quantas heinekens vendeu em maio no beco?'",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product","from","to"))),
             tool("sales_get_imports","Lista lotes importados de vendas e sua cobertura",Map.of("type","object","properties",Map.of())),
             tool("sales_audit_stock","Cruza quantidade vendida x quantidade abastecida para apontar extravio, venda sem entrada registrada e perdas. Aceita filtro textual por produto.",Map.of("type","object","properties",Map.of("purchaseDatasetId",Map.of("type","string"),"salesDatasetId",Map.of("type","string"),"from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date"),"locations",Map.of("type","array","items",Map.of("type","string")),"text",Map.of("type","string")),"required",List.of("from","to")))
         );
@@ -97,14 +100,30 @@ public class PurchaseMcpResource {
                 String current=Objects.toString(value,"").trim();
                 if(current.isBlank()) continue;
                 locations.add(current);
-                if(current.equalsIgnoreCase("beco")){
-                    locations.add("Beco");
-                    locations.add("Beco da Praia");
-                }
+                if(isBecoAlias(current)) locations.add(DEFAULT_LOCATION);
             }
             normalized.put("locations",new ArrayList<>(locations));
+        } else if(!normalized.containsKey("locations")){
+            normalized.put("locations",List.of(DEFAULT_LOCATION));
         }
         return normalized;
+    }
+    private static boolean isBecoAlias(String value){
+        String current=Objects.toString(value,"").trim();
+        if(current.isBlank()) return false;
+        String key=current.toLowerCase(Locale.ROOT)
+            .replace('ã','a')
+            .replace('á','a')
+            .replace('â','a')
+            .replace('é','e')
+            .replace('ê','e')
+            .replace('í','i')
+            .replace('ó','o')
+            .replace('ô','o')
+            .replace('õ','o')
+            .replace('ú','u')
+            .replace('ç','c');
+        return key.equals("beco")||key.equals("beco da praia")||key.equals("beco_da_praia");
     }
     private static Map<String,Object> tool(String name,String description,Map<String,Object> schema){ return Map.of("name",name,"description",description,"inputSchema",schema); }
     private static Map<String,Object> merge(Map<String,Object> left,Map<String,Object> right){ Map<String,Object> result=new LinkedHashMap<>(left); result.putAll(right); return result; }

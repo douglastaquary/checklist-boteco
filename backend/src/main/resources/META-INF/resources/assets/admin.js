@@ -46,6 +46,30 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
   '"': '&quot;'
 }[char]));
 
+const semanticColumnKey = value => {
+  const key = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const aliases = {
+    saleDate: ['data', 'data_venda', 'dt_venda', 'emissao', 'date', 'data_movimento', 'dia', 'dt', 'data_do_item', 'data_item', 'data_da_venda'],
+    description: ['produto', 'item', 'mercadoria', 'descricao', 'description', 'nome'],
+    category: ['categoria', 'grupo', 'departamento', 'category'],
+    location: ['local', 'loja', 'unidade', 'pdv', 'location'],
+    quantity: ['quantidade', 'qtd', 'qtde', 'quantity'],
+    totalInCents: ['total', 'valor_total', 'valor', 'receita', 'faturamento', 'total_venda', 'valor_venda'],
+    documentNumber: ['cupom', 'pedido', 'documento', 'numero_documento', 'cod_produto', 'codigo_produto'],
+    unit: ['unidade', 'un', 'unit', 'tipo_preco'],
+    unitPriceInCents: ['valor_unitario', 'preco_unitario', 'ticket_medio', 'unit_price', 'val_unit', 'vl_unit', 'val_unitario']
+  };
+  for (const [field, values] of Object.entries(aliases)) {
+    if (values.includes(key)) return field;
+  }
+  return key;
+};
+
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((Number(value) || 0) / 100);
 
 async function api(path, options = {}) {
@@ -439,8 +463,10 @@ function renderSalesPreview(data) {
   salesPreview = data;
   $('salesPreview').classList.remove('hidden');
   $('salesPreviewTitle').textContent = `${data.fileName} · ${data.totalRows} linhas`;
+  const requiredSalesFields = new Set(requiredSalesMappingFields);
+  if (data.errors?.some(error => error.field === 'saleDate')) requiredSalesFields.add('saleDate');
   $('salesMapping').innerHTML = salesMappingFields.map(([key, label]) => `
-    <label>${label} <small>${requiredSalesMappingFields.has(key) ? '(obrigatório)' : '(opcional)'}</small>
+    <label>${label} <small>${requiredSalesFields.has(key) ? '(obrigatório)' : '(opcional)'}</small>
       <select data-sales-map="${key}">
         <option value="">Não mapear</option>
         ${data.headers.map(header => `<option value="${escapeHtml(header)}" ${data.suggestedMapping?.[key] === header ? 'selected' : ''}>${escapeHtml(header)}</option>`).join('')}
@@ -561,7 +587,18 @@ function renderPurchases(schema, data) {
 }
 
 function renderSales(schema, data) {
-  const dynamic = (schema.fields || []).filter(field => !field.normalized).slice(0, 12);
+  const normalizedKeys = ['saleDate', 'description', 'category', 'location', 'quantity', 'unit', 'unitPriceInCents', 'totalInCents'];
+  const usedDynamicKeys = new Set();
+  const dynamic = (schema.fields || [])
+    .filter(field => !field.normalized)
+    .filter(field => !normalizedKeys.includes(semanticColumnKey(field.key)))
+    .filter(field => {
+      const semantic = semanticColumnKey(field.key);
+      if (usedDynamicKeys.has(semantic)) return false;
+      usedDynamicKeys.add(semantic);
+      return true;
+    })
+    .slice(0, 12);
   const normalized = [
     ['saleDate', 'Data'],
     ['description', 'Produto'],
@@ -693,9 +730,13 @@ $('commitSalesImport').addEventListener('click', async () => {
   document.querySelectorAll('[data-sales-map]').forEach(select => {
     if (select.value) mapping[select.dataset.salesMap] = select.value;
   });
-  const missing = [...requiredSalesMappingFields].filter(key => !mapping[key]);
+  const requiredSalesFields = new Set(requiredSalesMappingFields);
+  if (salesPreview?.errors?.some(error => error.field === 'saleDate')) requiredSalesFields.add('saleDate');
+  const missing = [...requiredSalesFields].filter(key => !mapping[key]);
   if (missing.length) {
-    $('salesImportMessage').textContent = 'Mapeie produto e quantidade antes de importar.';
+    $('salesImportMessage').textContent = requiredSalesFields.has('saleDate')
+      ? 'Mapeie data, produto e quantidade antes de importar.'
+      : 'Mapeie produto e quantidade antes de importar.';
     return;
   }
   $('salesImportMessage').textContent = 'Importando…';

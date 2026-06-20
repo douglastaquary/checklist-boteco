@@ -14,6 +14,8 @@ Regras:
 Interpretação de linguagem natural:
 
 - Se o usuário disser `beco`, interprete como contexto do estabelecimento Beco da Praia.
+- `beco` e `Beco da Praia` são o mesmo local.
+- Se o usuário não informar o local, assuma `Beco da Praia`.
 - Se o dataset não tiver local detalhado, ainda assim trate a pergunta como referente ao estabelecimento do projeto.
 - Perguntas como `quantas cervejas vendeu em 10/06/2026?` devem chamar `sales_by_product`.
 - Perguntas como `qual a quantidade de produto X vendido no beco no período Y?` devem chamar `sales_by_product` com período e, se fizer sentido, filtro de local.

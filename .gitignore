@@ -1,0 +1,29 @@
+# OS / editor
+.DS_Store
+.idea/
+
+# Gradle / Kotlin / Compose
+.gradle/
+build/
+*/build/
+
+# Maven / Quarkus / Java
+target/
+*/target/
+.quarkus/
+
+# AWS SAM
+.aws-sam/
+*/.aws-sam/
+
+# Local app artifacts
+.tmp-android/
+*.log
+*.tmp
+
+# Local persistent datasets
+backend/.data/
+backend/backend-data/
+*.db
+*.db-shm
+*.db-wal

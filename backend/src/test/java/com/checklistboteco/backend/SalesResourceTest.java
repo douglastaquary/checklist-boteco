@@ -79,7 +79,7 @@ class SalesResourceTest {
 
         Map<String,Object> request=Map.of("jsonrpc","2.0","id",1,"method","tools/list","params",Map.of());
         given().auth().oauth2("local-purchases-token").contentType("application/json").body(request).when().post("/mcp").then().statusCode(200)
-            .body("result.tools.name",hasItems("sales_get_schema","sales_list","sales_aggregate","sales_by_product","sales_get_imports","sales_audit_stock"));
+            .body("result.tools.name",hasItems("sales_get_schema","sales_list","sales_aggregate","sales_by_product","sales_quantity_by_product_in_period","sales_get_imports","sales_audit_stock"));
     }
 
     @Test void salesCsvWithoutDateAndLocationUsesDynamicMappingAndDefaults(){
@@ -108,7 +108,7 @@ class SalesResourceTest {
             .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
             .body("totalItems",is(1))
             .body("items[0].description",containsString("AGUA COM GAS"))
-            .body("items[0].location",is("Não informado"))
+            .body("items[0].location",is("Beco da Praia"))
             .body("items[0].documentNumber",is("143"))
             .body("items[0].unitPriceInCents",is(699))
             .body("items[0].totalInCents",is(56613));
@@ -126,6 +126,141 @@ class SalesResourceTest {
             .body("result.structuredContent.totalItems",is(1))
             .body("result.structuredContent.totalQuantity",anyOf(is(81),is("81")))
             .body("result.structuredContent.items[0].description",containsString("AGUA COM GAS"));
+
+        Map<String,Object> byPeriodRequest=Map.of(
+            "jsonrpc","2.0",
+            "id",3,
+            "method","tools/call",
+            "params",Map.of(
+                "name","sales_quantity_by_product_in_period",
+                "arguments",Map.of("datasetId",dataset,"product","agua","from","2026-06-01","to","2026-06-30")
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(byPeriodRequest).when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.totalItems",is(1))
+            .body("result.structuredContent.totalQuantity",anyOf(is(81),is("81")))
+            .body("result.structuredContent.totalInCents",is(56613));
+    }
+
+    @Test void salesImportRequiresSaleDateWhenCsvProvidesDateColumn(){
+        String token=adminToken(),dataset="sales-date-"+UUID.randomUUID();
+        String csv="""
+            Data;Nome;Qtde;Total Venda
+            15/05/2026;HEINEKEN 600ML;17;340
+            16/05/2026;HEINEKEN LATA;4;48
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-com-data.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("suggestedMapping.saleDate",is("Data"))
+            .extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("description","Nome","quantity","Qtde","totalInCents","Total Venda")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(400)
+            .body("message",containsString("Mapeie a data da venda"));
+    }
+
+    @Test void salesImportPropagatesDateMarkersFromProductCodeColumn(){
+        String token=adminToken(),dataset="sales-marker-"+UUID.randomUUID();
+        String csv="""
+            Cód Produto;Nome;Tipo Preço;Val. Unit;Qtde;Total Venda
+            15/05/2026;;;;;
+            30;HEINEKEN 600ML;A Vista;20;17;340
+            36;HEINEKEN LATA;A Vista;12;4;48
+            16/05/2026;;;;;
+            30;HEINEKEN 600ML;A Vista;20;10;200
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-marker.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("suggestedMapping.saleDate",is("Data da Venda"))
+            .body("totalRows",is(3))
+            .extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data da Venda","description","Nome","quantity","Qtde","totalInCents","Total Venda","documentNumber","Cód Produto","unit","Tipo Preço","unitPriceInCents","Val. Unit")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(3));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-05-01","to","2026-05-15","text","heineken","pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(2))
+            .body("totalInCents",is(38800));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-05-16","to","2026-05-16","product","heineken"))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(1))
+            .body("items[0].saleDate",is("2026-05-16"));
+    }
+
+    @Test void salesImportNormalizesBecoLocationAndMcpDefaultsToBecoDaPraia(){
+        String token=adminToken(),dataset="sales-beco-"+UUID.randomUUID();
+        String csv="""
+            Data;Produto;Local;Quantidade;Valor
+            10/02/2026;HEINEKEN LATA;beco;12;144
+            11/02/2026;HEINEKEN 600ML;Beco da Praia;8;160
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-beco.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200).extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","location","Local","quantity","Quantidade","totalInCents","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(2));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-02-01","to","2026-02-28","text","heineken","pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(2))
+            .body("items.location",everyItem(is("Beco da Praia")));
+
+        Map<String,Object> byPeriodRequest=Map.of(
+            "jsonrpc","2.0",
+            "id",4,
+            "method","tools/call",
+            "params",Map.of(
+                "name","sales_quantity_by_product_in_period",
+                "arguments",Map.of("datasetId",dataset,"product","heineken","from","2026-02-01","to","2026-02-28")
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(byPeriodRequest).when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.totalItems",is(2))
+            .body("result.structuredContent.locations",hasItem("Beco da Praia"))
+            .body("result.structuredContent.totalQuantity",anyOf(is(20),is("20")));
+    }
+
+    @Test void salesImportDeduplicatesEquivalentColumnsAndKeepsSaleDateInQuery(){
+        String token=adminToken(),dataset="sales-dedup-"+UUID.randomUUID();
+        String csv="""
+            Data;Data da Venda;Produto;Nome;Local;Qtde;Quantidade;Valor;Total Venda
+            10/02/2026;10/02/2026;HEINEKEN LATA;HEINEKEN LATA;Beco da Praia;12;12;144;144
+            11/02/2026;11/02/2026;HEINEKEN 600ML;HEINEKEN 600ML;Beco da Praia;8;8;160;160
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-dedup.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("headers",hasItems("Data","Produto","Local","Qtde","Valor"))
+            .body("headers",not(hasItem("Data da Venda")))
+            .body("headers",not(hasItem("Nome")))
+            .body("headers",not(hasItem("Quantidade")))
+            .body("headers",not(hasItem("Total Venda")))
+            .extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","location","Local","quantity","Qtde","totalInCents","Valor"),
+            "preserveColumns",List.of("Data","Produto","Local","Qtde","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(2));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-02-01","to","2026-02-28","text","heineken","pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(2))
+            .body("items[0].saleDate",notNullValue())
+            .body("items[0].attributes",anEmptyMap());
+
+        given().auth().oauth2(token).when().get("/api/sales/schema?datasetId="+dataset).then().statusCode(200)
+            .body("fields.key",not(hasItem("data_da_venda")))
+            .body("fields.key",not(hasItem("nome")))
+            .body("fields.key",not(hasItem("quantidade")))
+            .body("fields.key",not(hasItem("total_venda")));
     }
 
     private static String adminToken(){

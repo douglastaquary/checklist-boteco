@@ -11,7 +11,8 @@ Fluxo recomendado:
 
 Heurísticas:
 
-- `beco` = contexto padrão do estabelecimento do projeto.
+- `beco` = `Beco da Praia`.
+- Se o usuário não informar local, assuma `Beco da Praia`.
 - Se o dado importado não trouxer local explícito, continue consultando o dataset de vendas como fonte do Beco.
 - `quantas nome-do-produto vendeu data x?` => `sales_by_product`
 - `qual a quantidade do produto x vendida no beco no período y?` => `sales_by_product`

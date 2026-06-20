@@ -19,8 +19,9 @@ import java.util.regex.Pattern;
 
 @ApplicationScoped
 public class SalesImportService {
+    private static final String DEFAULT_LOCATION="Beco da Praia";
     private static final Map<String,List<String>> ALIASES=Map.of(
-        "saleDate",List.of("data","data_venda","dt_venda","emissao","date","data_movimento"),
+        "saleDate",List.of("data","data_venda","dt_venda","emissao","date","data_movimento","dia","dt","data_do_item","data_item","data_da_venda"),
         "description",List.of("produto","item","mercadoria","descricao","description","nome"),
         "category",List.of("categoria","grupo","departamento","category"),
         "location",List.of("local","loja","unidade","pdv","location"),
@@ -40,9 +41,10 @@ public class SalesImportService {
         ImportBatch batch=new ImportBatch(); batch.id=UUID.randomUUID().toString(); batch.fileName=cleanFileName(request.fileName);
         batch.fileHash=hash(request.csv); batch.createdBy=admin.id; batch.createdAt=Instant.now(); batch.delimiter=delimiter; batch.rawCsv=request.csv;
         int headerIndex=findHeader(rows); require(headerIndex>=0,"Não foi possível localizar um cabeçalho com produto e quantidade no CSV de vendas");
-        batch.headers=uniqueHeaders(rows.get(headerIndex)); batch.suggestedMapping=suggest(batch.headers); batch.referenceYear=referenceYear(request.csv);
-        for(int i=headerIndex+1;i<rows.size();i++){
-            List<String> row=rows.get(i);
+        batch.referenceYear=referenceYear(request.csv);
+        PreparedRows prepared=prepareRows(rows,headerIndex,batch.referenceYear);
+        batch.headers=uniqueHeaders(prepared.header()); batch.suggestedMapping=suggest(batch.headers);
+        for(List<String> row:prepared.rows()){
             if(isHeader(row)||isSummary(row)) continue;
             Map<String,String> source=asMap(batch.headers,row);
             if(!hasDataValues(source,batch.suggestedMapping)) continue;
@@ -51,7 +53,10 @@ public class SalesImportService {
         require(!batch.rows.isEmpty(),"Nenhuma linha de venda foi encontrada no CSV"); require(batch.rows.size()<=10_000,"CSV excede o limite de 10.000 linhas");
         List<String> emptyHeaders=batch.headers.stream().filter(header->batch.rows.stream().allMatch(row->row.getOrDefault(header,"").isBlank())).toList();
         batch.headers.removeAll(emptyHeaders); batch.rows.forEach(row->emptyHeaders.forEach(row::remove));
+        deduplicateColumns(batch);
+        batch.suggestedMapping=suggest(batch.headers);
         batch.totalRows=batch.rows.size(); for(int i=0;i<Math.min(batch.rows.size(),5);i++) batch.sampleRows.add(new LinkedHashMap<>(batch.rows.get(i)));
+        if(requiresExplicitDate(batch.headers)&&!batch.suggestedMapping.containsKey("saleDate")) batch.errors.add(new ImportError(1,"saleDate","Mapeie a coluna de data da venda"));
         if(!batch.suggestedMapping.containsKey("description")) batch.errors.add(new ImportError(1,"description","Mapeie a coluna do produto vendido"));
         if(!batch.suggestedMapping.containsKey("quantity")) batch.errors.add(new ImportError(1,"quantity","Mapeie a coluna de quantidade"));
         repository.saveBatch(batch); return publicBatch(batch);
@@ -61,9 +66,11 @@ public class SalesImportService {
         ImportBatch batch=repository.getBatch(id); require(batch!=null,"Importação não encontrada"); require("PREVIEW".equals(batch.status),"Importação já processada");
         Map<String,String> mapping=request!=null&&request.mapping!=null?request.mapping:batch.suggestedMapping;
         require(mapping.containsKey("description")&&mapping.containsKey("quantity"),"Produto e quantidade são obrigatórios");
+        if(requiresExplicitDate(batch.headers)) require(mapping.containsKey("saleDate"),"Esse CSV possui coluna de data. Mapeie a data da venda antes de importar");
         for(String header:mapping.values()) require(batch.headers.contains(header),"Coluna mapeada não existe: "+header);
         String dataset=request==null||request.datasetId==null||request.datasetId.isBlank()?"sales":request.datasetId.trim();
         Set<String> preserve=request==null||request.preserveColumns==null||request.preserveColumns.isEmpty()?new LinkedHashSet<>(batch.headers):new LinkedHashSet<>(request.preserveColumns);
+        preserve=sanitizePreserveColumns(batch,preserve,mapping);
         batch.mapping=new LinkedHashMap<>(mapping); batch.datasetId=dataset; batch.errors.clear();
         for(int index=0;index<batch.rows.size();index++){
             Map<String,String> source=batch.rows.get(index);
@@ -103,6 +110,47 @@ public class SalesImportService {
         for(var entry:ALIASES.entrySet()) for(String header:headers) if(entry.getValue().contains(CsvSupport.key(header))){ result.put(entry.getKey(),header); break; }
         return result;
     }
+    private static void deduplicateColumns(ImportBatch batch){
+        if(batch.headers.isEmpty()||batch.rows.isEmpty()) return;
+        List<String> deduplicated=new ArrayList<>();
+        for(String header:batch.headers){
+            String semantic=semanticKey(header);
+            String duplicate=deduplicated.stream().filter(current->semantic.equals(semanticKey(current))&&sameColumnValues(batch.rows,current,header)).findFirst().orElse(null);
+            if(duplicate==null) deduplicated.add(header);
+        }
+        if(deduplicated.size()==batch.headers.size()) return;
+        Set<String> removed=new LinkedHashSet<>(batch.headers);
+        removed.removeAll(deduplicated);
+        batch.headers=new ArrayList<>(deduplicated);
+        batch.rows.forEach(row->removed.forEach(row::remove));
+    }
+    private static PreparedRows prepareRows(List<List<String>> rows,int headerIndex,Integer referenceYear){
+        List<String> baseHeader=new ArrayList<>(rows.get(headerIndex));
+        int baseSize=baseHeader.size();
+        boolean headerHasDate=headerContainsDate(baseHeader);
+        List<List<String>> prepared=new ArrayList<>();
+        String currentDate="";
+        for(int i=headerIndex+1;i<rows.size();i++){
+            List<String> raw=rows.get(i);
+            if(raw==null||raw.stream().allMatch(value->value==null||value.isBlank())) continue;
+            List<String> normalized=normalizeWidth(raw,baseSize);
+            String first=normalized.isEmpty()?"":normalized.get(0).trim();
+            if(isDateMarkerRow(normalized,referenceYear)){
+                currentDate=normalizeMarkerDate(first,referenceYear);
+                continue;
+            }
+            if(!headerHasDate){
+                List<String> withDate=new ArrayList<>(normalized);
+                withDate.add(currentDate);
+                prepared.add(withDate);
+            } else prepared.add(normalized);
+        }
+        if(!headerHasDate&&prepared.stream().anyMatch(row->row.size()>baseSize&&!row.get(row.size()-1).isBlank())){
+            baseHeader=new ArrayList<>(baseHeader);
+            baseHeader.add("Data da Venda");
+        }
+        return new PreparedRows(baseHeader,prepared);
+    }
     private static int findHeader(List<List<String>> rows){ for(int i=0;i<rows.size();i++) if(isHeader(rows.get(i))) return i; return rows.isEmpty()?-1:0; }
     private static boolean isHeader(List<String> row){
         Set<String> keys=new HashSet<>(); row.forEach(value->keys.add(CsvSupport.key(value)));
@@ -114,6 +162,40 @@ public class SalesImportService {
     private static List<String> requiredFields(){ return List.of("description","quantity"); }
     private static boolean hasDataValues(Map<String,String> row,Map<String,String> mapping){ boolean complete=requiredFields().stream().allMatch(mapping::containsKey); return complete?requiredFields().stream().allMatch(field->!value(row,mapping,field).isBlank()):row.values().stream().filter(v->v!=null&&!v.isBlank()).count()>=2; }
     private static boolean matchesAlias(Set<String> keys,String field){ return ALIASES.getOrDefault(field,List.of()).stream().anyMatch(keys::contains); }
+    private static boolean headerContainsDate(List<String> header){
+        Set<String> keys=new HashSet<>();
+        header.forEach(value->keys.add(CsvSupport.key(value)));
+        return matchesAlias(keys,"saleDate");
+    }
+    private static boolean requiresExplicitDate(List<String> headers){
+        Set<String> keys=new HashSet<>();
+        headers.forEach(value->keys.add(CsvSupport.key(value)));
+        return matchesAlias(keys,"saleDate");
+    }
+    private static List<String> normalizeWidth(List<String> row,int size){
+        List<String> normalized=new ArrayList<>(row);
+        while(normalized.size()<size) normalized.add("");
+        if(normalized.size()>size) normalized=new ArrayList<>(normalized.subList(0,size));
+        return normalized;
+    }
+    private static boolean isDateMarkerRow(List<String> row,Integer referenceYear){
+        if(row.isEmpty()) return false;
+        String first=row.get(0)==null?"":row.get(0).trim();
+        if(first.isBlank()) return false;
+        if(!looksLikeDate(first,referenceYear)) return false;
+        return row.stream().skip(1).allMatch(value->value==null||value.isBlank());
+    }
+    private static boolean looksLikeDate(String value,Integer referenceYear){
+        String current=value.trim();
+        if(current.matches("\\d{1,2}/\\d{1,2}/\\d{2,4}")) return true;
+        if(current.matches("\\d{1,2}/\\d{1,2}")) return referenceYear!=null;
+        return false;
+    }
+    private static String normalizeMarkerDate(String value,Integer referenceYear){
+        String current=value.trim();
+        if(current.matches("\\d{1,2}/\\d{1,2}$")&&referenceYear!=null) return current+"/"+referenceYear;
+        return current;
+    }
     private static boolean isSummary(List<String> row){ String first=row.stream().map(String::trim).filter(v->!v.isBlank()).findFirst().orElse(""); String key=CsvSupport.key(first); return key.equals("total")||key.equals("total_geral")||key.equals("resumo"); }
     private static Integer referenceYear(String csv){ Matcher matcher=Pattern.compile("(?<!\\d)(20\\d{2})(?!\\d)").matcher(csv); return matcher.find()?Integer.valueOf(matcher.group(1)):null; }
     private static List<String> uniqueHeaders(List<String> raw){
@@ -122,6 +204,29 @@ public class SalesImportService {
         return result;
     }
     private static Map<String,String> asMap(List<String> headers,List<String> values){ Map<String,String> result=new LinkedHashMap<>(); for(int i=0;i<headers.size();i++) result.put(headers.get(i),i<values.size()?values.get(i):""); return result; }
+    private static Set<String> sanitizePreserveColumns(ImportBatch batch,Set<String> preserve,Map<String,String> mapping){
+        Set<String> mappedHeaders=new LinkedHashSet<>(mapping.values());
+        LinkedHashSet<String> result=new LinkedHashSet<>();
+        for(String header:preserve){
+            if(mappedHeaders.contains(header)) continue;
+            boolean duplicatesMapped=mappedHeaders.stream().anyMatch(mapped->semanticKey(mapped).equals(semanticKey(header))&&sameColumnValues(batch.rows,mapped,header));
+            if(!duplicatesMapped) result.add(header);
+        }
+        return result;
+    }
+    private static boolean sameColumnValues(List<Map<String,String>> rows,String left,String right){
+        for(Map<String,String> row:rows){
+            String a=Objects.toString(row.get(left),"").trim();
+            String b=Objects.toString(row.get(right),"").trim();
+            if(!Objects.equals(a,b)) return false;
+        }
+        return true;
+    }
+    private static String semanticKey(String header){
+        String key=CsvSupport.key(header);
+        for(var entry:ALIASES.entrySet()) if(entry.getValue().contains(key)) return entry.getKey();
+        return key;
+    }
     private static String value(Map<String,String> source,Map<String,String> mapping,String field){ String header=mapping.get(field); return header==null?"":source.getOrDefault(header,"").trim(); }
     private static String required(String value,String message){ if(value==null||value.isBlank()) throw new IllegalArgumentException(message); return value.trim(); }
     private static String nullable(String value){ return value==null||value.isBlank()?null:value.trim(); }
@@ -144,7 +249,13 @@ public class SalesImportService {
     private static long toCents(BigDecimal value){ return value.movePointRight(2).setScale(0,RoundingMode.HALF_UP).longValue(); }
     private static Object infer(String raw){ try { return parseDecimal(raw); } catch(Exception ignored) {} try { return parseDate(raw,null).toString(); } catch(Exception ignored) {} return raw.trim(); }
     private static LocalDate defaultSaleDate(ImportBatch batch){ return LocalDate.ofInstant(batch.createdAt==null?Instant.now():batch.createdAt,ZoneId.systemDefault()); }
-    private static String defaultLocation(String value){ return value==null||value.isBlank()?"Não informado":value.trim(); }
+    private static String defaultLocation(String value){
+        String normalized=value==null?"":value.trim();
+        if(normalized.isBlank()) return DEFAULT_LOCATION;
+        String key=CsvSupport.key(normalized);
+        if(key.equals("beco")||key.equals("beco_da_praia")||key.equals("nao_informado")||key.equals("n_a")) return DEFAULT_LOCATION;
+        return normalized;
+    }
     private static String uniqueAttributeKey(Map<String,Object> attributes,String base){ String key=base; int suffix=2; while(attributes.containsKey(key)) key=base+"_"+suffix++; return key; }
     private static String cleanFileName(String value){ String name=value==null?"vendas.csv":value.replaceAll("[\\r\\n\\\\/]","_"); return name.length()>120?name.substring(0,120):name; }
     private static String hash(String value){
@@ -152,6 +263,7 @@ public class SalesImportService {
         catch(Exception e){ throw new IllegalStateException(e); }
     }
     private static void require(boolean valid,String message){ if(!valid) throw new IllegalArgumentException(message); }
+    private record PreparedRows(List<String> header,List<List<String>> rows){}
     private ImportBatch publicBatch(ImportBatch source){
         ImportBatch batch=new ImportBatch(); batch.id=source.id; batch.fileName=source.fileName; batch.fileHash=source.fileHash; batch.datasetId=source.datasetId; batch.createdBy=source.createdBy; batch.status=source.status;
         batch.createdAt=source.createdAt; batch.delimiter=source.delimiter; batch.referenceYear=source.referenceYear; batch.headers=new ArrayList<>(source.headers); batch.suggestedMapping=new LinkedHashMap<>(source.suggestedMapping); batch.mapping=new LinkedHashMap<>(source.mapping);
