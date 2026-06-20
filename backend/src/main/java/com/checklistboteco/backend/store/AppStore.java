@@ -1,0 +1,25 @@
+package com.checklistboteco.backend.store;
+
+import com.checklistboteco.backend.model.Models.*;
+import java.util.List;
+
+public interface AppStore {
+    User authenticate(String email,String password);
+    User getUser(String id);
+    List<PublicUser> users();
+    PublicUser createUser(CreateUserRequest request);
+    PublicUser updateUser(String id,UpdateUserRequest request);
+    void deleteUser(String id);
+    PublicUser resetUserPassword(String id,String newPassword);
+    PublicUser updatePermissions(String id,FeaturePermissions permissions);
+    List<Activity> activities();
+    Activity createActivity(CreateActivityRequest request);
+    List<Completion> completions();
+    void upsertWorkClockEntries(List<WorkClockEntry> values);
+    DashboardStats dashboard();
+    PullData pullChanges(String userId,long cursor,int limit);
+    SyncPushResult pushSync(String userId,boolean admin,SyncPushRequest request);
+    boolean isTrustedDevice(String userId,String deviceId);
+    DeviceChallenge createDeviceChallenge(String userId,String deviceId,String deviceName);
+    User verifyDeviceChallenge(String challengeId,String code,String deviceId,String deviceName);
+}

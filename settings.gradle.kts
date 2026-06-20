@@ -16,4 +16,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "ChecklistBoteco"
 include(":composeApp")
-include(":backend")

@@ -3,6 +3,7 @@ package com.checklistboteco.presentation.viewmodel
 import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.remote.RemoteLoginResult
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.data.sync.SyncSession
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.platform.DeviceIdentity
 import kotlinx.coroutines.CoroutineScope
@@ -36,10 +37,6 @@ class LoginViewModel(
 ) {
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
-
-    init {
-        repository.seedInitialData()
-    }
 
     fun updateUserName(name: String) {
         _uiState.update { it.copy(userName = name, error = null) }
@@ -112,6 +109,7 @@ class LoginViewModel(
     }
 
     fun logout() {
+        repository.clearSyncSession()
         _uiState.update { 
             LoginUiState()
         }
@@ -176,9 +174,12 @@ class LoginViewModel(
                     permissionLevel = remoteUser.permissionLevel,
                     allowedAreas = remoteUser.allowedAreas,
                     createdAt = remoteUser.createdAt,
+                    remoteId = remoteUserId,
                     featurePermissions = remoteUser.featurePermissions
                 )
-                repository.getUserByEmail(remoteUser.email) ?: repository.getUserByName(remoteUser.name)
+                repository.getUserByRemoteId(remoteUserId)
+                    ?: repository.getUserByEmail(remoteUser.email)
+                    ?: repository.getUserByName(remoteUser.name)
             }
 
         if (localUser == null) {
@@ -186,9 +187,17 @@ class LoginViewModel(
             return
         }
 
+        repository.saveSyncSession(
+            localUserId = localUser.id,
+            session = SyncSession(
+                authToken = token,
+                remoteUserId = remoteUserId
+            )
+        )
+
         _uiState.update {
             it.copy(
-                currentUser = localUser,
+                currentUser = localUser.copy(remoteId = remoteUserId),
                 authToken = token,
                 remoteUserId = remoteUserId,
                 requiresTwoFactor = false,

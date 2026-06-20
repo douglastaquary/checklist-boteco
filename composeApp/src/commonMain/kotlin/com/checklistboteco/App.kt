@@ -1,6 +1,7 @@
 package com.checklistboteco
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -8,8 +9,12 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.checklistboteco.data.remote.BackendApiClient
+import com.checklistboteco.data.remote.SyncApiClient
 import com.checklistboteco.data.database.DatabaseDriverFactory
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.data.sync.NoOpSyncScheduler
+import com.checklistboteco.data.sync.SyncCoordinator
+import com.checklistboteco.data.sync.SyncScheduler
 import com.checklistboteco.database.ChecklistDatabase
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.PermissionLevel
@@ -25,17 +30,42 @@ import com.checklistboteco.presentation.viewmodel.UserRegistrationViewModel
 
 @Composable
 fun App(
-    databaseDriverFactory: DatabaseDriverFactory
+    databaseDriverFactory: DatabaseDriverFactory,
+    syncScheduler: SyncScheduler = NoOpSyncScheduler
 ) {
     ChecklistBotecoTheme {
         val database = remember {
             ChecklistDatabase(databaseDriverFactory.createDriver())
         }
+        val syncCoordinatorState = remember { mutableStateOf<SyncCoordinator?>(null) }
         val repository = remember {
-            ChecklistRepository(database)
+            ChecklistRepository(database) {
+                syncCoordinatorState.value?.requestSync()
+            }
         }
         val backendApiClient = remember {
             BackendApiClient.fromEnvironment()
+        }
+        val syncApiClient = remember {
+            SyncApiClient.fromEnvironment()
+        }
+        val syncCoordinator = remember(repository, syncApiClient, syncScheduler) {
+            SyncCoordinator(
+                repository = repository,
+                syncApiClient = syncApiClient,
+                scheduler = syncScheduler
+            )
+        }
+
+        LaunchedEffect(syncCoordinator) {
+            syncCoordinatorState.value = syncCoordinator
+            syncCoordinator.start()
+        }
+
+        LaunchedEffect(backendApiClient) {
+            if (backendApiClient == null) {
+                repository.seedInitialData()
+            }
         }
 
         val screenSaver = listSaver<Screen, Any>(
@@ -54,6 +84,7 @@ fun App(
                         screen.user.permissionLevel.name,
                         screen.user.allowedAreas.joinToString(",") { it.name },
                         screen.user.createdAt,
+                        screen.user.remoteId.orEmpty(),
                         screen.user.featurePermissions.canRegisterUsers,
                         screen.user.featurePermissions.canCreateActivities,
                         screen.user.featurePermissions.canEditUsers,
@@ -79,16 +110,17 @@ fun App(
                             .filter { it.isNotEmpty() }
                             .map { Area.fromString(it) },
                         createdAt = list[9] as Long,
+                        remoteId = (list[10] as? String)?.ifBlank { null },
                         featurePermissions = com.checklistboteco.domain.model.FeaturePermissions(
-                            canRegisterUsers = list[10] as Boolean,
-                            canCreateActivities = list[11] as Boolean,
-                            canEditUsers = list[12] as Boolean
+                            canRegisterUsers = list[11] as Boolean,
+                            canCreateActivities = list[12] as Boolean,
+                            canEditUsers = list[13] as Boolean
                         )
                     )
                     Screen.Main(
                         user = user,
-                        authToken = (list.getOrNull(13) as? String)?.ifBlank { null },
-                        remoteUserId = (list.getOrNull(14) as? String)?.ifBlank { null }
+                        authToken = (list.getOrNull(14) as? String)?.ifBlank { null },
+                        remoteUserId = (list.getOrNull(15) as? String)?.ifBlank { null }
                     )
                 }
             }

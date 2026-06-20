@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.2"
+agp = "8.13.2"
 kotlin = "1.9.24"
 compose = "1.6.11"
 composeCompiler = "1.5.14"
@@ -28,6 +28,7 @@ compose-material-icons = { module = "org.jetbrains.compose.material:material-ico
 # Android
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version = "1.9.3" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version = "2.8.7" }
+androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version = "2.10.2" }
 
 # SQLDelight
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }

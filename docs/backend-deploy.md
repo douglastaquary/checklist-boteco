@@ -1,225 +1,230 @@
-# Backend Kotlin e Web Admin
+# Backend serverless e Web Admin
 
-Este backend expõe uma API REST em Kotlin/Ktor para sincronizar dados do app e uma página web administrativa servida em `/`.
+O backend agora é uma aplicação **Quarkus 3**. A API REST, o endpoint MCP, o template Qute, o CSS e o JavaScript vanilla são empacotados no mesmo JAR. Em desenvolvimento o estado fica em memória; no perfil de produção a aplicação usa tabelas DynamoDB separadas para a operação, compras e vendas.
 
-## Escopo
+## Arquitetura
 
-- API REST para autenticação, usuários, permissões, atividades, conclusões e sincronização.
-- Web admin com dashboard, usuários/permissões e atividades.
-- A web admin não exibe marcações de ponto. O módulo de ponto permanece somente no app.
-- Persistência em SQLite para MVP, simples, performática e de baixo custo para até 10 pessoas.
-- Autenticação por senha + confiança de dispositivo via código de verificação no primeiro login, troca de aparelho ou perda da seed local.
-
-## Execução local
-
-```bash
-./gradlew :backend:run
+```text
+App Android ─┐
+             ├─ HTTP API ─ Quarkus/Lambda ─ DynamoDB
+Admin Qute ──┘              │
+                       HTML + CSS + JS
+                       no mesmo artefato
 ```
 
-Variáveis opcionais:
+- `dev` e `test`: `LocalStore`, sem Docker e sem credenciais AWS.
+- `prod`: `DynamoDbStore`, selecionado no build e configurado por variáveis.
+- AWS: API Gateway HTTP API encaminha todas as rotas à Lambda.
+- As tabelas usam `PAY_PER_REQUEST`; não há VPC nem pool de conexões. Compras usam `pk` + `sk` para manter o histórico isolado.
+
+### Pontos importantes da infraestrutura
+
+- **HTTP API (API Gateway v2):** produz URLs limpas, sem o prefixo de stage `/Prod` usado normalmente pelas REST APIs v1.
+- **Cobrança `PAY_PER_REQUEST`:** o DynamoDB cobra conforme o uso, sem capacidade provisionada enquanto a aplicação está ociosa.
+- **Roteamento proxy:** `/{proxy+}` captura todas as rotas internas, como `/api/auth/login`, e as encaminha ao Quarkus. O evento separado para `/` garante que a página inicial Qute também seja atendida.
+- **Tabelas automáticas:** os recursos `ChecklistTable`, `PurchasesTable` e `SalesTable` são criados pelo CloudFormation durante `sam deploy`; não há configuração manual do banco.
+- **Sem rede privada:** a Lambda não declara VPC, subnets ou security groups. Ela acessa o DynamoDB pela API gerenciada da AWS usando a permissão criada pelo SAM.
+
+## Rodar localmente
+
+Pré-requisitos: JDK 17+. O Maven é baixado pelo wrapper na primeira execução.
 
 ```bash
-PORT=8080
-JWT_SECRET=troque-este-segredo
-CHECKLIST_BOTECO_DB=backend-data/checklist-boteco.db
+cd backend
+./mvnw quarkus:dev
 ```
 
-URLs locais:
+Abra:
 
-- Admin web: `http://localhost:8080`
+- Admin: `http://localhost:8080`
 - Health check: `http://localhost:8080/api/health`
 
-Credenciais seed:
+Credenciais seed: `admin@checklistboteco.com` / `admin123`. No primeiro login, a tela mostra o código de confirmação do dispositivo. O store local é recriado quando o processo reinicia.
 
-- Email: `admin@checklistboteco.com`
-- Senha: `admin123`
+Observação atualizada para módulos de compras e vendas:
 
-## Contratos principais
+- os uploads confirmados de CSV em `Compras` e `Vendas` são persistidos localmente em arquivos JSON estáveis no diretório `backend/.data/`;
+- isso mantém os dados disponíveis após reiniciar o backend local;
+- o MCP continua lendo esses dados persistidos normalmente.
 
-### Login
+Arquivos usados no dev local:
 
-```http
-POST /api/auth/login
-Content-Type: application/json
+- `backend/.data/purchases-local.json`
+- `backend/.data/sales-local.json`
 
-{
-  "email": "admin@checklistboteco.com",
-  "password": "admin123",
-  "deviceId": "uuid-do-aparelho",
-  "deviceName": "iPhone Douglas"
-}
+## Web Admin: equipe, permissões e senha
+
+A aba `Equipe` agora suporta o ciclo completo de gestão de acessos:
+
+- criar usuário;
+- editar nome, email, setor e perfil;
+- remover usuário;
+- resetar senha quando um colaborador perder o acesso.
+
+Regras de acesso:
+
+- `ADMIN` sempre pode acessar todas as funcionalidades do painel.
+- A permissão `canRegisterUsers` libera a visualização da aba `Equipe` e o cadastro de novos usuários.
+- A permissão `canEditUsers` libera edição, remoção e reset de senha de usuários existentes.
+- Apenas `ADMIN` pode alterar os checkboxes de permissões dos usuários.
+- A permissão `canCreateActivities` libera a aba `Atividades` e o cadastro de novas atividades.
+
+Comportamentos importantes:
+
+- reset de senha invalida dispositivos confiáveis e desafios de verificação pendentes daquele usuário;
+- não é permitido remover o último administrador do sistema;
+- ao promover um usuário para `ADMIN`, ele recebe todas as permissões automaticamente;
+- ao rebaixar um `ADMIN` para `USER`, as permissões delegadas são zeradas por segurança e podem ser reatribuídas manualmente por um administrador.
+
+## Módulos admin de compras e vendas
+
+As abas `Compras` e `Vendas` ficam disponíveis somente para administradores.
+
+- `Compras` importa CSVs de abastecimento/compras e normaliza os campos mais úteis para consulta.
+- `Vendas` importa CSVs de relatório de vendas e exige como mapeamento mínimo `data`, `produto`, `local` e `quantidade`.
+- Ambas preservam colunas extras como atributos dinâmicos, úteis para filtros e leitura por agentes.
+- A auditoria `vendido x abastecido` cruza os datasets para apontar extravio potencial, consumo sem registro, venda sem entrada correspondente e perdas.
+
+Rotas principais:
+
+- `POST /api/purchases/imports/preview`
+- `POST /api/purchases/imports/{id}/commit`
+- `POST /api/purchases/query`
+- `POST /api/purchases/aggregate`
+- `POST /api/sales/imports/preview`
+- `POST /api/sales/imports/{id}/commit`
+- `POST /api/sales/query`
+- `POST /api/sales/aggregate`
+- `POST /api/sales/audit/stock`
+
+O endpoint MCP local continua em `POST /mcp` e agora expõe ferramentas de compras e vendas somente leitura.
+
+Para perguntas por produto, o MCP expõe a tool `sales_by_product`, útil para frases como:
+
+- `quantas águas vendeu?`
+- `qual a quantidade de amstel 600ml vendida no beco?`
+- `quanto vendeu de batata frita no período?`
+
+## Conectar o app
+
+O contrato de `/api` foi preservado. Para Android Emulator, a máquina host é `10.0.2.2`:
+
+```bash
+./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8080
 ```
 
-No primeiro login de um dispositivo novo, a resposta pede confirmação do aparelho:
+Em aparelho físico, use o IP da máquina na rede local. Fora de `localhost`, `127.0.0.1` e `10.0.2.2`, o cliente exige HTTPS.
+
+No Android, o build `debug` permite HTTP claro somente para `10.0.2.2`, `127.0.0.1` e `localhost` por meio de `network_security_config`. Isso destrava o ambiente local sem abrir exceção ampla para produção.
+
+## Testar e empacotar
+
+```bash
+cd backend
+./mvnw test
+./mvnw package
+java -jar target/checklist-boteco-serverless-2.0.0-runner.jar
+```
+
+O build também produz `target/function.zip`, consumido pelo SAM.
+
+## Deploy AWS SAM
+
+Pré-requisitos: AWS CLI configurada e AWS SAM CLI.
+
+```bash
+cd backend
+./mvnw package -DskipTests
+sam build --template-file template.yaml
+sam deploy --guided
+```
+
+No primeiro deploy, informe `JwtSecret` e `PurchasesMcpToken` com 24 ou mais caracteres. O template cria Lambda Java 17 ARM64, HTTP API e duas tabelas DynamoDB, aplica permissão CRUD à função e mantém as tabelas quando a stack é removida.
+
+Depois do deploy, use o output `ApiUrl` no app:
+
+```bash
+./gradlew :composeApp:assembleDebug -PCHECKLIST_API_BASE_URL=https://id.execute-api.regiao.amazonaws.com
+```
+
+Quando o ambiente dev estiver validado, gere a variante Android apontando para a URL HTTPS da AWS. O app já está preparado para isso e continua bloqueando HTTP fora dos hosts locais de desenvolvimento.
+
+Variáveis da Lambda definidas pelo template:
+
+- `JWT_SECRET`: segredo HMAC dos tokens.
+- `CHECKLIST_TABLE`: nome da tabela criada.
+- `PURCHASES_TABLE`: tabela separada de compras e importações.
+- `SALES_TABLE`: tabela separada de vendas e importações.
+- `PURCHASES_MCP_TOKEN`: token de serviço enviado por clientes MCP com `Authorization: Bearer`.
+- `AWS_REGION`: fornecida pelo runtime da Lambda.
+- `EXPOSE_DEVICE_CODE`: por padrão `true` para o MVP continuar funcional; defina `false` quando integrar o envio do código por email, SMS ou autenticador.
+
+Opcionalmente, `CORS_ORIGINS` restringe as origens da interface web. O valor padrão é permissivo para o MVP.
+
+## Contratos mantidos
+
+- `POST /api/auth/login`
+- `POST /api/auth/verify-device`
+- `GET /api/me`
+- `GET|POST /api/users`
+- `PUT /api/users/{id}`
+- `DELETE /api/users/{id}`
+- `POST /api/users/{id}/reset-password`
+- `PATCH /api/users/{id}/permissions`
+- `GET|POST /api/activities`
+- `GET /api/completions`
+- `GET /api/admin/dashboard`
+- `GET /api/sync/pull?since=...`
+- `POST /api/sync/push`
+- `POST /api/purchases/imports/preview`
+- `POST /api/purchases/imports/{id}/commit`
+- `GET /api/purchases/schema`
+- `POST /api/purchases/query`
+- `POST /api/purchases/aggregate`
+- `POST /api/sales/imports/preview`
+- `POST /api/sales/imports/{id}/commit`
+- `GET /api/sales/schema`
+- `POST /api/sales/query`
+- `POST /api/sales/aggregate`
+- `POST /api/sales/audit/stock`
+- `POST /mcp` (MCP Streamable HTTP, tools de compras e vendas somente leitura)
+
+As marcações de ponto continuam filtradas pelo `userId` do token, impedindo que um colaborador envie ponto em nome de outro.
+
+## Teste local com MCP
+
+Suba o backend:
+
+```bash
+cd backend
+./mvnw quarkus:dev
+```
+
+Depois conecte um cliente MCP HTTP apontando para:
+
+- URL: `http://localhost:8080/mcp`
+- Header: `Authorization: Bearer local-purchases-token`
+
+Exemplo de configuração para Cursor/Codex:
 
 ```json
 {
-  "requiresTwoFactor": true,
-  "challengeId": "...",
-  "deliveryHint": "Código de verificação gerado para confirmação do dispositivo"
-}
-```
-
-Em desenvolvimento local, o campo `developmentCode` também é retornado para facilitar testes. Em produção, substitua isso por envio via email, SMS ou app autenticador.
-
-Confirmação do aparelho:
-
-```http
-POST /api/auth/verify-device
-Content-Type: application/json
-
-{
-  "challengeId": "...",
-  "code": "123456",
-  "deviceId": "uuid-do-aparelho",
-  "deviceName": "iPhone Douglas"
-}
-```
-
-Resposta após o dispositivo ser confiado:
-
-```json
-{
-  "token": "...",
-  "user": {
-    "id": "...",
-    "name": "admin",
-    "email": "admin@checklistboteco.com"
+  "mcpServers": {
+    "checklist-boteco-analytics": {
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer local-purchases-token"
+      }
+    }
   }
 }
 ```
 
-Use o token com:
+Arquivos prontos no repositório:
 
-```http
-Authorization: Bearer <token>
-```
+- Cursor: [.cursor/mcp.json](/Users/douglastaquary/ChecklistBoteco/.cursor/mcp.json)
+- Codex: [.codex/mcp.json](/Users/douglastaquary/ChecklistBoteco/.codex/mcp.json)
 
-### Sincronização
+Passo a passo de uso via chat:
 
-Pull:
-
-```http
-GET /api/sync/pull?since=0
-```
-
-Push:
-
-```http
-POST /api/sync/push
-Content-Type: application/json
-
-{
-  "activities": [],
-  "completions": [],
-  "workClockEntries": []
-}
-```
-
-O app deve manter o comportamento offline-first: salvar localmente, marcar como pendente e chamar `push` quando houver conectividade. Depois do `push`, chamar `pull` com o último timestamp sincronizado.
-
-Marcações de ponto enviadas para `/api/sync/push` são filtradas pelo backend: uma marcação só é aceita quando `workClockEntries.userId` é igual ao usuário autenticado no token. Isso impede que um colaborador envie ponto para outro usuário.
-
-## HTTPS
-
-O app deve consumir a API sempre por `https://` em produção. Em deploys gerenciados como Render, Railway e Cloud Run, o TLS fica no edge/proxy da plataforma e o Ktor recebe o tráfego já encaminhado para a porta interna.
-
-Regras:
-
-- Produção: usar somente URL pública `https://...`
-- Localhost: `http://localhost:8080` pode ser usado apenas para desenvolvimento
-- Não enviar `JWT_SECRET` padrão para produção
-- Configurar CORS apenas para domínios reais quando sair do MVP
-
-No build Android, configure a URL pública:
-
-```bash
-./gradlew :composeApp:assembleDebug -PCHECKLIST_API_BASE_URL=https://sua-api.exemplo.com
-```
-
-Quando essa propriedade fica vazia, o app mantém o login local/offline. Quando ela é preenchida, o login usa a API, confirma dispositivo novo por código e sincroniza marcações de ponto com o token do usuário autenticado.
-
-## Deploy com Docker
-
-Build local:
-
-```bash
-docker build -f backend/Dockerfile -t checklist-boteco-backend .
-docker run -p 8080:8080 \
-  -e JWT_SECRET=troque-este-segredo \
-  -e CHECKLIST_BOTECO_DB=/app/data/checklist-boteco.db \
-  -v checklist-boteco-data:/app/data \
-  checklist-boteco-backend
-```
-
-## Deploy em Render
-
-Render informa em sua página de preços que há plano Free para web services e planos pagos por compute; a página free também indica que o workspace Hobby é gratuito e suporta serviços pequenos. Consulte [Render Pricing](https://render.com/pricing) e [Deploy for Free](https://render.com/free).
-
-Passos:
-
-1. Criar um novo **Web Service**.
-2. Conectar o repositório.
-3. Selecionar deploy via Docker.
-4. Dockerfile path: `backend/Dockerfile`.
-5. Definir variáveis:
-  - `JWT_SECRET`
-   - `CHECKLIST_BOTECO_DB=/app/data/checklist-boteco.db`
-6. Configurar health check: `/api/health`.
-7. Para persistência real, adicionar disco persistente no plano que ofereça suporte ou migrar para Postgres.
-
-Indicação: bom para começar barato e simples. Para produção, prefira plano pago com persistência adequada.
-
-## Deploy em Railway
-
-Railway documenta planos Free, Hobby, Pro e Enterprise. A documentação oficial lista Free a `$0/month` com crédito mensal pequeno e Hobby a `$5/month`, além de cobrança por uso de RAM/CPU/rede/storage. Consulte [Railway Pricing Plans](https://docs.railway.com/reference/pricing/plans) e [Pricing FAQs](https://docs.railway.com/reference/pricing/faqs).
-
-Passos:
-
-1. Criar projeto no Railway.
-2. Conectar o repositório.
-3. Usar Dockerfile `backend/Dockerfile`.
-4. Definir variáveis:
-  - `JWT_SECRET`
-  - `CHECKLIST_BOTECO_DB=/app/data/checklist-boteco.db`
-5. Criar Volume e montar em `/app/data`.
-6. Expor porta via variável `PORT` fornecida pelo Railway.
-7. Validar `/api/health`.
-
-Indicação: prático para MVP, com atenção ao uso de recursos para evitar cobrança acima do plano.
-
-## Deploy em Google Cloud Run
-
-Cloud Run é serverless para containers e a página oficial menciona cobrança por uso com camada always-free; a documentação mostra deploy de imagens de container. Consulte [Cloud Run Pricing](https://cloud.google.com/run/pricing) e [Deploying container images to Cloud Run](https://docs.cloud.google.com/run/docs/deploying).
-
-Passos:
-
-1. Ativar Cloud Run e Artifact Registry.
-2. Buildar e publicar imagem:
-
-```bash
-gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/checklist/backend:latest
-```
-
-3. Deploy:
-
-```bash
-gcloud run deploy checklist-boteco-backend \
-  --image REGION-docker.pkg.dev/PROJECT/checklist/backend:latest \
-  --region REGION \
-  --allow-unauthenticated \
-  --set-env-vars JWT_SECRET=troque-este-segredo
-```
-
-4. Validar `/api/health`.
-
-Observação: Cloud Run é ótimo para baixo tráfego, mas o armazenamento local do container não é persistente. Para produção com SQLite, monte um volume compatível quando disponível ou evolua para Cloud SQL/PostgreSQL.
-
-## Próxima evolução recomendada
-
-- Evoluir SQLite para PostgreSQL quando o volume de dados ou necessidade de multi-instância crescer.
-- Adicionar refresh token e rotação de segredo.
-- Implementar sync incremental no app com cliente HTTP.
-- Remover `developmentCode` do retorno do desafio e enviar o código por canal externo.
-- Adicionar auditoria de permissões.
-- Adicionar migrations do backend.
+- [docs/mcp-local-test.md](/Users/douglastaquary/ChecklistBoteco/docs/mcp-local-test.md)

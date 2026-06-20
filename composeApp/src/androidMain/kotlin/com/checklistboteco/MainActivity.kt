@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.checklistboteco.data.database.AndroidDatabaseDriverFactory
+import com.checklistboteco.data.sync.AndroidSyncScheduler
 import com.checklistboteco.platform.DeviceIdentity
 
 class MainActivity : ComponentActivity() {
@@ -13,7 +14,10 @@ class MainActivity : ComponentActivity() {
         DeviceIdentity.initialize(this)
         enableEdgeToEdge()
         setContent {
-            App(databaseDriverFactory = AndroidDatabaseDriverFactory(applicationContext))
+            App(
+                databaseDriverFactory = AndroidDatabaseDriverFactory(applicationContext),
+                syncScheduler = AndroidSyncScheduler(applicationContext)
+            )
         }
     }
 }
