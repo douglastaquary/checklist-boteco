@@ -1,7 +1,7 @@
 import Foundation
 import Models
 import Network
-public struct InventoryDailyAuditItem: Decodable, Sendable, Identifiable {
+public struct InventoryDailyAuditItem: Decodable, Sendable, Identifiable, Hashable {
   public var id: String { product }
   public let product: String
   public let status: String
@@ -9,15 +9,76 @@ public struct InventoryDailyAuditItem: Decodable, Sendable, Identifiable {
   public let openingQuantity: Double
   public let soldQuantity: Double
   public let theoreticalRemaining: Double
+
+  public init(
+    product: String,
+    status: String,
+    notes: String,
+    openingQuantity: Double,
+    soldQuantity: Double,
+    theoreticalRemaining: Double
+  ) {
+    self.product = product
+    self.status = status
+    self.notes = notes
+    self.openingQuantity = openingQuantity
+    self.soldQuantity = soldQuantity
+    self.theoreticalRemaining = theoreticalRemaining
+  }
 }
 
-public struct InventoryDailyAudit: Decodable, Sendable {
+public struct InventoryDailyAudit: Decodable, Sendable, Hashable {
   public let date: String
   public let location: String
   public let items: [InventoryDailyAuditItem]
   public let totalOpening: Double
   public let totalSold: Double
   public let totalRemaining: Double
+
+  public init(
+    date: String,
+    location: String,
+    items: [InventoryDailyAuditItem],
+    totalOpening: Double,
+    totalSold: Double,
+    totalRemaining: Double
+  ) {
+    self.date = date
+    self.location = location
+    self.items = items
+    self.totalOpening = totalOpening
+    self.totalSold = totalSold
+    self.totalRemaining = totalRemaining
+  }
+}
+
+/// Snapshot navegável (detalhe de auditoria / deep link).
+public struct InventoryAuditItemSnapshot: Hashable, Sendable {
+  public let product: String
+  public let auditDate: String
+  public let location: String
+  public let status: String
+  public let notes: String
+  public let openingQuantity: Double
+  public let soldQuantity: Double
+  public let theoreticalRemaining: Double
+  public let totalOpening: Double
+  public let totalSold: Double
+  public let totalRemaining: Double
+
+  public init(item: InventoryDailyAuditItem, audit: InventoryDailyAudit) {
+    product = item.product
+    auditDate = audit.date
+    location = audit.location
+    status = item.status
+    notes = item.notes
+    openingQuantity = item.openingQuantity
+    soldQuantity = item.soldQuantity
+    theoreticalRemaining = item.theoreticalRemaining
+    totalOpening = audit.totalOpening
+    totalSold = audit.totalSold
+    totalRemaining = audit.totalRemaining
+  }
 }
 
 public struct ApplyDailyAuditResponse: Decodable, Sendable {

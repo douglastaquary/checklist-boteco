@@ -414,6 +414,30 @@ public final class ChecklistRepository: Sendable {
     notifySyncRequested()
   }
 
+  public func updateActivity(id: Int64, name: String, area: Area, frequency: Frequency) throws {
+    try dbQueue.write { db in
+      try db.execute(
+        sql: """
+        UPDATE Activity SET name = ?, area = ?, frequency = ?, syncState = 'PENDING'
+        WHERE id = ? AND deletedAt IS NULL
+        """,
+        arguments: [name, area.rawValue, frequency.rawValue, id]
+      )
+    }
+    notifySyncRequested()
+  }
+
+  public func deleteActivity(id: Int64) throws {
+    let now = Date.nowMillis
+    try dbQueue.write { db in
+      try db.execute(
+        sql: "UPDATE Activity SET deletedAt = ?, syncState = 'PENDING' WHERE id = ?",
+        arguments: [now, id]
+      )
+    }
+    notifySyncRequested()
+  }
+
   public func updateUserPermissions(userId: Int64, permissions: FeaturePermissions) throws {
     try dbQueue.write { db in
       try db.execute(

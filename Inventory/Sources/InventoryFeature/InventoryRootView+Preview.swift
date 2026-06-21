@@ -16,11 +16,11 @@ struct InventoryRootView_Previews: PreviewProvider {
       )
     }
     .environmentObject(AppTheme.shared)
+    .previewDisplayName("Rascunho vazio")
   }
 
   private static var previewRepository: ChecklistRepository {
-    let db = try! AppDatabase.inMemory()
-    return ChecklistRepository(dbQueue: db)
+    ChecklistRepository(dbQueue: try! AppDatabase.inMemory())
   }
 }
 #endif

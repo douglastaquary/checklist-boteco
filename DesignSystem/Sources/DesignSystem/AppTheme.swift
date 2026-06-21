@@ -8,6 +8,7 @@ public final class AppTheme: ObservableObject {
   public let primaryBackground: Color
   public let secondaryBackground: Color
   public let rowBackground: Color
+  public let sectionHeaderBackground: Color
   public let label: Color
   public let secondaryLabel: Color
 
@@ -16,6 +17,7 @@ public final class AppTheme: ObservableObject {
     primaryBackground = Color(.systemBackground)
     secondaryBackground = Color(.secondarySystemBackground)
     rowBackground = Color(.systemBackground)
+    sectionHeaderBackground = Color(.tertiarySystemFill)
     label = Color.primary
     secondaryLabel = Color.secondary
   }

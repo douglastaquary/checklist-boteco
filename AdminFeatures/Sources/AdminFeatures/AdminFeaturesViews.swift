@@ -7,6 +7,8 @@ public struct ActivitiesManagementView: View {
   private let repository: ChecklistRepository
   @State private var activities: [Activity] = []
   @State private var createSheet: ActivityCreateSheet?
+  @State private var editSheet: ActivityEditSheet?
+  @State private var deleteConfirm: ActivityDeleteConfirm?
 
   public init(repository: ChecklistRepository) {
     self.repository = repository
@@ -19,19 +21,61 @@ public struct ActivitiesManagementView: View {
           createSheet = ActivityCreateSheet()
         }
         .themedListRowBackground()
+      } header: {
+        themedSectionHeader("Ações")
       }
-      ActivityListSection(activities: activities)
+      ActivityListSection(
+        activities: activities,
+        onEdit: { editSheet = ActivityEditSheet(activity: $0) },
+        onDelete: { deleteConfirm = ActivityDeleteConfirm(activity: $0) }
+      )
     }
     .themedListStyle()
     .navigationTitle("Atividades")
     .task { reload() }
     .sheet(item: $createSheet) { _ in
-      ActivityCreateSheetView(repository: repository) {
-        reload()
-        createSheet = nil
-      } onCancel: {
-        createSheet = nil
-      }
+      ActivityFormSheet(
+        title: "Nova atividade",
+        initialName: "",
+        initialArea: .atendimento,
+        onSave: { name, area in
+          try? repository.insertActivity(
+            Activity(id: 0, name: name, area: area, frequency: .daily)
+          )
+          reload()
+          createSheet = nil
+        },
+        onCancel: { createSheet = nil }
+      )
+    }
+    .sheet(item: $editSheet) { sheet in
+      ActivityFormSheet(
+        title: "Editar atividade",
+        initialName: sheet.activity.name,
+        initialArea: sheet.activity.area,
+        onSave: { name, area in
+          try? repository.updateActivity(
+            id: sheet.activity.id,
+            name: name,
+            area: area,
+            frequency: sheet.activity.frequency
+          )
+          reload()
+          editSheet = nil
+        },
+        onCancel: { editSheet = nil }
+      )
+    }
+    .alert(item: $deleteConfirm) { confirm in
+      Alert(
+        title: Text("Excluir atividade"),
+        message: Text("Remover \"\(confirm.activity.name)\"? Esta ação não pode ser desfeita localmente."),
+        primaryButton: .destructive(Text("Excluir")) {
+          try? repository.deleteActivity(id: confirm.activity.id)
+          reload()
+        },
+        secondaryButton: .cancel()
+      )
     }
   }
 
@@ -44,13 +88,41 @@ private struct ActivityCreateSheet: Identifiable {
   let id = UUID()
 }
 
-private struct ActivityCreateSheetView: View {
-  let repository: ChecklistRepository
-  let onSaved: () -> Void
+private struct ActivityEditSheet: Identifiable {
+  let activity: Activity
+  var id: Int64 { activity.id }
+}
+
+private struct ActivityDeleteConfirm: Identifiable {
+  let activity: Activity
+  var id: Int64 { activity.id }
+}
+
+private struct ActivityFormSheet: View {
+  let title: String
+  let initialName: String
+  let initialArea: Area
+  let onSave: (String, Area) -> Void
   let onCancel: () -> Void
 
-  @State private var name = ""
-  @State private var area: Area = .atendimento
+  @State private var name: String
+  @State private var area: Area
+
+  init(
+    title: String,
+    initialName: String,
+    initialArea: Area,
+    onSave: @escaping (String, Area) -> Void,
+    onCancel: @escaping () -> Void
+  ) {
+    self.title = title
+    self.initialName = initialName
+    self.initialArea = initialArea
+    self.onSave = onSave
+    self.onCancel = onCancel
+    _name = State(initialValue: initialName)
+    _area = State(initialValue: initialArea)
+  }
 
   var body: some View {
     NavigationStack {
@@ -63,7 +135,7 @@ private struct ActivityCreateSheetView: View {
         .themedListRowBackground()
       }
       .themedFormStyle()
-      .navigationTitle("Nova atividade")
+      .navigationTitle(title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
@@ -71,10 +143,7 @@ private struct ActivityCreateSheetView: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Salvar") {
-            try? repository.insertActivity(
-              Activity(id: 0, name: name, area: area, frequency: .daily)
-            )
-            onSaved()
+            onSave(name.trimmingCharacters(in: .whitespaces), area)
           }
           .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
         }
@@ -94,7 +163,7 @@ public struct PermissionManagementView: View {
 
   public var body: some View {
     List {
-      Section("Usuários") {
+      Section {
         ForEach(users, id: \.id) { user in
           Button {
             editSheet = PermissionEditSheet(user: user)
@@ -104,12 +173,14 @@ public struct PermissionManagementView: View {
               Spacer()
               Text(user.permissionLevel.rawValue)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundColor(.secondary)
             }
           }
           .buttonStyle(.plain)
           .themedListRowBackground()
         }
+      } header: {
+        themedSectionHeader("Usuários")
       }
     }
     .themedListStyle()
@@ -161,8 +232,10 @@ private struct PermissionEditorSheet: View {
         Section {
           Text(user.name).font(.headline)
             .themedListRowBackground()
-          Text(user.email).font(.caption).foregroundStyle(.secondary)
+          Text(user.email).font(.caption).foregroundColor(.secondary)
             .themedListRowBackground()
+        } header: {
+          themedSectionHeader("Usuário")
         }
         PermissionTogglesSection(permissions: $permissions)
         Section {
@@ -188,13 +261,46 @@ private struct PermissionEditorSheet: View {
 
 private struct ActivityListSection: View {
   let activities: [Activity]
+  let onEdit: (Activity) -> Void
+  let onDelete: (Activity) -> Void
 
   var body: some View {
-    Section("Cadastradas") {
-      ForEach(activities) { activity in
-        Text("\(activity.name) — \(activity.area.displayName)")
+    Section {
+      if activities.isEmpty {
+        Text("Nenhuma atividade cadastrada.")
+          .foregroundColor(.secondary)
           .themedListRowBackground()
+      } else {
+        ForEach(activities) { activity in
+          Button {
+            onEdit(activity)
+          } label: {
+            HStack {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(activity.name).font(.headline)
+                Text(activity.area.displayName)
+                  .font(.caption)
+                  .foregroundColor(.secondary)
+              }
+              Spacer()
+              Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+          }
+          .buttonStyle(.plain)
+          .themedListRowBackground()
+          .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+              onDelete(activity)
+            } label: {
+              Label("Excluir", systemImage: "trash")
+            }
+          }
+        }
       }
+    } header: {
+      themedSectionHeader("Cadastradas")
     }
   }
 }
@@ -203,7 +309,7 @@ private struct PermissionTogglesSection: View {
   @Binding var permissions: FeaturePermissions
 
   var body: some View {
-    Section("Permissões") {
+    Section {
       Toggle("Cadastrar usuários", isOn: $permissions.canRegisterUsers)
         .themedListRowBackground()
       Toggle("Criar atividades", isOn: $permissions.canCreateActivities)
@@ -216,6 +322,8 @@ private struct PermissionTogglesSection: View {
         .themedListRowBackground()
       Toggle("Estoque administrativo", isOn: $permissions.canManageAdministrativeStock)
         .themedListRowBackground()
+    } header: {
+      themedSectionHeader("Permissões")
     }
   }
 }
