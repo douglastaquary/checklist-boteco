@@ -64,6 +64,7 @@ public struct ChecklistRootView: View {
     }
   }
 
+  @MainActor
   private func reload() async {
     do {
       items = try repository.activitiesByArea(selectedArea)
@@ -72,6 +73,7 @@ public struct ChecklistRootView: View {
     }
   }
 
+  @MainActor
   private func complete(activityId: Int64, imagePath: String?) async {
     do {
       try repository.completeActivity(activityId: activityId, userId: user.id, imagePath: imagePath, isLate: false)
