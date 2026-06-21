@@ -20,15 +20,29 @@ struct UserRecord: FetchableRecord, Decodable {
   let canManageAdministrativeStock: Bool
 
   func toDomain() -> User {
-    User(
+    let level = PermissionLevel.from(permissionLevel)
+    let sector = WorkSector.from(workSector)
+    let parsedAreas = allowedAreas
+      .split(separator: ",")
+      .map { Area.from(String($0)) }
+      .filter { !$0.rawValue.isEmpty }
+    let resolvedAreas: [Area]
+    if level == .admin {
+      resolvedAreas = Area.allCases
+    } else if parsedAreas.isEmpty {
+      resolvedAreas = [sector.activityArea]
+    } else {
+      resolvedAreas = parsedAreas
+    }
+    return User(
       id: id,
       name: name,
       email: email,
       password: password,
       area: Area.from(area),
-      workSector: WorkSector.from(workSector),
-      permissionLevel: PermissionLevel.from(permissionLevel),
-      allowedAreas: allowedAreas.split(separator: ",").map { Area.from(String($0)) },
+      workSector: sector,
+      permissionLevel: level,
+      allowedAreas: resolvedAreas,
       createdAt: createdAt,
       remoteId: remoteId,
       featurePermissions: FeaturePermissions(

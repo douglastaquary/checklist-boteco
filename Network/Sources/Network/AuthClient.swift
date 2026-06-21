@@ -95,15 +95,25 @@ private struct PublicUserDTO: Decodable {
 
   func toDomain() -> User {
     let level = PermissionLevel.from(permissionLevel)
+    let sector = WorkSector.from(workSector)
+    let parsedAreas = allowedAreas.map(Area.from).filter { !$0.rawValue.isEmpty }
+    let resolvedAreas: [Area]
+    if level == .admin {
+      resolvedAreas = Area.allCases
+    } else if parsedAreas.isEmpty {
+      resolvedAreas = [sector.activityArea]
+    } else {
+      resolvedAreas = parsedAreas
+    }
     return User(
       id: 0,
       name: name,
       email: email,
       password: "",
       area: Area.from(area),
-      workSector: WorkSector.from(workSector),
+      workSector: sector,
       permissionLevel: level,
-      allowedAreas: level == .admin ? Area.allCases : allowedAreas.map(Area.from),
+      allowedAreas: resolvedAreas,
       createdAt: createdAt,
       remoteId: id,
       featurePermissions: permissions?.toDomain() ?? .default

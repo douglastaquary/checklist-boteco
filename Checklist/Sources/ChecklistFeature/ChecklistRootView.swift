@@ -12,7 +12,7 @@ public struct ChecklistRootView: View {
   private let onSelectActivity: ((Int64, Area) -> Void)?
 
   private var accessibleAreas: [Area] {
-    Area.allCases.filter { user.canAccessArea($0) }
+    user.checklistAccessibleAreas
   }
 
   @State private var selectedArea: Area
@@ -32,8 +32,8 @@ public struct ChecklistRootView: View {
     self.syncController = syncController
     self.onLogout = onLogout
     self.onSelectActivity = onSelectActivity
-    let areas = Area.allCases.filter { user.canAccessArea($0) }
-    let initialArea = areas.contains(user.area) ? user.area : (areas.first ?? .atendimento)
+    let areas = user.checklistAccessibleAreas
+    let initialArea = areas.first ?? user.workSector.checklistAreas.first ?? .atendimento
     _selectedArea = State(initialValue: initialArea)
   }
 
@@ -42,7 +42,7 @@ public struct ChecklistRootView: View {
       Section(sectionTitle) {
         if items.isEmpty {
           Text("Nenhuma atividade para esta área.")
-            .foregroundStyle(.secondary)
+            .foregroundColor(.secondary)
         } else {
           ForEach(items) { item in
             ActivityChecklistRow(
@@ -75,16 +75,17 @@ public struct ChecklistRootView: View {
       }
     }
     .task(id: selectedArea) { await reload() }
-    .sheet(item: $cameraCapture) { request in
+    .sheet(item: $cameraCapture, onDismiss: { Task { await reload() } }) { request in
       CameraCaptureView { path in
+        guard let path else { return }
         Task { await complete(activityId: request.activityId, imagePath: path) }
       }
     }
     .alert(item: $alert) { item in
       Alert(
-        title: Text("Erro"),
+        title: Text(item.title),
         message: Text(item.message),
-        dismissButton: .cancel(Text("OK"))
+        dismissButton: .default(Text("OK"))
       )
     }
   }
@@ -95,10 +96,14 @@ public struct ChecklistRootView: View {
 
   @MainActor
   private func reload() async {
+    guard user.canAccessChecklistArea(selectedArea) else {
+      items = []
+      return
+    }
     do {
       items = try repository.activitiesByArea(selectedArea)
     } catch {
-      alert = ChecklistAlert(message: error.localizedDescription)
+      alert = ChecklistAlert(title: "Erro", message: error.localizedDescription)
     }
   }
 
@@ -108,8 +113,11 @@ public struct ChecklistRootView: View {
       try repository.completeActivity(activityId: activityId, userId: user.id, imagePath: imagePath, isLate: false)
       syncController.requestSync()
       await reload()
+      if imagePath != nil {
+        alert = ChecklistAlert(title: "Checklist", message: "Atividade concluída.")
+      }
     } catch {
-      alert = ChecklistAlert(message: error.localizedDescription)
+      alert = ChecklistAlert(title: "Erro", message: error.localizedDescription)
     }
   }
 }
@@ -120,8 +128,9 @@ private struct CameraCaptureRequest: Identifiable {
 }
 
 private struct ChecklistAlert: Identifiable {
+  let title: String
   let message: String
-  var id: String { message }
+  var id: String { "\(title)-\(message)" }
 }
 
 private struct ActivityChecklistRow: View {
@@ -134,7 +143,7 @@ private struct ActivityChecklistRow: View {
       Button(action: { onSelect?() }) {
         VStack(alignment: .leading) {
           Text(item.activity.name).font(.headline)
-          Text(item.activity.frequency.displayName).font(.caption).foregroundStyle(.secondary)
+          Text(item.activity.frequency.displayName).font(.caption).foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
@@ -161,7 +170,11 @@ struct CameraCaptureView: UIViewControllerRepresentable {
 
   func makeUIViewController(context: Context) -> UIImagePickerController {
     let picker = UIImagePickerController()
-    picker.sourceType = .camera
+    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+      picker.sourceType = .camera
+    } else if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
+      picker.sourceType = .photoLibrary
+    }
     picker.delegate = context.coordinator
     return picker
   }
