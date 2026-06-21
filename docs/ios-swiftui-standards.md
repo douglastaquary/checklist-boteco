@@ -51,7 +51,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 
 | Área | Referência do skill | Arquivos atuais | Backlog fase 2 |
 |------|-------------------|-----------------|----------------|
-| App shell / tabs | [`navigationstack.md`](../.cursor/skills/swiftui-ui-patterns/references/navigationstack.md) | [`AppTabRoute.swift`](../iosApp/ChecklistBoteco/AppTabRoute.swift) | Rotas de inventário; deep links |
+| App shell / tabs | [`navigationstack.md`](../.cursor/skills/swiftui-ui-patterns/references/navigationstack.md) | [`AppTabRoute.swift`](../iosApp/ChecklistBoteco/AppTabRoute.swift), [`AppDeepLink.swift`](../iosApp/ChecklistBoteco/AppDeepLink.swift) | — |
 | Auth / forms | [`form.md`](../.cursor/skills/swiftui-ui-patterns/references/form.md), [`async-state.md`](../.cursor/skills/swiftui-ui-patterns/references/async-state.md) | [`LoginView.swift`](../Packages/Auth/Sources/Auth/LoginView.swift) | Previews 2FA/biometria |
 | Sheets / modals | [`sheets.md`](../.cursor/skills/swiftui-ui-patterns/references/sheets.md) | Permissões (Admin), Checklist (câmera) | Sheets em Inventory quando necessário |
 | Feedback global | [`overlay.md`](../.cursor/skills/swiftui-ui-patterns/references/overlay.md) | [`DesignSystem.swift`](../Packages/DesignSystem/Sources/DesignSystem/DesignSystem.swift) | Cores de linha via `AppTheme` |
@@ -111,14 +111,21 @@ Itens **já implementados** (2026-06):
 - Usuário seed `colaborador@checklistboteco.com` / `colab123` para testar aba Ponto
 - Ponto: simulador usa sempre coordenada do estabelecimento; device exige GPS real ≤ 5 m; alert modal + botão em `safeAreaInset`
 - Checklist: sem segmented com 1 área; filtro multi-área via menu na toolbar; lista única com section header — [`ChecklistRootView.swift`](../Packages/Checklist/Sources/ChecklistFeature/ChecklistRootView.swift)
+- Checklist: áreas por setor — cozinha vê `COZINHA`; demais setores veem `ATENDIMENTO` (`WorkSector.checklistAreas` em [`UserModels.swift`](../Packages/Models/Sources/Models/UserModels.swift))
+- Simulador: conclusão de checklist usa galeria quando câmera indisponível; cancelar reverte toggle via `reload` no `onDismiss`
+- Android emulador: [`CameraCapture.android.kt`](../composeApp/src/androidMain/kotlin/com/checklistboteco/platform/CameraCapture.android.kt) usa galeria quando emulador ou câmera indisponível/falha
+- Inventário: rota `inventoryAuditDetail` + `InventoryAuditDetailView`; tap na auditoria diária — [`InventoryRootView.swift`](../Packages/Inventory/Sources/InventoryFeature/InventoryRootView.swift)
+- Deep links `checklistboteco://` — [`AppDeepLink.swift`](../iosApp/ChecklistBoteco/AppDeepLink.swift), URL scheme em [`Info.plist`](../iosApp/ChecklistBoteco/Info.plist)
+- `themedSectionHeader` + token `sectionHeaderBackground` — [`ThemedFormStyle.swift`](../Packages/DesignSystem/Sources/DesignSystem/ThemedFormStyle.swift)
+- Atividades: editar/excluir com sheet + alert de confirmação — [`AdminFeaturesViews.swift`](../Packages/AdminFeatures/Sources/AdminFeatures/AdminFeaturesViews.swift)
+- `MainTabView`: lazy load de tabs (`loadedTabs`) + `onOpenURL` para deep links
+- Previews: estados vazios (Inventory, Admin atividades) — `*+Preview.swift` nos packages
 
 **Próximos PRs:**
 
-1. **Navegação**: rotas de inventário (detalhe de auditoria) e deep links.
-2. **DesignSystem**: `themedSectionHeader` e contraste de seção.
-3. **Features**: editar/excluir atividade; sheet de confirmação.
-4. **Previews**: estados vazios e erro de rede.
-5. **Performance**: lazy load de tabs inativas (se necessário).
+1. **Previews**: estados de erro de rede (Login, Inventory sync).
+2. **Inventory**: sheets adicionais quando necessário (criação/edição de contagem).
+3. **Performance**: reduzir escopo de `@ObservedObject session` onde ainda restar.
 
 ## Precedência em caso de conflito
 

@@ -16,6 +16,7 @@ APP_SOURCES = [
   "ChecklistBoteco/AppDependencyGraph.swift",
   "ChecklistBoteco/AppTabContent.swift",
   "ChecklistBoteco/AppTabRoute.swift",
+  "ChecklistBoteco/AppDeepLink.swift",
   "ChecklistBoteco/TabRouter.swift",
 ]
 

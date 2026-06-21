@@ -10,17 +10,27 @@ struct ChecklistRootView_Previews: PreviewProvider {
     Group {
       NavigationStack {
         ChecklistRootView(
-          user: singleAreaUser,
+          user: atendimentoUser,
           repository: previewRepository,
           syncController: previewSyncController,
           onLogout: {}
         )
       }
-      .previewDisplayName("Colaborador — 1 área")
+      .previewDisplayName("Garçom — Atendimento")
 
       NavigationStack {
         ChecklistRootView(
-          user: multiAreaUser,
+          user: cozinhaUser,
+          repository: previewRepository,
+          syncController: previewSyncController,
+          onLogout: {}
+        )
+      }
+      .previewDisplayName("Ajudante cozinha")
+
+      NavigationStack {
+        ChecklistRootView(
+          user: adminUser,
           repository: previewRepository,
           syncController: previewSyncController,
           onLogout: {}
@@ -33,33 +43,51 @@ struct ChecklistRootView_Previews: PreviewProvider {
 
   private static var previewRepository: ChecklistRepository {
     let db = try! AppDatabase.inMemory()
-    return ChecklistRepository(dbQueue: db)
+    let repo = ChecklistRepository(dbQueue: db)
+    try! repo.seedInitialDataIfNeeded()
+    return repo
   }
 
   private static var previewSyncController: SyncController {
     SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil))
   }
 
-  private static var singleAreaUser: User {
+  private static var atendimentoUser: User {
     User(
       id: 1,
-      name: "Colaborador",
-      email: "colab@test.com",
+      name: "Garçom",
+      email: "garcom@test.com",
       password: "x",
       area: .atendimento,
+      workSector: .garcom,
       permissionLevel: .user,
       allowedAreas: [.atendimento],
       createdAt: 0
     )
   }
 
-  private static var multiAreaUser: User {
+  private static var cozinhaUser: User {
     User(
       id: 2,
+      name: "Ajudante",
+      email: "cozinha@test.com",
+      password: "x",
+      area: .cozinha,
+      workSector: .ajudanteCozinha,
+      permissionLevel: .user,
+      allowedAreas: [.cozinha],
+      createdAt: 0
+    )
+  }
+
+  private static var adminUser: User {
+    User(
+      id: 3,
       name: "Admin",
       email: "admin@test.com",
       password: "x",
       area: .atendimento,
+      workSector: .gerente,
       permissionLevel: .admin,
       allowedAreas: Area.allCases,
       createdAt: 0,

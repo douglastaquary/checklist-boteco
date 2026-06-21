@@ -77,7 +77,12 @@ extension AppTab {
         token: context.authToken,
         canCreate: user.canCreateInventoryCounts(),
         canViewInsights: user.canViewInventoryInsights(),
-        canManageAdministrativeStock: user.canManageAdministrativeStock()
+        canManageAdministrativeStock: user.canManageAdministrativeStock(),
+        onSelectAuditItem: { snapshot in
+          Task { @MainActor in
+            tabRouter.push(.inventoryAuditDetail(snapshot), on: .inventory)
+          }
+        }
       )
     case .dashboard:
       DashboardRootView(repository: context.repository) { area in

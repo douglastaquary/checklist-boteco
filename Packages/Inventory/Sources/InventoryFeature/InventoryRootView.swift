@@ -11,6 +11,7 @@ public struct InventoryRootView: View {
   private let canCreate: Bool
   private let canViewInsights: Bool
   private let canManageAdministrativeStock: Bool
+  private let onSelectAuditItem: ((InventoryAuditItemSnapshot) -> Void)?
 
   @State private var drafts: [InventoryCountDraft] = []
   @State private var administrativeMode = false
@@ -26,7 +27,8 @@ public struct InventoryRootView: View {
     token: String?,
     canCreate: Bool,
     canViewInsights: Bool = false,
-    canManageAdministrativeStock: Bool = false
+    canManageAdministrativeStock: Bool = false,
+    onSelectAuditItem: ((InventoryAuditItemSnapshot) -> Void)? = nil
   ) {
     self.repository = repository
     self.inventoryClient = inventoryClient
@@ -34,6 +36,7 @@ public struct InventoryRootView: View {
     self.canCreate = canCreate
     self.canViewInsights = canViewInsights
     self.canManageAdministrativeStock = canManageAdministrativeStock
+    self.onSelectAuditItem = onSelectAuditItem
   }
 
   public var body: some View {
@@ -63,13 +66,14 @@ public struct InventoryRootView: View {
           loading: loadingAudit,
           canApply: canManageAdministrativeStock,
           onLoad: { Task { await loadAudit() } },
-          onApply: { Task { await applyAudit() } }
+          onApply: { Task { await applyAudit() } },
+          onSelectItem: onSelectAuditItem
         )
       }
       if let banner {
         Section {
           Text(banner.message)
-            .foregroundStyle(banner.isSuccess ? .green : .primary)
+            .foregroundColor(banner.isSuccess ? .green : .primary)
         }
       }
     }
@@ -204,10 +208,12 @@ private struct InventoryAddItemSection: View {
   let onAdd: () -> Void
 
   var body: some View {
-    Section("Adicionar item") {
+    Section {
       TextField("Produto", text: $name)
       TextField("Quantidade", text: $quantity).keyboardType(.decimalPad)
       Button("Incluir no rascunho", action: onAdd)
+    } header: {
+      themedSectionHeader("Adicionar item")
     }
   }
 }
@@ -217,11 +223,13 @@ private struct InventoryDraftSection: View {
   let onDelete: (IndexSet) -> Void
 
   var body: some View {
-    Section("Rascunho") {
+    Section {
       ForEach(drafts) { draft in
         Text("\(draft.name) — \(draft.quantity, format: .number)")
       }
       .onDelete(perform: onDelete)
+    } header: {
+      themedSectionHeader("Rascunho")
     }
   }
 }
@@ -232,14 +240,24 @@ private struct InventoryAuditSection: View {
   let canApply: Bool
   let onLoad: () -> Void
   let onApply: () -> Void
+  let onSelectItem: ((InventoryAuditItemSnapshot) -> Void)?
 
   var body: some View {
-    Section("Auditoria diária") {
+    Section {
       Button(loading ? "Carregando..." : "Consultar auditoria", action: onLoad)
         .disabled(loading)
       if let audit {
         ForEach(audit.items) { item in
-          InventoryAuditRow(item: item)
+          if let onSelectItem {
+            Button {
+              onSelectItem(InventoryAuditItemSnapshot(item: item, audit: audit))
+            } label: {
+              InventoryAuditRow(item: item)
+            }
+            .buttonStyle(.plain)
+          } else {
+            InventoryAuditRow(item: item)
+          }
         }
       }
       if canApply {
@@ -247,6 +265,8 @@ private struct InventoryAuditSection: View {
           .buttonStyle(PrimaryButtonStyle())
           .disabled(loading)
       }
+    } header: {
+      themedSectionHeader("Auditoria diária")
     }
   }
 }
@@ -262,7 +282,7 @@ private struct InventoryAuditRow: View {
       Text("Saldo teórico: \(item.theoreticalRemaining, format: .number)")
         .font(.caption)
       if !item.notes.isEmpty {
-        Text(item.notes).font(.caption2).foregroundStyle(.secondary)
+        Text(item.notes).font(.caption2).foregroundColor(.secondary)
       }
     }
   }

@@ -24,6 +24,32 @@ public enum WorkSector: String, CaseIterable, Codable, Sendable {
   public static func from(_ value: String) -> WorkSector {
     WorkSector(rawValue: value.uppercased()) ?? .atendimento
   }
+
+  /// Área principal de atividades associada ao setor (paridade backend/KMP).
+  public var activityArea: Area {
+    switch self {
+    case .atendimento, .garcom, .cumim, .gerente, .atendente, .barman:
+      return .atendimento
+    case .cozinha, .chefeCozinha, .ajudanteCozinha:
+      return .cozinha
+    case .servicosGerais:
+      return .limpeza
+    }
+  }
+
+  public var isKitchenSector: Bool {
+    switch self {
+    case .cozinha, .chefeCozinha, .ajudanteCozinha:
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Áreas visíveis no checklist conforme regra de negócio: cozinha só vê COZINHA; demais setores veem ATENDIMENTO.
+  public var checklistAreas: [Area] {
+    isKitchenSector ? [.cozinha] : [.atendimento]
+  }
 }
 
 public struct FeaturePermissions: Codable, Equatable, Sendable {
@@ -103,6 +129,16 @@ public struct User: Identifiable, Equatable, Sendable {
 
   public func canAccessArea(_ area: Area) -> Bool {
     permissionLevel == .admin || allowedAreas.contains(area)
+  }
+
+  /// Áreas do checklist derivadas do setor (admin vê todas).
+  public var checklistAccessibleAreas: [Area] {
+    if permissionLevel == .admin { return Area.allCases }
+    return workSector.checklistAreas
+  }
+
+  public func canAccessChecklistArea(_ area: Area) -> Bool {
+    checklistAccessibleAreas.contains(area)
   }
 
   public func canRegisterUsers() -> Bool {

@@ -6,94 +6,96 @@
   objects = {
 
 /* Begin PBXBuildFile section */
-		C3FE4E98C9AB4A82A046EA5A /* file */ = {isa = PBXBuildFile; fileRef = EBF4124DB71D4593BD97485B; };
-		63365F3BCC044AE3B403B28E /* file */ = {isa = PBXBuildFile; fileRef = 0B38813964CC4824842BA529; };
-		B7BC4C09722E49EBA3609ABE /* file */ = {isa = PBXBuildFile; fileRef = F46874CFD44C4D8AA289EBCC; };
-		F57B5B81A15B45C28225A65C /* file */ = {isa = PBXBuildFile; fileRef = 7E58E7A728124F1A9FA88E35; };
-		7AC6A3751C364D148BF4C632 /* file */ = {isa = PBXBuildFile; fileRef = FA89CCFAB2864B18A4B4413C; };
-		6EA4E31EEE404D10BEFCA116 /* file */ = {isa = PBXBuildFile; fileRef = C2BA812AD7A64ACBBBBA5EC9; };
-		7E895B7B8A0A47FAA8B8BEE5 /* file */ = {isa = PBXBuildFile; fileRef = EEED2F95C10C4D69B7E52DA4; };
-		DE20DA15768D4356AC9EC199 /* file */ = {isa = PBXBuildFile; fileRef = 2ECB325AE166483F9891938C; };
-		D35643CEFC0F42CBBF4179A6 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 358CBB3881BE4B8CB17082A4 /* Models */; };
-		AC377779E22840F2AC318C31 /* Network in Frameworks */ = {isa = PBXBuildFile; productRef = FCF22F2571574B68A905101A /* Network */; };
-		626E302DD02C4230934F9A18 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 240E35E8198D4E0D81C334C1 /* Persistence */; };
-		A118FB8AE070490C9FF7C5B6 /* Env in Frameworks */ = {isa = PBXBuildFile; productRef = CDDC4D22EEAB4A529FC4CDA4 /* Env */; };
-		F484F65988C345F0BCE3E5FB /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 497F9736764D49B9B40E42FC /* DesignSystem */; };
-		598183E481204E8DB29BB7A7 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 94438CA6A8BD4506A8DACAC7 /* Auth */; };
-		DBD17E15D49C44479CF66762 /* ChecklistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 332FEA9B77E7471C87DC3A86 /* ChecklistFeature */; };
-		AF70CF02FEC5467ABAC99ED0 /* WorkClockFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 76477B34D65941BDA879BB8E /* WorkClockFeature */; };
-		D7A20CF87A084680AA8E2A73 /* InventoryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 870087EFD3B94F65B04E8C12 /* InventoryFeature */; };
-		9C0742C39F7E4713BD9C572A /* DashboardFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 2BC0EC80B35046F99D0FFDEC /* DashboardFeature */; };
-		50D17ACB290F4980A364CAB6 /* AdminFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = E4EFFD02D5BF45DDBC718CBF /* AdminFeatures */; };
+		87E490A192934A179A33E918 /* file */ = {isa = PBXBuildFile; fileRef = 30BCFABEB60342ACBC79D90C; };
+		6AACA51D7C2345F7BBBD9FAD /* file */ = {isa = PBXBuildFile; fileRef = 453B63DA2D9745B2A1F23BFF; };
+		CF17216FD53E43AFAAEC70DC /* file */ = {isa = PBXBuildFile; fileRef = 7DC4691E8BD5454FB57165DA; };
+		BCA0C1331C384C0099D61B84 /* file */ = {isa = PBXBuildFile; fileRef = DA5C662E7F2D4C688FB7DFF9; };
+		A374B6023D1B4745BEBB2CA7 /* file */ = {isa = PBXBuildFile; fileRef = 469C4CB7F500416CB8041E8A; };
+		FD8C8732D9B1414998D9C82B /* file */ = {isa = PBXBuildFile; fileRef = 48846245505E4DE98CD350BF; };
+		E4375CF08EC7414292F5A9E0 /* file */ = {isa = PBXBuildFile; fileRef = 879890E257C24AC39B2D9A33; };
+		520A09A6CB55437DAD494D4D /* file */ = {isa = PBXBuildFile; fileRef = B879F62D9AAF4B36B0E97115; };
+		8278DC8E1A9C4ACA9A30DC3A /* file */ = {isa = PBXBuildFile; fileRef = B376BB8A40ED455E996B4DD0; };
+		205C5F2E67724682945B9C83 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 78CAB7E4F1DA4E7BB80B17F7 /* Models */; };
+		AC8C0132A78B4BB2886353EA /* Network in Frameworks */ = {isa = PBXBuildFile; productRef = C2D069520C594AE48F5CD988 /* Network */; };
+		B5403B57C04348BDB1470971 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 4997E8B3655A45569814149B /* Persistence */; };
+		A1B3A9A0B3404F1EB7F6E3E6 /* Env in Frameworks */ = {isa = PBXBuildFile; productRef = 3DD731C5996646FAA0982BE7 /* Env */; };
+		2DBFCF12FD6746B5BA6B4AB0 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 9724FC90F3FC46598C59CF5F /* DesignSystem */; };
+		1BE7BE9854E04A54958DD6A2 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = EA179C1F49B04958A7B39BB8 /* Auth */; };
+		5D4499F013C145D7AD41799E /* ChecklistFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 95D06A26A673416F846623E1 /* ChecklistFeature */; };
+		429DDB1B3C2D4BC8B4D09261 /* WorkClockFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 12CD4BC686894AB48CAD6B45 /* WorkClockFeature */; };
+		3FE111A6D5AF4C2180665CCA /* InventoryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 20C6497BDC9E4AC1B71E97C6 /* InventoryFeature */; };
+		12FF51ECA7124C108ED69A03 /* DashboardFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 3F99DBDC5B3542CAB0CD07C5 /* DashboardFeature */; };
+		E73D4126621648A0A3213E93 /* AdminFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = F822E87D9365495E87C39177 /* AdminFeatures */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		EBF4124DB71D4593BD97485B /* ChecklistBotecoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistBotecoApp.swift; sourceTree = "<group>"; };
-		0B38813964CC4824842BA529 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
-		F46874CFD44C4D8AA289EBCC /* MainTabViewPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabViewPreview.swift; sourceTree = "<group>"; };
-		7E58E7A728124F1A9FA88E35 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
-		FA89CCFAB2864B18A4B4413C /* AppDependencyGraph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencyGraph.swift; sourceTree = "<group>"; };
-		C2BA812AD7A64ACBBBBA5EC9 /* AppTabContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTabContent.swift; sourceTree = "<group>"; };
-		EEED2F95C10C4D69B7E52DA4 /* AppTabRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTabRoute.swift; sourceTree = "<group>"; };
-		2ECB325AE166483F9891938C /* TabRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabRouter.swift; sourceTree = "<group>"; };
-		8B82EC05186A4D3E936EA711 /* ChecklistBoteco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChecklistBoteco.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3A3DF086980F4A99AB90ED25 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		2ED0F10E3F44401882B272B6 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
-		46242EB004004199A57C0925 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		30BCFABEB60342ACBC79D90C /* ChecklistBotecoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistBotecoApp.swift; sourceTree = "<group>"; };
+		453B63DA2D9745B2A1F23BFF /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		7DC4691E8BD5454FB57165DA /* MainTabViewPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabViewPreview.swift; sourceTree = "<group>"; };
+		DA5C662E7F2D4C688FB7DFF9 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
+		469C4CB7F500416CB8041E8A /* AppDependencyGraph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencyGraph.swift; sourceTree = "<group>"; };
+		48846245505E4DE98CD350BF /* AppTabContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTabContent.swift; sourceTree = "<group>"; };
+		879890E257C24AC39B2D9A33 /* AppTabRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTabRoute.swift; sourceTree = "<group>"; };
+		B879F62D9AAF4B36B0E97115 /* AppDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDeepLink.swift; sourceTree = "<group>"; };
+		B376BB8A40ED455E996B4DD0 /* TabRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabRouter.swift; sourceTree = "<group>"; };
+		FA4D5991F23D43C3943E9641 /* ChecklistBoteco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChecklistBoteco.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1D6F00FEAFD945EB976A1227 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D7C0D3B055654EFAB93D29F7 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		90C056D5CF024BA3BC7B28DC /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		57CAC7E6E69D48679C3C0377 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (D35643CEFC0F42CBBF4179A6, AC377779E22840F2AC318C31, 626E302DD02C4230934F9A18, A118FB8AE070490C9FF7C5B6, F484F65988C345F0BCE3E5FB, 598183E481204E8DB29BB7A7, DBD17E15D49C44479CF66762, AF70CF02FEC5467ABAC99ED0, D7A20CF87A084680AA8E2A73, 9C0742C39F7E4713BD9C572A, 50D17ACB290F4980A364CAB6); runOnlyForDeploymentPostprocessing = 0; };
+		8B090AD393F34A9B9A8A00C0 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (205C5F2E67724682945B9C83, AC8C0132A78B4BB2886353EA, B5403B57C04348BDB1470971, A1B3A9A0B3404F1EB7F6E3E6, 2DBFCF12FD6746B5BA6B4AB0, 1BE7BE9854E04A54958DD6A2, 5D4499F013C145D7AD41799E, 429DDB1B3C2D4BC8B4D09261, 3FE111A6D5AF4C2180665CCA, 12FF51ECA7124C108ED69A03, E73D4126621648A0A3213E93); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		6BEFC97C58794770B8DA89DE = {isa = PBXGroup; children = (38F98CFBBA7B4CA5A3C3BF53, 9838E86DE84D4D64982B40AB, 6E53B3E9158C446DB292D3E9); sourceTree = "<group>"; };
-		6E53B3E9158C446DB292D3E9 /* Products */ = {isa = PBXGroup; children = (8B82EC05186A4D3E936EA711); name = Products; sourceTree = "<group>"; };
-		9838E86DE84D4D64982B40AB /* Config */ = {isa = PBXGroup; children = (2ED0F10E3F44401882B272B6, 46242EB004004199A57C0925); path = Config; sourceTree = "<group>"; };
-		38F98CFBBA7B4CA5A3C3BF53 /* ChecklistBoteco */ = {isa = PBXGroup; children = (EBF4124DB71D4593BD97485B, 0B38813964CC4824842BA529, F46874CFD44C4D8AA289EBCC, 7E58E7A728124F1A9FA88E35, FA89CCFAB2864B18A4B4413C, C2BA812AD7A64ACBBBBA5EC9, EEED2F95C10C4D69B7E52DA4, 2ECB325AE166483F9891938C, 3A3DF086980F4A99AB90ED25); path = ChecklistBoteco; sourceTree = "<group>"; };
+		29AE45ECD4384F35B4D59393 = {isa = PBXGroup; children = (B156D1C09B0548F3A81745E7, 7348BDC5C23D41318EA4AEB0, B538BD97A3744BCCB479B389); sourceTree = "<group>"; };
+		B538BD97A3744BCCB479B389 /* Products */ = {isa = PBXGroup; children = (FA4D5991F23D43C3943E9641); name = Products; sourceTree = "<group>"; };
+		7348BDC5C23D41318EA4AEB0 /* Config */ = {isa = PBXGroup; children = (D7C0D3B055654EFAB93D29F7, 90C056D5CF024BA3BC7B28DC); path = Config; sourceTree = "<group>"; };
+		B156D1C09B0548F3A81745E7 /* ChecklistBoteco */ = {isa = PBXGroup; children = (30BCFABEB60342ACBC79D90C, 453B63DA2D9745B2A1F23BFF, 7DC4691E8BD5454FB57165DA, DA5C662E7F2D4C688FB7DFF9, 469C4CB7F500416CB8041E8A, 48846245505E4DE98CD350BF, 879890E257C24AC39B2D9A33, B879F62D9AAF4B36B0E97115, B376BB8A40ED455E996B4DD0, 1D6F00FEAFD945EB976A1227); path = ChecklistBoteco; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		4FFB43DDB55C4D40AE807D88 /* ChecklistBoteco */ = {isa = PBXNativeTarget; buildConfigurationList = A02D565FA3DC4742AF73E5B5; buildPhases = (85BCF51BB9054C4E8F920EBD, 57CAC7E6E69D48679C3C0377, F92009E26B454B8A8487248F); buildRules = (); dependencies = (); name = ChecklistBoteco; packageProductDependencies = (358CBB3881BE4B8CB17082A4, FCF22F2571574B68A905101A, 240E35E8198D4E0D81C334C1, CDDC4D22EEAB4A529FC4CDA4, 497F9736764D49B9B40E42FC, 94438CA6A8BD4506A8DACAC7, 332FEA9B77E7471C87DC3A86, 76477B34D65941BDA879BB8E, 870087EFD3B94F65B04E8C12, 2BC0EC80B35046F99D0FFDEC, E4EFFD02D5BF45DDBC718CBF); productName = ChecklistBoteco; productReference = 8B82EC05186A4D3E936EA711; productType = "com.apple.product-type.application"; };
+		00968A46643C4EC393A5EA2F /* ChecklistBoteco */ = {isa = PBXNativeTarget; buildConfigurationList = 0E01C506B2CE4FD1982D031B; buildPhases = (7757FCB25F9B480AAF9B5EC3, 8B090AD393F34A9B9A8A00C0, CE87A29956AA41A38C4BEDCF); buildRules = (); dependencies = (); name = ChecklistBoteco; packageProductDependencies = (78CAB7E4F1DA4E7BB80B17F7, C2D069520C594AE48F5CD988, 4997E8B3655A45569814149B, 3DD731C5996646FAA0982BE7, 9724FC90F3FC46598C59CF5F, EA179C1F49B04958A7B39BB8, 95D06A26A673416F846623E1, 12CD4BC686894AB48CAD6B45, 20C6497BDC9E4AC1B71E97C6, 3F99DBDC5B3542CAB0CD07C5, F822E87D9365495E87C39177); productName = ChecklistBoteco; productReference = FA4D5991F23D43C3943E9641; productType = "com.apple.product-type.application"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2562CC0932A741D1B3CF34F8 /* Project object */ = {isa = PBXProject; attributes = {LastSwiftUpdateCheck = 1420; LastUpgradeCheck = 1420;}; buildConfigurationList = A668FA3431EE493FBDAB8B93; compatibilityVersion = "Xcode 14.0"; developmentRegion = pt-BR; hasScannedForEncodings = 0; knownRegions = (pt-BR, en); mainGroup = 6BEFC97C58794770B8DA89DE; packageReferences = (B167AC2B10F34E958B985157); productRefGroup = 6E53B3E9158C446DB292D3E9; projectDirPath = ""; projectRoot = ""; targets = (4FFB43DDB55C4D40AE807D88); };
+		83387B37A88844878C167F0E /* Project object */ = {isa = PBXProject; attributes = {LastSwiftUpdateCheck = 1420; LastUpgradeCheck = 1420;}; buildConfigurationList = DCE5474CAE164EEE8BB7ECAF; compatibilityVersion = "Xcode 14.0"; developmentRegion = pt-BR; hasScannedForEncodings = 0; knownRegions = (pt-BR, en); mainGroup = 29AE45ECD4384F35B4D59393; packageReferences = (65514588539B439E81E7E91E); productRefGroup = B538BD97A3744BCCB479B389; projectDirPath = ""; projectRoot = ""; targets = (00968A46643C4EC393A5EA2F); };
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		F92009E26B454B8A8487248F /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		CE87A29956AA41A38C4BEDCF /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		85BCF51BB9054C4E8F920EBD /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (C3FE4E98C9AB4A82A046EA5A, 63365F3BCC044AE3B403B28E, B7BC4C09722E49EBA3609ABE, F57B5B81A15B45C28225A65C, 7AC6A3751C364D148BF4C632, 6EA4E31EEE404D10BEFCA116, 7E895B7B8A0A47FAA8B8BEE5, DE20DA15768D4356AC9EC199); runOnlyForDeploymentPostprocessing = 0; };
+		7757FCB25F9B480AAF9B5EC3 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (87E490A192934A179A33E918, 6AACA51D7C2345F7BBBD9FAD, CF17216FD53E43AFAAEC70DC, BCA0C1331C384C0099D61B84, A374B6023D1B4745BEBB2CA7, FD8C8732D9B1414998D9C82B, E4375CF08EC7414292F5A9E0, 520A09A6CB55437DAD494D4D, 8278DC8E1A9C4ACA9A30DC3A); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		885E483C59974671B239BD37 /* Debug */ = {isa = XCBuildConfiguration; baseConfigurationReference = 2ED0F10E3F44401882B272B6; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
-		B71D220F076340AAA5B293BF /* Release */ = {isa = XCBuildConfiguration; baseConfigurationReference = 46242EB004004199A57C0925; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Release; };
-		A02D565FA3DC4742AF73E5B5 = {isa = XCConfigurationList; buildConfigurations = (885E483C59974671B239BD37, B71D220F076340AAA5B293BF); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		A668FA3431EE493FBDAB8B93 = {isa = XCConfigurationList; buildConfigurations = (885E483C59974671B239BD37, B71D220F076340AAA5B293BF); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		298738C773D94A8E9DCD44F3 /* Debug */ = {isa = XCBuildConfiguration; baseConfigurationReference = D7C0D3B055654EFAB93D29F7; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
+		28E35C7F3F90459394E5C21A /* Release */ = {isa = XCBuildConfiguration; baseConfigurationReference = 90C056D5CF024BA3BC7B28DC; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Release; };
+		0E01C506B2CE4FD1982D031B = {isa = XCConfigurationList; buildConfigurations = (298738C773D94A8E9DCD44F3, 28E35C7F3F90459394E5C21A); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		DCE5474CAE164EEE8BB7ECAF = {isa = XCConfigurationList; buildConfigurations = (298738C773D94A8E9DCD44F3, 28E35C7F3F90459394E5C21A); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "../Packages"; requirement = {kind = branch; branch = main;}; };
+		65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "../Packages"; requirement = {kind = branch; branch = main;}; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		358CBB3881BE4B8CB17082A4 /* Models */ = {isa = XCSwiftPackageProductDependency; productName = Models; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		FCF22F2571574B68A905101A /* Network */ = {isa = XCSwiftPackageProductDependency; productName = Network; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		240E35E8198D4E0D81C334C1 /* Persistence */ = {isa = XCSwiftPackageProductDependency; productName = Persistence; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		CDDC4D22EEAB4A529FC4CDA4 /* Env */ = {isa = XCSwiftPackageProductDependency; productName = Env; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		497F9736764D49B9B40E42FC /* DesignSystem */ = {isa = XCSwiftPackageProductDependency; productName = DesignSystem; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		94438CA6A8BD4506A8DACAC7 /* Auth */ = {isa = XCSwiftPackageProductDependency; productName = Auth; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		332FEA9B77E7471C87DC3A86 /* ChecklistFeature */ = {isa = XCSwiftPackageProductDependency; productName = ChecklistFeature; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		76477B34D65941BDA879BB8E /* WorkClockFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkClockFeature; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		870087EFD3B94F65B04E8C12 /* InventoryFeature */ = {isa = XCSwiftPackageProductDependency; productName = InventoryFeature; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		2BC0EC80B35046F99D0FFDEC /* DashboardFeature */ = {isa = XCSwiftPackageProductDependency; productName = DashboardFeature; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
-		E4EFFD02D5BF45DDBC718CBF /* AdminFeatures */ = {isa = XCSwiftPackageProductDependency; productName = AdminFeatures; package = B167AC2B10F34E958B985157 /* XCRemoteSwiftPackageReference Packages */; };
+		78CAB7E4F1DA4E7BB80B17F7 /* Models */ = {isa = XCSwiftPackageProductDependency; productName = Models; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		C2D069520C594AE48F5CD988 /* Network */ = {isa = XCSwiftPackageProductDependency; productName = Network; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		4997E8B3655A45569814149B /* Persistence */ = {isa = XCSwiftPackageProductDependency; productName = Persistence; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		3DD731C5996646FAA0982BE7 /* Env */ = {isa = XCSwiftPackageProductDependency; productName = Env; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		9724FC90F3FC46598C59CF5F /* DesignSystem */ = {isa = XCSwiftPackageProductDependency; productName = DesignSystem; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		EA179C1F49B04958A7B39BB8 /* Auth */ = {isa = XCSwiftPackageProductDependency; productName = Auth; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		95D06A26A673416F846623E1 /* ChecklistFeature */ = {isa = XCSwiftPackageProductDependency; productName = ChecklistFeature; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		12CD4BC686894AB48CAD6B45 /* WorkClockFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkClockFeature; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		20C6497BDC9E4AC1B71E97C6 /* InventoryFeature */ = {isa = XCSwiftPackageProductDependency; productName = InventoryFeature; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		3F99DBDC5B3542CAB0CD07C5 /* DashboardFeature */ = {isa = XCSwiftPackageProductDependency; productName = DashboardFeature; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
+		F822E87D9365495E87C39177 /* AdminFeatures */ = {isa = XCSwiftPackageProductDependency; productName = AdminFeatures; package = 65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */; };
 /* End XCSwiftPackageProductDependency section */
 
   };
-  rootObject = 2562CC0932A741D1B3CF34F8 /* Project object */;
+  rootObject = 83387B37A88844878C167F0E /* Project object */;
 }

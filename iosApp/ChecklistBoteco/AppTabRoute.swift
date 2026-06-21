@@ -4,12 +4,14 @@ import Persistence
 import WorkClockFeature
 import DashboardFeature
 import ChecklistFeature
+import InventoryFeature
 
 /// Destinos de navegação programática por tab (iOS 16 — `Hashable` + `NavigationPath`).
 enum AppTabRoute: Hashable {
   case workClockDayEntries(userId: Int64)
   case dashboardAreaDetail(area: Area)
   case checklistActivityDetail(activityId: Int64, area: Area)
+  case inventoryAuditDetail(InventoryAuditItemSnapshot)
 
   @ViewBuilder
   func destination(context: MainTabContext) -> some View {
@@ -24,6 +26,8 @@ enum AppTabRoute: Hashable {
         area: area,
         repository: context.repository
       )
+    case .inventoryAuditDetail(let snapshot):
+      InventoryAuditDetailView(snapshot: snapshot)
     }
   }
 }

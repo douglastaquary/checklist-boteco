@@ -9,6 +9,7 @@ struct MainTabView: View {
   @StateObject private var tabRouter = TabRouter()
 
   @State private var selectedTab: AppTab = .checklist
+  @State private var loadedTabs: Set<AppTab> = [.checklist]
 
   private var tabs: [AppTab] {
     AppTab.available(for: user)
@@ -17,11 +18,12 @@ struct MainTabView: View {
   var body: some View {
     TabView(selection: $selectedTab) {
       ForEach(tabs) { tab in
-        NavigationStack(path: tabRouter.binding(for: tab)) {
-          tab.makeContentView(context: context, user: user, tabRouter: tabRouter)
-            .navigationDestination(for: AppTabRoute.self) { route in
-              route.destination(context: context)
-            }
+        Group {
+          if loadedTabs.contains(tab) {
+            navigationStack(for: tab)
+          } else {
+            Color.clear
+          }
         }
         .tabItem { tab.label }
         .tag(tab)
@@ -29,6 +31,30 @@ struct MainTabView: View {
     }
     .onAppear {
       if !tabs.contains(selectedTab) { selectedTab = tabs.first ?? .checklist }
+      loadedTabs.insert(selectedTab)
+    }
+    .onChange(of: selectedTab) { tab in
+      loadedTabs.insert(tab)
+    }
+    .onOpenURL { url in
+      guard let link = AppDeepLink.parse(url) else { return }
+      AppDeepLinkHandler.apply(
+        link,
+        user: user,
+        selectedTab: &selectedTab,
+        tabRouter: tabRouter
+      )
+      loadedTabs.insert(selectedTab)
+    }
+  }
+
+  @ViewBuilder
+  private func navigationStack(for tab: AppTab) -> some View {
+    NavigationStack(path: tabRouter.binding(for: tab)) {
+      tab.makeContentView(context: context, user: user, tabRouter: tabRouter)
+        .navigationDestination(for: AppTabRoute.self) { route in
+          route.destination(context: context)
+        }
     }
   }
 }
