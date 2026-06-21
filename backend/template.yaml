@@ -25,6 +25,7 @@ Globals:
         PURCHASES_TABLE: !Ref PurchasesTable
         SALES_TABLE: !Ref SalesTable
         PURCHASES_MCP_TOKEN: !Ref PurchasesMcpToken
+        QUARKUS_PROFILE: prod
 
 Resources:
   ChecklistApi:

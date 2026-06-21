@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Autenticando…</title>
+  <link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+  <main style="max-width:520px;margin:48px auto;padding:24px;">
+    <article>
+      <p class="eyebrow">ACESSO</p>
+      <h1>Finalizando login</h1>
+      <p id="authCallbackMessage">Aguarde enquanto validamos sua sessão…</p>
+    </article>
+  </main>
+  <script src="/assets/auth.js"></script>
+  <script>
+    if (!window.ChecklistAuth?.captureFromRedirect()) {
+      document.getElementById('authCallbackMessage').textContent =
+        'Token não encontrado. Volte ao login e tente novamente.';
+      setTimeout(() => window.location.replace('/'), 2500);
+    }
+  </script>
+</body>
+</html>

@@ -88,6 +88,9 @@ fun App(
                         screen.user.featurePermissions.canRegisterUsers,
                         screen.user.featurePermissions.canCreateActivities,
                         screen.user.featurePermissions.canEditUsers,
+                        screen.user.featurePermissions.canCreateInventoryCounts,
+                        screen.user.featurePermissions.canViewInventoryInsights,
+                        screen.user.featurePermissions.canManageAdministrativeStock,
                         screen.authToken.orEmpty(),
                         screen.remoteUserId.orEmpty()
                     )
@@ -114,13 +117,18 @@ fun App(
                         featurePermissions = com.checklistboteco.domain.model.FeaturePermissions(
                             canRegisterUsers = list[11] as Boolean,
                             canCreateActivities = list[12] as Boolean,
-                            canEditUsers = list[13] as Boolean
+                            canEditUsers = list[13] as Boolean,
+                            canCreateInventoryCounts = list.getOrNull(14) as? Boolean ?: false,
+                            canViewInventoryInsights = list.getOrNull(15) as? Boolean ?: false,
+                            canManageAdministrativeStock = list.getOrNull(16) as? Boolean ?: false
                         )
                     )
                     Screen.Main(
                         user = user,
-                        authToken = (list.getOrNull(14) as? String)?.ifBlank { null },
-                        remoteUserId = (list.getOrNull(15) as? String)?.ifBlank { null }
+                        authToken = (list.getOrNull(17) as? String)?.ifBlank { null }
+                            ?: ((list.getOrNull(16) as? String)?.ifBlank { null }),
+                        remoteUserId = (list.getOrNull(18) as? String)?.ifBlank { null }
+                            ?: ((list.getOrNull(17) as? String)?.ifBlank { null })
                     )
                 }
             }

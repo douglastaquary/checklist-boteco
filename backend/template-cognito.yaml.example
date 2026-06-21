@@ -1,0 +1,84 @@
+# SAM overlay — Cognito + JWT authorizer (Fase 4)
+
+Use este arquivo como referência para estender [`template.yaml`](template.yaml) quando migrar auth para Cognito.
+
+Baseado em [re:Money security](https://dev.to/vsenger/goodbye-localhost-hello-aws-adding-security-to-remoney-2063).
+
+## Pré-requisitos
+
+1. Google OAuth Client ID/Secret (opcional, para login Google)
+2. Callback URL: `https://<ApiId>.execute-api.<region>.amazonaws.com/auth/callback`
+3. `auth.js` + rota `/auth/callback` já implementados no Quarkus
+
+## Recursos a adicionar ao template.yaml
+
+```yaml
+Parameters:
+  GoogleClientId:
+    Type: String
+    Default: ""
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+
+Conditions:
+  UseGoogleAuth: !Not [!Equals [!Ref GoogleClientId, ""]]
+
+Resources:
+  ChecklistUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: checklist-boteco-users
+      AutoVerifiedAttributes: [email]
+
+  ChecklistUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: checklist-boteco-auth-UNIQUE
+      UserPoolId: !Ref ChecklistUserPool
+
+  ChecklistUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: checklist-web
+      UserPoolId: !Ref ChecklistUserPool
+      GenerateSecret: false
+      AllowedOAuthFlows: [implicit]
+      AllowedOAuthScopes: [openid, email, profile]
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - https://YOUR-API.execute-api.us-east-1.amazonaws.com/auth/callback
+      LogoutURLs:
+        - https://YOUR-API.execute-api.us-east-1.amazonaws.com/
+
+  ChecklistHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${ChecklistUserPool}
+              audience: [!Ref ChecklistUserPoolClient]
+```
+
+## Rotas
+
+| Rota | Auth gateway | Auth app |
+|------|--------------|----------|
+| `/`, `/assets/*`, `/auth/callback` | Pública | Callback sem guard |
+| `/api/*` | JWT Cognito | AdminGuard valida claims |
+
+## Próximos passos código
+
+1. `admin.js`: login redirect para hosted UI Cognito quando `checklist.auth.mode=cognito`
+2. Mapear claims Cognito → `PermissionLevel` / `FeaturePermissions`
+3. App Android: Hosted UI ou SRP contra User Pool
+4. Desativar `TokenService` HMAC em `%prod` após cutover
+
+## Dev local
+
+Manter auth HMAC + 2FA em `%dev`. Cognito só em stack AWS com parâmetros configurados.

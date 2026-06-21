@@ -19,6 +19,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.checklistboteco.domain.model.InventoryCountDraft
 
 class BackendApiClient private constructor(
     private val baseUrl: String,
@@ -103,6 +104,28 @@ class BackendApiClient private constructor(
             )
         }
     }
+
+    suspend fun submitInventoryCount(token: String, date: String, items: List<InventoryCountDraft>) {
+        httpClient.post("$baseUrl/api/inventory/counts") {
+            bearerAuth(token); contentType(ContentType.Application.Json)
+            setBody(InventoryCountRequestDto(date,countedAt=kotlinx.datetime.Clock.System.now().toString(),items=items.map { InventoryCountItemDto(it.name,it.quantity,it.category.name,it.volume,it.volumeUnit,it.salePriceInCents,it.costPriceInCents,it.storageCondition.name) }))
+        }
+    }
+
+    suspend fun submitAdminStockCount(token: String, date: String, items: List<InventoryCountDraft>) {
+        httpClient.post("$baseUrl/api/inventory/admin-stock/counts") {
+            bearerAuth(token); contentType(ContentType.Application.Json)
+            setBody(InventoryCountRequestDto(date,countedAt=kotlinx.datetime.Clock.System.now().toString(),items=items.map { InventoryCountItemDto(it.name,it.quantity,it.category.name,it.volume,it.volumeUnit,it.salePriceInCents,it.costPriceInCents,it.storageCondition.name) }))
+        }
+    }
+
+    suspend fun inventoryDailyAudit(token:String,date:String):RemoteInventoryAudit = httpClient.post("$baseUrl/api/inventory/audit/daily") {
+        bearerAuth(token); contentType(ContentType.Application.Json); setBody(InventoryAuditRequestDto(date))
+    }.body()
+
+    suspend fun applyDailyAudit(token: String, date: String): RemoteApplyDailyAudit = httpClient.post("$baseUrl/api/inventory/audit/daily/apply") {
+        bearerAuth(token); contentType(ContentType.Application.Json); setBody(InventoryAuditRequestDto(date))
+    }.body()
 
     companion object {
         fun fromEnvironment(): BackendApiClient? {
@@ -216,16 +239,30 @@ private data class PublicUserDto(
 private data class FeaturePermissionsDto(
     val canRegisterUsers: Boolean = false,
     val canCreateActivities: Boolean = false,
-    val canEditUsers: Boolean = false
+    val canEditUsers: Boolean = false,
+    val canCreateInventoryCounts: Boolean = false,
+    val canViewInventoryInsights: Boolean = false,
+    val canManageAdministrativeStock: Boolean = false
 ) {
     fun toDomain(): FeaturePermissions {
         return FeaturePermissions(
             canRegisterUsers = canRegisterUsers,
             canCreateActivities = canCreateActivities,
-            canEditUsers = canEditUsers
+            canEditUsers = canEditUsers,
+            canCreateInventoryCounts = canCreateInventoryCounts,
+            canViewInventoryInsights = canViewInventoryInsights,
+            canManageAdministrativeStock = canManageAdministrativeStock
         )
     }
 }
+
+@Serializable private data class InventoryCountRequestDto(val countDate:String,val countedAt:String,val location:String="Beco da Praia",val items:List<InventoryCountItemDto>)
+@Serializable private data class InventoryCountItemDto(val name:String,val quantity:Double,val category:String,val volume:Double,val volumeUnit:String,val salePriceInCents:Long,val costPriceInCents:Long?,val condition:String)
+@Serializable private data class InventoryAuditRequestDto(val date:String,val location:String="Beco da Praia")
+@Serializable data class RemoteInventoryAudit(val date:String,val location:String,val items:List<RemoteInventoryAuditItem> = emptyList(),val totalOpening:Double=0.0,val totalSold:Double=0.0,val totalRemaining:Double=0.0)
+@Serializable data class RemoteInventoryAuditItem(val product:String,val status:String,val notes:String,val openingQuantity:Double=0.0,val soldQuantity:Double=0.0,val theoreticalRemaining:Double=0.0)
+@Serializable data class RemoteApplyDailyAudit(val audit:RemoteInventoryAudit?=null,val balances:List<RemoteAdminStockBalance> = emptyList(),val alreadyApplied:Boolean=false)
+@Serializable data class RemoteAdminStockBalance(val productKey:String,val productName:String,val location:String,val quantity:Double=0.0)
 
 @Serializable
 private data class SyncPushRequestDto(

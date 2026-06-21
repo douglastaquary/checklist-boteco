@@ -55,6 +55,9 @@ fun PermissionManagementScreen(
             onCanRegisterUsersChange = viewModel::updateCanRegisterUsers,
             onCanCreateActivitiesChange = viewModel::updateCanCreateActivities,
             onCanEditUsersChange = viewModel::updateCanEditUsers,
+            onCanCreateInventoryCountsChange = viewModel::updateCanCreateInventoryCounts,
+            onCanViewInventoryInsightsChange = viewModel::updateCanViewInventoryInsights,
+            onCanManageAdministrativeStockChange = viewModel::updateCanManageAdministrativeStock,
             modifier = modifier
         )
         return
@@ -149,6 +152,9 @@ private fun UserPermissionDetailsScreen(
     onCanRegisterUsersChange: (Boolean) -> Unit,
     onCanCreateActivitiesChange: (Boolean) -> Unit,
     onCanEditUsersChange: (Boolean) -> Unit,
+    onCanCreateInventoryCountsChange: (Boolean) -> Unit,
+    onCanViewInventoryInsightsChange: (Boolean) -> Unit,
+    onCanManageAdministrativeStockChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isAdmin = user.permissionLevel == PermissionLevel.ADMIN
@@ -206,6 +212,9 @@ private fun UserPermissionDetailsScreen(
                 enabled = !isAdmin,
                 onCheckedChange = onCanEditUsersChange
             )
+            PermissionToggle(label="Criar contagens de mercadorias",checked=user.canCreateInventoryCounts(),enabled=!isAdmin,onCheckedChange=onCanCreateInventoryCountsChange)
+            PermissionToggle(label="Visualizar insights e auditoria",checked=user.canViewInventoryInsights(),enabled=!isAdmin,onCheckedChange=onCanViewInventoryInsightsChange)
+            PermissionToggle(label="Contagem administrativa de estoque",checked=user.canManageAdministrativeStock(),enabled=!isAdmin,onCheckedChange=onCanManageAdministrativeStockChange)
 
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)

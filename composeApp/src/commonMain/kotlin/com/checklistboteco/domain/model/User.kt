@@ -29,6 +29,10 @@ data class User(
         return permissionLevel == PermissionLevel.ADMIN || featurePermissions.canEditUsers
     }
 
+    fun canCreateInventoryCounts() = permissionLevel == PermissionLevel.ADMIN || featurePermissions.canCreateInventoryCounts
+    fun canViewInventoryInsights() = permissionLevel == PermissionLevel.ADMIN || featurePermissions.canViewInventoryInsights
+    fun canManageAdministrativeStock() = permissionLevel == PermissionLevel.ADMIN || featurePermissions.canManageAdministrativeStock
+
     fun canManagePermissions(): Boolean {
         return permissionLevel == PermissionLevel.ADMIN
     }

@@ -28,11 +28,20 @@ public final class Models {
         public boolean canRegisterUsers;
         public boolean canCreateActivities;
         public boolean canEditUsers;
+        public boolean canCreateInventoryCounts;
+        public boolean canViewInventoryInsights;
+        public boolean canManageAdministrativeStock;
         public FeaturePermissions() {}
         public FeaturePermissions(boolean register, boolean activities, boolean edit) {
             canRegisterUsers = register; canCreateActivities = activities; canEditUsers = edit;
         }
-        public static FeaturePermissions admin() { return new FeaturePermissions(true, true, true); }
+        public static FeaturePermissions admin() {
+            var value=new FeaturePermissions(true,true,true);
+            value.canCreateInventoryCounts=true;
+            value.canViewInventoryInsights=true;
+            value.canManageAdministrativeStock=true;
+            return value;
+        }
     }
 
     public static class User {

@@ -11,7 +11,10 @@ CREATE TABLE User (
     remoteId TEXT,
     canRegisterUsers INTEGER NOT NULL DEFAULT 0,
     canCreateActivities INTEGER NOT NULL DEFAULT 0,
-    canEditUsers INTEGER NOT NULL DEFAULT 0
+    canEditUsers INTEGER NOT NULL DEFAULT 0,
+    canCreateInventoryCounts INTEGER NOT NULL DEFAULT 0,
+    canViewInventoryInsights INTEGER NOT NULL DEFAULT 0,
+    canManageAdministrativeStock INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE Activity (
@@ -70,9 +73,23 @@ CREATE TABLE WorkClockEntry (
     FOREIGN KEY (userId) REFERENCES User(id)
 );
 
+CREATE TABLE InventoryCountDraft (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    category TEXT NOT NULL,
+    volume REAL NOT NULL,
+    volumeUnit TEXT NOT NULL,
+    salePriceInCents INTEGER NOT NULL,
+    costPriceInCents INTEGER,
+    storageCondition TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    isAdministrative INTEGER NOT NULL DEFAULT 0
+);
+
 insertUser:
-INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId, canRegisterUsers, canCreateActivities, canEditUsers)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId, canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts, canViewInventoryInsights, canManageAdministrativeStock)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertActivity:
 INSERT INTO Activity(syncId, name, area, frequency, effort, serverRevision, syncState, deletedAt)
@@ -100,8 +117,24 @@ SELECT * FROM User WHERE remoteId = ?;
 
 updateUserFeaturePermissions:
 UPDATE User
-SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?
+SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?, canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
 WHERE id = ?;
+
+insertInventoryCountDraft:
+INSERT INTO InventoryCountDraft(name, quantity, category, volume, volumeUnit, salePriceInCents, costPriceInCents, storageCondition, createdAt, isAdministrative)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectInventoryCountDraft:
+SELECT * FROM InventoryCountDraft WHERE isAdministrative = ? ORDER BY id ASC;
+
+updateInventoryCountDraft:
+UPDATE InventoryCountDraft SET name=?, quantity=?, category=?, volume=?, volumeUnit=?, salePriceInCents=?, costPriceInCents=?, storageCondition=? WHERE id=?;
+
+deleteInventoryCountDraft:
+DELETE FROM InventoryCountDraft WHERE id=?;
+
+clearInventoryCountDraft:
+DELETE FROM InventoryCountDraft WHERE isAdministrative = ?;
 
 selectAllActivities:
 SELECT * FROM Activity WHERE deletedAt IS NULL;

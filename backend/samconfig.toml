@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "checklist-boteco"
+resolve_s3 = true
+s3_prefix = "checklist-boteco"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "JwtSecret=CHANGE_ME_32_CHARS_MINIMUM_SECRET!! PurchasesMcpToken=CHANGE_ME_MCP_TOKEN_32_CHARS!!"
+image_repositories = []
+
+[default.build.parameters]
+template_file = "template.yaml"

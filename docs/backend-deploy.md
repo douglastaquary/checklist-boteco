@@ -36,8 +36,8 @@ cd backend
 
 Abra:
 
-- Admin: `http://localhost:8080`
-- Health check: `http://localhost:8080/api/health`
+- Admin: `http://localhost:8181`
+- Health check: `http://localhost:8181/api/health`
 
 Credenciais seed: `admin@checklistboteco.com` / `admin123`. No primeiro login, a tela mostra o código de confirmação do dispositivo. O store local é recriado quando o processo reinicia.
 
@@ -134,12 +134,18 @@ Pré-requisitos: AWS CLI configurada e AWS SAM CLI.
 
 ```bash
 cd backend
-./mvnw package -DskipTests
+./build-lambda.sh
 sam build --template-file template.yaml
-sam deploy --guided
+sam deploy
 ```
 
-No primeiro deploy, informe `JwtSecret` e `PurchasesMcpToken` com 24 ou mais caracteres. O template cria Lambda Java 17 ARM64, HTTP API e duas tabelas DynamoDB, aplica permissão CRUD à função e mantém as tabelas quando a stack é removida.
+No primeiro deploy use `sam deploy --guided` para gerar `samconfig.toml`. Informe `JwtSecret` e `PurchasesMcpToken` com 24 ou mais caracteres.
+
+O template cria Lambda Java 17 ARM64, HTTP API e **três** tabelas DynamoDB (`ChecklistTable`, `PurchasesTable`, `SalesTable`), aplica permissão CRUD à função e mantém as tabelas quando a stack é removida.
+
+**Produção:** deploy somente via SAM/Lambda. O arquivo `Dockerfile.deprecated` não deve ser usado.
+
+Roadmap arquitetural (Cognito, lazy DynamoDB, SnapStart): [architecture-serverless.md](architecture-serverless.md)
 
 Depois do deploy, use o output `ApiUrl` no app:
 

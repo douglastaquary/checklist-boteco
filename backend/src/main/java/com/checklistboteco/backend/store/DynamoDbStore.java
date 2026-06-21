@@ -17,7 +17,7 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
 import java.util.*;
 
-/** Single-table DynamoDB adapter. The local profile deliberately uses LocalStore instead. */
+/** Single-table DynamoDB adapter. Hydrates lazily on first access to avoid scan during Lambda cold start. */
 @ApplicationScoped
 @IfBuildProfile("prod")
 public class DynamoDbStore extends LocalStore {
@@ -26,25 +26,42 @@ public class DynamoDbStore extends LocalStore {
     @ConfigProperty(name="checklist.aws.region") String region;
     private DynamoDbClient dynamo;
     private final Set<String> deletedUsers=new HashSet<>();
+    private volatile boolean hydrated;
 
-    @PostConstruct void connectAndLoad() {
+    @PostConstruct void connect() {
         dynamo=DynamoDbClient.builder().region(Region.of(region)).credentialsProvider(DefaultCredentialsProvider.create())
             .httpClientBuilder(UrlConnectionHttpClient.builder()).build();
-        users.clear(); activities.clear(); completions.clear(); workClock.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear();
-        dynamo.scan(ScanRequest.builder().tableName(table).build()).items().forEach(this::hydrate);
-        deletedUsers.forEach(users::remove);
         seed();
     }
     @PreDestroy void close(){ if(dynamo!=null)dynamo.close(); }
 
-    @Override public synchronized PublicUser createUser(CreateUserRequest request){ PublicUser result=super.createUser(request); put("USER",result.id,users.get(result.id)); return result; }
-    @Override public synchronized PublicUser updateUser(String id,UpdateUserRequest request){ PublicUser result=super.updateUser(id,request); put("USER",id,users.get(id)); return result; }
-    @Override public synchronized void deleteUser(String id){ super.deleteUser(id); putRaw("USER_DELETED",id,"deleted"); }
-    @Override public synchronized PublicUser resetUserPassword(String id,String newPassword){ PublicUser result=super.resetUserPassword(id,newPassword); put("USER",id,users.get(id)); return result; }
-    @Override public synchronized PublicUser updatePermissions(String id,FeaturePermissions permissions){ PublicUser result=super.updatePermissions(id,permissions); put("USER",id,users.get(id)); return result; }
-    @Override public synchronized Activity createActivity(CreateActivityRequest request){ Activity result=super.createActivity(request); put("ACTIVITY",result.id,result); return result; }
-    @Override public void upsertWorkClockEntries(List<WorkClockEntry> values){ super.upsertWorkClockEntries(values); safe(values).forEach(v->put("WORK_CLOCK",v.id,v)); }
+    private synchronized void ensureHydrated() {
+        if (hydrated) return;
+        users.clear(); activities.clear(); completions.clear(); workClock.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear();
+        dynamo.scan(ScanRequest.builder().tableName(table).build()).items().forEach(this::hydrate);
+        deletedUsers.forEach(users::remove);
+        if (users.isEmpty()) seed();
+        hydrated=true;
+    }
+
+    @Override public User authenticate(String email,String password){ ensureHydrated(); return super.authenticate(email,password); }
+    @Override public User getUser(String id){ ensureHydrated(); return super.getUser(id); }
+    @Override public List<PublicUser> users(){ ensureHydrated(); return super.users(); }
+    @Override public List<Activity> activities(){ ensureHydrated(); return super.activities(); }
+    @Override public List<Completion> completions(){ ensureHydrated(); return super.completions(); }
+    @Override public DashboardStats dashboard(){ ensureHydrated(); return super.dashboard(); }
+    @Override public PullData pullChanges(String userId,long cursor,int limit){ ensureHydrated(); return super.pullChanges(userId,cursor,limit); }
+    @Override public boolean isTrustedDevice(String userId,String deviceId){ ensureHydrated(); return super.isTrustedDevice(userId,deviceId); }
+
+    @Override public synchronized PublicUser createUser(CreateUserRequest request){ ensureHydrated(); PublicUser result=super.createUser(request); put("USER",result.id,users.get(result.id)); return result; }
+    @Override public synchronized PublicUser updateUser(String id,UpdateUserRequest request){ ensureHydrated(); PublicUser result=super.updateUser(id,request); put("USER",id,users.get(id)); return result; }
+    @Override public synchronized void deleteUser(String id){ ensureHydrated(); super.deleteUser(id); putRaw("USER_DELETED",id,"deleted"); }
+    @Override public synchronized PublicUser resetUserPassword(String id,String newPassword){ ensureHydrated(); PublicUser result=super.resetUserPassword(id,newPassword); put("USER",id,users.get(id)); return result; }
+    @Override public synchronized PublicUser updatePermissions(String id,FeaturePermissions permissions){ ensureHydrated(); PublicUser result=super.updatePermissions(id,permissions); put("USER",id,users.get(id)); return result; }
+    @Override public synchronized Activity createActivity(CreateActivityRequest request){ ensureHydrated(); Activity result=super.createActivity(request); put("ACTIVITY",result.id,result); return result; }
+    @Override public void upsertWorkClockEntries(List<WorkClockEntry> values){ ensureHydrated(); super.upsertWorkClockEntries(values); safe(values).forEach(v->put("WORK_CLOCK",v.id,v)); }
     @Override public synchronized SyncPushResult pushSync(String userId,boolean admin,SyncPushRequest request){
+        ensureHydrated();
         SyncPushResult result=super.pushSync(userId,admin,request);
         safe(request==null?null:request.operations).forEach(operation->{
             if(operation.entityId==null) return;
@@ -58,8 +75,9 @@ public class DynamoDbStore extends LocalStore {
         safe(request==null?null:request.workClockEntries).forEach(v->put("WORK_CLOCK",v.id,v));
         return result;
     }
-    @Override public DeviceChallenge createDeviceChallenge(String userId,String deviceId,String deviceName){ DeviceChallenge result=super.createDeviceChallenge(userId,deviceId,deviceName); put("CHALLENGE",result.id,result); return result; }
+    @Override public DeviceChallenge createDeviceChallenge(String userId,String deviceId,String deviceName){ ensureHydrated(); DeviceChallenge result=super.createDeviceChallenge(userId,deviceId,deviceName); put("CHALLENGE",result.id,result); return result; }
     @Override public User verifyDeviceChallenge(String id,String code,String deviceId,String deviceName){
+        ensureHydrated();
         User result=super.verifyDeviceChallenge(id,code,deviceId,deviceName);
         if(result!=null) putRaw("TRUSTED",result.id+":"+deviceId,result.id+":"+deviceId);
         return result;

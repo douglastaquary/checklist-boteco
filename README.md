@@ -1,6 +1,16 @@
 # Checklist Boteco
 
+Documentação do módulo de contagem e auditoria diária: [docs/inventory-counting-module.md](docs/inventory-counting-module.md).
+
 Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform**, backend **Quarkus serverless** e administração web em **Qute + JavaScript vanilla**.
+
+## Direcionamento backend/web (Cursor)
+
+Para features de API, painel admin, persistência ou deploy AWS, use a skill de projeto:
+
+**[`.cursor/skills/quarkus-serverless-qute/SKILL.md`](.cursor/skills/quarkus-serverless-qute/SKILL.md)**
+
+Roadmap de alinhamento: [`docs/architecture-serverless.md`](docs/architecture-serverless.md)
 
 ## Funcionalidades
 

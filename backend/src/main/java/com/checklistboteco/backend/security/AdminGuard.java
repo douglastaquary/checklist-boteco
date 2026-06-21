@@ -61,6 +61,43 @@ public class AdminGuard {
         return user;
     }
 
+    public User requireInventoryCountAccess(String authorization) {
+        User user=requireUser(authorization);
+        if(user.permissionLevel==PermissionLevel.ADMIN || (user.permissions!=null&&user.permissions.canCreateInventoryCounts)) return user;
+        fail(Response.Status.FORBIDDEN,"Permissão para criar contagens necessária");
+        return user;
+    }
+
+    public User requireInventoryInsightsAccess(String authorization) {
+        User user=requireUser(authorization);
+        if(user.permissionLevel==PermissionLevel.ADMIN || (user.permissions!=null&&user.permissions.canViewInventoryInsights)) return user;
+        fail(Response.Status.FORBIDDEN,"Permissão para visualizar auditoria de estoque necessária");
+        return user;
+    }
+
+    public User requireAdministrativeStockAccess(String authorization) {
+        User user=requireUser(authorization);
+        if(user.permissionLevel==PermissionLevel.ADMIN || (user.permissions!=null&&user.permissions.canManageAdministrativeStock)) return user;
+        fail(Response.Status.FORBIDDEN,"Permissão para contagem administrativa de estoque necessária");
+        return user;
+    }
+
+    public User requireApplyDailyAuditAccess(String authorization) {
+        User user=requireUser(authorization);
+        if(user.permissionLevel==PermissionLevel.ADMIN) return user;
+        FeaturePermissions permissions=user.permissions==null?new FeaturePermissions():user.permissions;
+        if(permissions.canManageAdministrativeStock || permissions.canViewInventoryInsights) return user;
+        fail(Response.Status.FORBIDDEN,"Permissão para aplicar auditoria diária no estoque necessária");
+        return user;
+    }
+
+    private User requireUser(String authorization) {
+        TokenService.Payload payload=requireToken(authorization);
+        User user=store.getUser(payload.userId);
+        if(user==null) fail(Response.Status.UNAUTHORIZED,"Usuário não encontrado");
+        return user;
+    }
+
     public static void fail(Response.Status status,String message) {
         throw new WebApplicationException(Response.status(status).entity(new ApiError(message)).type(MediaType.APPLICATION_JSON).build());
     }
