@@ -6,6 +6,12 @@ import Models
 import Network
 import Persistence
 
+enum LoginPhase: Equatable {
+  case credentials
+  case biometricUnlock
+  case twoFactor
+}
+
 public struct LoginView: View {
   @EnvironmentObject private var session: AppSession
   @ObservedObject private var feedback = NetworkFeedback.shared
@@ -13,6 +19,7 @@ public struct LoginView: View {
   private let credentialStore: CredentialStoreProtocol
   private let onLoginSuccess: () -> Void
   private let onRegisterTap: () -> Void
+  private let skipsRestore: Bool
 
   @State private var username = ""
   @State private var password = ""
@@ -28,11 +35,19 @@ public struct LoginView: View {
   public init(
     credentialStore: CredentialStoreProtocol = KeychainCredentialStore(),
     onLoginSuccess: @escaping () -> Void,
-    onRegisterTap: @escaping () -> Void
+    onRegisterTap: @escaping () -> Void,
+    debugPhase: LoginPhase? = nil,
+    debugTwoFactorHint: String? = nil,
+    debugUsername: String = "",
+    skipsRestore: Bool = false
   ) {
     self.credentialStore = credentialStore
     self.onLoginSuccess = onLoginSuccess
     self.onRegisterTap = onRegisterTap
+    self.skipsRestore = skipsRestore || debugPhase != nil
+    _phase = State(initialValue: debugPhase ?? .credentials)
+    _twoFactorHint = State(initialValue: debugTwoFactorHint)
+    _username = State(initialValue: debugUsername)
   }
 
   public var body: some View {
@@ -103,7 +118,10 @@ public struct LoginView: View {
       }
       .themedFormStyle()
       .navigationTitle("Checklist Boteco")
-      .task { await restoreSavedLogin(autoUnlock: true) }
+      .task {
+        guard !skipsRestore else { return }
+        await restoreSavedLogin(autoUnlock: true)
+      }
       .onChange(of: phase) { newPhase in
         switch newPhase {
         case .twoFactor: focusedField = .twoFactorCode
@@ -187,12 +205,6 @@ public struct LoginView: View {
       }
     }
   }
-}
-
-private enum LoginPhase: Equatable {
-  case credentials
-  case biometricUnlock
-  case twoFactor
 }
 
 private enum Field: Hashable {

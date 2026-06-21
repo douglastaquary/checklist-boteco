@@ -9,6 +9,7 @@ public struct ChecklistRootView: View {
   private let repository: ChecklistRepository
   private let syncController: SyncController
   private let onLogout: () -> Void
+  private let onSelectActivity: ((Int64, Area) -> Void)?
 
   @State private var selectedArea: Area = .atendimento
   @State private var items: [ActivityWithCompletion] = []
@@ -19,12 +20,14 @@ public struct ChecklistRootView: View {
     user: User,
     repository: ChecklistRepository,
     syncController: SyncController,
-    onLogout: @escaping () -> Void
+    onLogout: @escaping () -> Void,
+    onSelectActivity: ((Int64, Area) -> Void)? = nil
   ) {
     self.user = user
     self.repository = repository
     self.syncController = syncController
     self.onLogout = onLogout
+    self.onSelectActivity = onSelectActivity
   }
 
   public var body: some View {
@@ -38,9 +41,14 @@ public struct ChecklistRootView: View {
       .padding()
 
       List(items) { item in
-        ActivityChecklistRow(item: item) {
-          cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
-        }
+        ActivityChecklistRow(
+          item: item,
+          onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
+          onMarkComplete: {
+            cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
+          }
+        )
+        .themedListRowBackground()
       }
       .themedListStyle()
     }
@@ -98,15 +106,20 @@ private struct ChecklistAlert: Identifiable {
 
 private struct ActivityChecklistRow: View {
   let item: ActivityWithCompletion
+  let onSelect: (() -> Void)?
   let onMarkComplete: () -> Void
 
   var body: some View {
     HStack {
-      VStack(alignment: .leading) {
-        Text(item.activity.name).font(.headline)
-        Text(item.activity.frequency.displayName).font(.caption).foregroundStyle(.secondary)
+      Button(action: { onSelect?() }) {
+        VStack(alignment: .leading) {
+          Text(item.activity.name).font(.headline)
+          Text(item.activity.frequency.displayName).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
-      Spacer()
+      .buttonStyle(.plain)
+      .disabled(onSelect == nil)
       Toggle(
         "",
         isOn: Binding(

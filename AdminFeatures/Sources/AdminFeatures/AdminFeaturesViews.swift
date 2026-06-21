@@ -5,28 +5,81 @@ import DesignSystem
 
 public struct ActivitiesManagementView: View {
   private let repository: ChecklistRepository
-  @State private var name = ""
-  @State private var area: Area = .atendimento
   @State private var activities: [Activity] = []
+  @State private var createSheet: ActivityCreateSheet?
 
   public init(repository: ChecklistRepository) {
     self.repository = repository
   }
 
   public var body: some View {
-    Form {
-      ActivityCreateSection(name: $name, area: $area) {
-        try? repository.insertActivity(
-          Activity(id: 0, name: name, area: area, frequency: .daily)
-        )
-        name = ""
-        activities = (try? repository.allActivities()) ?? []
+    List {
+      Section {
+        Button("Nova atividade") {
+          createSheet = ActivityCreateSheet()
+        }
+        .themedListRowBackground()
       }
       ActivityListSection(activities: activities)
     }
-    .themedFormStyle()
+    .themedListStyle()
     .navigationTitle("Atividades")
-    .task { activities = (try? repository.allActivities()) ?? [] }
+    .task { reload() }
+    .sheet(item: $createSheet) { _ in
+      ActivityCreateSheetView(repository: repository) {
+        reload()
+        createSheet = nil
+      } onCancel: {
+        createSheet = nil
+      }
+    }
+  }
+
+  private func reload() {
+    activities = (try? repository.allActivities()) ?? []
+  }
+}
+
+private struct ActivityCreateSheet: Identifiable {
+  let id = UUID()
+}
+
+private struct ActivityCreateSheetView: View {
+  let repository: ChecklistRepository
+  let onSaved: () -> Void
+  let onCancel: () -> Void
+
+  @State private var name = ""
+  @State private var area: Area = .atendimento
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        TextField("Nome da atividade", text: $name)
+          .themedListRowBackground()
+        Picker("Área", selection: $area) {
+          ForEach(Area.allCases, id: \.self) { Text($0.displayName).tag($0) }
+        }
+        .themedListRowBackground()
+      }
+      .themedFormStyle()
+      .navigationTitle("Nova atividade")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancelar", action: onCancel)
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Salvar") {
+            try? repository.insertActivity(
+              Activity(id: 0, name: name, area: area, frequency: .daily)
+            )
+            onSaved()
+          }
+          .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+      }
+    }
   }
 }
 
@@ -55,6 +108,7 @@ public struct PermissionManagementView: View {
             }
           }
           .buttonStyle(.plain)
+          .themedListRowBackground()
         }
       }
     }
@@ -106,7 +160,9 @@ private struct PermissionEditorSheet: View {
       Form {
         Section {
           Text(user.name).font(.headline)
+            .themedListRowBackground()
           Text(user.email).font(.caption).foregroundStyle(.secondary)
+            .themedListRowBackground()
         }
         PermissionTogglesSection(permissions: $permissions)
         Section {
@@ -116,6 +172,7 @@ private struct PermissionEditorSheet: View {
           }
           .buttonStyle(PrimaryButtonStyle())
         }
+        .themedListRowBackground()
       }
       .themedFormStyle()
       .navigationTitle("Editar permissões")
@@ -129,22 +186,6 @@ private struct PermissionEditorSheet: View {
   }
 }
 
-private struct ActivityCreateSection: View {
-  @Binding var name: String
-  @Binding var area: Area
-  let onAdd: () -> Void
-
-  var body: some View {
-    Section("Nova atividade") {
-      TextField("Nome da atividade", text: $name)
-      Picker("Área", selection: $area) {
-        ForEach(Area.allCases, id: \.self) { Text($0.displayName).tag($0) }
-      }
-      Button("Adicionar", action: onAdd)
-    }
-  }
-}
-
 private struct ActivityListSection: View {
   let activities: [Activity]
 
@@ -152,6 +193,7 @@ private struct ActivityListSection: View {
     Section("Cadastradas") {
       ForEach(activities) { activity in
         Text("\(activity.name) — \(activity.area.displayName)")
+          .themedListRowBackground()
       }
     }
   }
@@ -163,11 +205,17 @@ private struct PermissionTogglesSection: View {
   var body: some View {
     Section("Permissões") {
       Toggle("Cadastrar usuários", isOn: $permissions.canRegisterUsers)
+        .themedListRowBackground()
       Toggle("Criar atividades", isOn: $permissions.canCreateActivities)
+        .themedListRowBackground()
       Toggle("Editar usuários", isOn: $permissions.canEditUsers)
+        .themedListRowBackground()
       Toggle("Contagem de inventário", isOn: $permissions.canCreateInventoryCounts)
+        .themedListRowBackground()
       Toggle("Insights de inventário", isOn: $permissions.canViewInventoryInsights)
+        .themedListRowBackground()
       Toggle("Estoque administrativo", isOn: $permissions.canManageAdministrativeStock)
+        .themedListRowBackground()
     }
   }
 }

@@ -24,6 +24,16 @@ public struct ThemedListStyle: ViewModifier {
   }
 }
 
+public struct ThemedListRowBackground: ViewModifier {
+  @EnvironmentObject private var theme: AppTheme
+
+  public init() {}
+
+  public func body(content: Content) -> some View {
+    content.listRowBackground(theme.rowBackground)
+  }
+}
+
 extension View {
   public func themedFormStyle() -> some View {
     modifier(ThemedFormStyle())
@@ -31,5 +41,9 @@ extension View {
 
   public func themedListStyle() -> some View {
     modifier(ThemedListStyle())
+  }
+
+  public func themedListRowBackground() -> some View {
+    modifier(ThemedListRowBackground())
   }
 }
