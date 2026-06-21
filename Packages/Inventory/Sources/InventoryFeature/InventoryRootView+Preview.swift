@@ -1,5 +1,6 @@
 #if os(iOS) && DEBUG
 import SwiftUI
+import Models
 import Persistence
 import DesignSystem
 
@@ -32,7 +33,27 @@ struct InventoryRootView_Previews: PreviewProvider {
           )
         )
       }
-      .previewDisplayName("Erro de rede")
+      NavigationStack {
+        InventoryDraftFormSheet(
+          mode: .edit(
+            InventoryCountDraft(
+              id: 1,
+              name: "Heineken Lata",
+              quantity: 24,
+              category: .alcoolico,
+              volume: 350,
+              volumeUnit: "ML",
+              salePriceInCents: 1200,
+              costPriceInCents: 800,
+              storageCondition: .gelado
+            )
+          ),
+          showCostField: true,
+          onSave: { _ in },
+          onCancel: {}
+        )
+      }
+      .previewDisplayName("Sheet editar")
     }
     .environmentObject(AppTheme.shared)
   }

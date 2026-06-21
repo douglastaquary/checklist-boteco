@@ -397,6 +397,23 @@ public final class ChecklistRepository: Sendable {
     }
   }
 
+  public func updateInventoryDraft(_ draft: InventoryCountDraft) throws {
+    try dbQueue.write { db in
+      try db.execute(
+        sql: """
+        UPDATE InventoryCountDraft
+        SET name = ?, quantity = ?, category = ?, volume = ?, volumeUnit = ?,
+            salePriceInCents = ?, costPriceInCents = ?, storageCondition = ?
+        WHERE id = ?
+        """,
+        arguments: [
+          draft.name, draft.quantity, draft.category.rawValue, draft.volume, draft.volumeUnit,
+          draft.salePriceInCents, draft.costPriceInCents, draft.storageCondition.rawValue, draft.id,
+        ]
+      )
+    }
+  }
+
   public func allActivities() throws -> [Activity] {
     try dbQueue.read { db in
       try ActivityRecord.fetchAll(db, sql: "SELECT * FROM Activity WHERE deletedAt IS NULL").map { $0.toDomain() }

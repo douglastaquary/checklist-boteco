@@ -53,7 +53,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 |------|-------------------|-----------------|----------------|
 | App shell / tabs | [`navigationstack.md`](../.cursor/skills/swiftui-ui-patterns/references/navigationstack.md) | [`AppTabRoute.swift`](../iosApp/ChecklistBoteco/AppTabRoute.swift), [`AppDeepLink.swift`](../iosApp/ChecklistBoteco/AppDeepLink.swift) | — |
 | Auth / forms | [`form.md`](../.cursor/skills/swiftui-ui-patterns/references/form.md), [`async-state.md`](../.cursor/skills/swiftui-ui-patterns/references/async-state.md) | [`LoginView.swift`](../Packages/Auth/Sources/Auth/LoginView.swift) | Previews 2FA/biometria |
-| Sheets / modals | [`sheets.md`](../.cursor/skills/swiftui-ui-patterns/references/sheets.md) | Permissões (Admin), Checklist (câmera) | Sheets em Inventory quando necessário |
+| Sheets / modals | [`sheets.md`](../.cursor/skills/swiftui-ui-patterns/references/sheets.md) | Permissões (Admin), Checklist (câmera), Inventário (rascunho) | — |
 | Feedback global | [`overlay.md`](../.cursor/skills/swiftui-ui-patterns/references/overlay.md) | [`DesignSystem.swift`](../Packages/DesignSystem/Sources/DesignSystem/DesignSystem.swift) | Cores de linha via `AppTheme` |
 | Listas / features | [`list.md`](../.cursor/skills/swiftui-ui-patterns/references/list.md) | Inventory, WorkClock, AdminFeatures | Extrair subviews; estados loading/error explícitos |
 | Previews | [`previews.md`](../.cursor/skills/swiftui-ui-patterns/references/previews.md) | [`LoginView+Preview.swift`](../Packages/Auth/Sources/Auth/LoginView+Preview.swift) | `#Preview` / PreviewProvider por feature |
@@ -124,11 +124,11 @@ Itens **já implementados** (2026-06):
 - Inventário: erros de sync inline via banner (sem depender só do overlay global)
 - `AppDependencyGraph`: `session` injetado sem `@ObservedObject` no modifier (menos re-render global)
 - `RootView`: observa `session` localmente; `MainTabContext` sem referência a `AppSession`
+- Inventário: criar/editar rascunho via `.sheet(item:)` — [`InventoryDraftFormSheet.swift`](../Packages/Inventory/Sources/InventoryFeature/InventoryDraftFormSheet.swift), `updateInventoryDraft` no repositório
 
 **Próximos PRs:**
 
-1. **Inventory**: sheets adicionais quando necessário (criação/edição de contagem).
-2. **Performance**: revisar `@ObservedObject` em `AppDependenciesHolder` / sync lifecycle.
+1. **Performance**: revisar `@ObservedObject` em `AppDependenciesHolder` / sync lifecycle.
 
 ## Precedência em caso de conflito
 
