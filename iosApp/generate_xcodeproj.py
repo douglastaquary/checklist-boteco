@@ -54,7 +54,8 @@ for src in APP_SOURCES:
   file_refs[src] = ref
   build_files.append((bf, ref))
 
-packages_url = "file://" + PACKAGES_DIR
+packages_url = "../Packages"
+packages_requirement = "{kind = branch; branch = main;}"
 
 pbx = f"""// !$*UTF8*$!
 {{
@@ -190,7 +191,7 @@ pbx += "/* End XCBuildConfiguration section */\n\n"
 pbx += "/* Begin XCRemoteSwiftPackageReference section */\n"
 pbx += (
   f"\t\t{packages_ref} /* XCRemoteSwiftPackageReference Packages */ = {{isa = XCRemoteSwiftPackageReference; "
-  f"repositoryURL = \"{packages_url}\"; requirement = {{kind = branch; branch = main;}}; }};\n"
+  f"repositoryURL = \"{packages_url}\"; requirement = {packages_requirement}; }};\n"
 )
 pbx += "/* End XCRemoteSwiftPackageReference section */\n\n"
 
@@ -239,7 +240,4 @@ os.makedirs(PROJECT_DIR, exist_ok=True)
 with open(os.path.join(PROJECT_DIR, "project.pbxproj"), "w", encoding="utf-8") as f:
   f.write(pbx)
 print(f"Generated {PROJECT_DIR}/project.pbxproj (umbrella: {packages_url})")
-print("Após commit em Packages/, atualize Package.resolved:")
-print("  git -C Packages rev-parse HEAD")
-print("  # cole a revision em project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
-print("  # ou: xcodebuild -resolvePackageDependencies (Xcode 14)")
+print("Packages faz parte do monorepo — commitar junto com o restante do projeto.")
