@@ -39,7 +39,7 @@ Roadmap de alinhamento: [`docs/architecture-serverless.md`](docs/architecture-se
 
 - **Android** (API 26+)
 - **Desktop** (JVM)
-- **iOS** (estrutura preparada)
+- **iOS** (app nativo SwiftUI — ver [docs/ios-app.md](docs/ios-app.md))
 
 ## Tecnologias
 
@@ -181,6 +181,12 @@ Ferramentas MCP disponíveis localmente em `http://localhost:8080/mcp`:
 - `sales_quantity_by_product_in_period`
 - `sales_get_imports`
 - `sales_audit_stock`
+- `inventory_daily_audit`
+- `inventory_count_sessions`
+- `work_clock_summary`
+- `work_clock_entries`
+- `work_clock_schedule`
+- `work_clock_worksite`
 
 Exemplo de configuração MCP para Cursor/Codex em ambiente local:
 

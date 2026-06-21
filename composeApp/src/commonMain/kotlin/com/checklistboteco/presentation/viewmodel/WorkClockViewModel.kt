@@ -11,6 +11,8 @@ import com.checklistboteco.domain.model.WorkClockSummary
 import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorksiteLocation
 import com.checklistboteco.platform.DeviceIdentity
+import com.checklistboteco.platform.LocationProvider
+import com.checklistboteco.platform.LocationUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,10 +27,12 @@ data class WorkClockUiState(
     val entries: List<WorkClockEntry> = emptyList(),
     val nextType: WorkClockType = WorkClockType.ENTRADA,
     val summary: WorkClockSummary = WorkClockCalculator.summarizeDay(emptyList(), 0L),
-    val currentLocation: GeoPoint = WorksiteLocation.point,
-    val distanceFromWorkMeters: Double = 0.0,
+    val currentLocation: GeoPoint? = null,
+    val locationAccuracyMeters: Float? = null,
+    val distanceFromWorkMeters: Double = Double.MAX_VALUE,
     val currentTimestamp: Long = Clock.System.now().toEpochMilliseconds(),
     val canClockIn: Boolean = false,
+    val locationStatus: String = "Aguardando GPS…",
     val isAdmin: Boolean = false,
     val deviceId: String = "",
     val deviceName: String = "",
@@ -48,7 +52,6 @@ class WorkClockViewModel(
     private val _uiState = MutableStateFlow(
         WorkClockUiState(
             isAdmin = user.permissionLevel == PermissionLevel.ADMIN,
-            canClockIn = canUseClock(WorksiteLocation.point),
             deviceId = DeviceIdentity.getOrCreateDeviceId(),
             deviceName = DeviceIdentity.deviceName()
         )
@@ -57,6 +60,52 @@ class WorkClockViewModel(
 
     init {
         loadTodayEntries()
+        retryPendingEntries()
+    }
+
+    fun startLocationUpdates() {
+        LocationProvider.startUpdates(::onLocationUpdate)
+    }
+
+    fun stopLocationUpdates() {
+        LocationProvider.stopUpdates()
+    }
+
+    fun onLocationPermissionChanged(granted: Boolean) {
+        if (!granted) {
+            _uiState.update {
+                it.copy(
+                    locationStatus = "Permita o acesso ao GPS para registrar ponto.",
+                    canClockIn = false
+                )
+            }
+            return
+        }
+        startLocationUpdates()
+    }
+
+    private fun onLocationUpdate(update: LocationUpdate) {
+        val point = update.point
+        val accuracy = update.accuracyMeters
+        val distance = point?.let { WorkClockCalculator.distanceMeters(it, WorksiteLocation.point) } ?: Double.MAX_VALUE
+        val canClock = canUseClock(point, accuracy, distance)
+        val status = when {
+            point == null -> "Aguardando sinal GPS…"
+            accuracy != null && accuracy > 20f -> "Aguardando precisão do GPS (≤ 20 m)…"
+            distance > WorksiteLocation.allowedRadiusMeters ->
+                "Fora do raio de ${WorksiteLocation.allowedRadiusMeters.toInt()} m (${distance.toInt()} m)."
+            else -> "Dentro do raio permitido."
+        }
+        _uiState.update {
+            it.copy(
+                currentLocation = point,
+                locationAccuracyMeters = accuracy,
+                distanceFromWorkMeters = distance,
+                canClockIn = canClock,
+                locationStatus = status,
+                currentTimestamp = Clock.System.now().toEpochMilliseconds()
+            )
+        }
     }
 
     private fun loadTodayEntries() {
@@ -68,17 +117,15 @@ class WorkClockViewModel(
                     .values
                     .sumOf { WorkClockCalculator.summarizeDay(it).workedMillis }
                 val nextType = WorkClockCalculator.nextType(entries)
-                val now = Clock.System.now().toEpochMilliseconds()
-                val distance = WorkClockCalculator.distanceMeters(_uiState.value.currentLocation, WorksiteLocation.point)
+                val state = _uiState.value
 
                 _uiState.update {
                     it.copy(
                         entries = entries,
                         nextType = nextType,
                         summary = WorkClockCalculator.summarizeDay(entries, weeklyWorked),
-                        currentTimestamp = now,
-                        distanceFromWorkMeters = distance,
-                        canClockIn = canUseClock(it.currentLocation)
+                        currentTimestamp = Clock.System.now().toEpochMilliseconds(),
+                        canClockIn = canUseClock(state.currentLocation, state.locationAccuracyMeters, state.distanceFromWorkMeters)
                     )
                 }
             }
@@ -88,24 +135,29 @@ class WorkClockViewModel(
     fun confirmClockIn() {
         val state = _uiState.value
         if (!state.canClockIn) {
-            _uiState.update { it.copy(feedback = "A marcação só é liberada dentro de ${WorksiteLocation.allowedRadiusMeters.toInt()} metros do local de trabalho") }
+            _uiState.update {
+                it.copy(feedback = state.locationStatus.ifBlank {
+                    "A marcação só é liberada dentro de ${WorksiteLocation.allowedRadiusMeters.toInt()} metros do local de trabalho"
+                })
+            }
             return
         }
+        val location = state.currentLocation ?: return
 
         val now = Clock.System.now().toEpochMilliseconds()
         val isLate = WorkClockCalculator.isLateEntry()
-        repository.insertWorkClockEntry(
+        val localId = repository.insertWorkClockEntry(
             userId = user.id,
             type = state.nextType,
             registeredAt = now,
-            location = state.currentLocation,
+            location = location,
             distanceFromWorkMeters = state.distanceFromWorkMeters,
             isLate = isLate
         )
         _uiState.update {
             it.copy(feedback = "${state.nextType.displayName} registrada")
         }
-        syncWorkClockEntry(state, now, isLate)
+        syncWorkClockEntry(state, localId, location, now, isLate)
     }
 
     fun showDetails() {
@@ -120,27 +172,55 @@ class WorkClockViewModel(
         _uiState.update { it.copy(feedback = null) }
     }
 
-    private fun canUseClock(location: GeoPoint): Boolean {
-        if (user.permissionLevel == PermissionLevel.ADMIN) return false
-        return WorkClockCalculator.distanceMeters(location, WorksiteLocation.point) <= WorksiteLocation.allowedRadiusMeters
-    }
-
-    private fun syncWorkClockEntry(state: WorkClockUiState, registeredAt: Long, isLate: Boolean) {
+    private fun retryPendingEntries() {
         val api = backendApiClient ?: return
         val token = authToken ?: return
         val backendUserId = remoteUserId ?: return
         scope.launch {
             runCatching {
-                api.pushWorkClockEntry(
-                    token = token,
+                repository.retryPendingWorkClockEntries(
+                    userId = user.id,
                     remoteUserId = backendUserId,
+                    deviceId = DeviceIdentity.getOrCreateDeviceId(),
+                    token = token,
+                    api = api
+                )
+            }
+        }
+    }
+
+    private fun canUseClock(location: GeoPoint?, accuracy: Float?, distance: Double): Boolean {
+        if (user.permissionLevel == PermissionLevel.ADMIN) return false
+        if (location == null) return false
+        if (accuracy != null && accuracy > 20f) return false
+        return distance <= WorksiteLocation.allowedRadiusMeters
+    }
+
+    private fun syncWorkClockEntry(
+        state: WorkClockUiState,
+        localId: Long,
+        location: GeoPoint,
+        registeredAt: Long,
+        isLate: Boolean
+    ) {
+        val api = backendApiClient ?: return
+        val token = authToken ?: return
+        val backendUserId = remoteUserId ?: return
+        scope.launch {
+            runCatching {
+                val remoteId = api.pushWorkClockEntry(
+                    token = token,
+                    deviceId = DeviceIdentity.getOrCreateDeviceId(),
+                    remoteUserId = backendUserId,
+                    _localEntryId = localId,
                     type = state.nextType,
                     registeredAt = registeredAt,
-                    latitude = state.currentLocation.latitude,
-                    longitude = state.currentLocation.longitude,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
                     distanceFromWorkMeters = state.distanceFromWorkMeters,
                     isLate = isLate
                 )
+                repository.markWorkClockEntrySynced(localId, remoteId)
             }.onFailure {
                 _uiState.update { current ->
                     current.copy(feedback = "${state.nextType.displayName} registrada localmente. Sincronização pendente.")

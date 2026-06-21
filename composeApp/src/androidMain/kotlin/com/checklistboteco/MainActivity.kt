@@ -12,6 +12,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DeviceIdentity.initialize(this)
+        com.checklistboteco.platform.LoginCredentialsStorage.initialize(this)
+        com.checklistboteco.platform.BiometricAuth.initialize(this)
+        com.checklistboteco.platform.LocationProvider.initialize(this)
         enableEdgeToEdge()
         setContent {
             App(

@@ -70,6 +70,8 @@ CREATE TABLE WorkClockEntry (
     longitude REAL NOT NULL,
     distanceFromWorkMeters REAL NOT NULL,
     isLate INTEGER NOT NULL DEFAULT 0,
+    syncStatus TEXT NOT NULL DEFAULT 'PENDING',
+    remoteId TEXT,
     FOREIGN KEY (userId) REFERENCES User(id)
 );
 
@@ -100,8 +102,23 @@ INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePat
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 insertWorkClockEntry:
-INSERT INTO WorkClockEntry(userId, type, registeredAt, latitude, longitude, distanceFromWorkMeters, isLate)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO WorkClockEntry(userId, type, registeredAt, latitude, longitude, distanceFromWorkMeters, isLate, syncStatus)
+VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING');
+
+updateWorkClockEntrySync:
+UPDATE WorkClockEntry
+SET syncStatus = ?, remoteId = ?
+WHERE id = ?;
+
+selectPendingWorkClockEntries:
+SELECT * FROM WorkClockEntry
+WHERE syncStatus = 'PENDING'
+ORDER BY registeredAt ASC;
+
+selectWorkClockEntryByRegisteredAt:
+SELECT * FROM WorkClockEntry
+WHERE userId = ? AND registeredAt = ?
+LIMIT 1;
 
 selectAllUsers:
 SELECT * FROM User;
@@ -114,6 +131,12 @@ SELECT * FROM User WHERE email = ?;
 
 selectUserByRemoteId:
 SELECT * FROM User WHERE remoteId = ?;
+
+selectUserById:
+SELECT * FROM User WHERE id = ?;
+
+updateUserRemoteId:
+UPDATE User SET remoteId = ? WHERE id = ?;
 
 updateUserFeaturePermissions:
 UPDATE User

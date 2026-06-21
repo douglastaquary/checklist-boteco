@@ -1,6 +1,8 @@
 package com.checklistboteco.presentation.viewmodel
 
 import com.checklistboteco.data.remote.BackendApiClient
+import com.checklistboteco.platform.AppErrorMapper
+import com.checklistboteco.platform.AppNetworkFeedback
 import com.checklistboteco.data.remote.RemoteAdminStockBalance
 import com.checklistboteco.data.remote.RemoteInventoryAudit
 import com.checklistboteco.data.repository.ChecklistRepository
@@ -97,7 +99,8 @@ class InventoryCountViewModel(
                     )
                 }
             }.onFailure { error ->
-                _state.update { it.copy(sending = false, message = error.message ?: "Falha ao enviar") }
+                AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
+                _state.update { it.copy(sending = false) }
             }
         }
     }
@@ -112,7 +115,7 @@ class InventoryCountViewModel(
             }.onSuccess { value ->
                 _state.update { it.copy(audit = value, message = null) }
             }.onFailure { error ->
-                _state.update { it.copy(message = error.message) }
+                AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
             }
         }
     }
@@ -140,7 +143,8 @@ class InventoryCountViewModel(
                     )
                 }
             }.onFailure { error ->
-                _state.update { it.copy(sending = false, message = error.message ?: "Falha ao aplicar auditoria") }
+                AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
+                _state.update { it.copy(sending = false) }
             }
         }
     }

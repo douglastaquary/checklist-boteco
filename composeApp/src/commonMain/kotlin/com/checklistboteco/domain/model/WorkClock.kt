@@ -48,6 +48,7 @@ data class WorkClockSummary(
     val breakOverageMillis: Long,
     val missingDailyMillis: Long,
     val missingWeeklyMillis: Long,
+    val overtimeMillis: Long,
     val requiresTwoHoursRest: Boolean
 )
 
@@ -85,6 +86,7 @@ object WorkClockCalculator {
         val rest = entries.durationBetween(WorkClockType.DESCANSO_INICIO, WorkClockType.DESCANSO_FIM)
         val breakMillis = lunch + rest
         val requiredBreak = if (worked >= 12L * 60L * 60L * 1000L) extendedShiftBreakMillis else regularBreakMillis
+        val overtime = max(0L, weeklyWorkedMillis - weeklyExpectedMillis)
         return WorkClockSummary(
             workedMillis = worked,
             lunchMillis = lunch,
@@ -94,6 +96,7 @@ object WorkClockCalculator {
             breakOverageMillis = if (entries.isEmpty()) 0L else max(0L, breakMillis - requiredBreak),
             missingDailyMillis = if (entries.isEmpty()) 0L else max(0L, dailyExpectedMillis - worked),
             missingWeeklyMillis = max(0L, weeklyExpectedMillis - weeklyWorkedMillis),
+            overtimeMillis = overtime,
             requiresTwoHoursRest = worked >= 12L * 60L * 60L * 1000L && breakMillis < extendedShiftBreakMillis
         )
     }

@@ -2,16 +2,20 @@ package com.checklistboteco.backend.store;
 
 import com.checklistboteco.backend.model.Models.*;
 import com.checklistboteco.backend.security.PasswordHasher;
+import com.checklistboteco.backend.workclock.domain.WorkClockModels.UserWorkSchedule;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +26,7 @@ public class LocalStore implements AppStore {
     protected final Map<String,Activity> activities=new ConcurrentHashMap<>();
     protected final Map<String,Completion> completions=new ConcurrentHashMap<>();
     protected final Map<String,WorkClockEntry> workClock=new ConcurrentHashMap<>();
+    protected final Map<String,UserWorkSchedule> userSchedules=new ConcurrentHashMap<>();
     protected final Map<String,Tombstone> tombstones=new ConcurrentHashMap<>();
     protected final Map<String,SyncAcknowledgement> processedOperations=new ConcurrentHashMap<>();
     protected final List<ChangeRecord> changeLog=new ArrayList<>();
@@ -83,7 +88,7 @@ public class LocalStore implements AppStore {
         user.allowedAreas=user.permissionLevel==PermissionLevel.ADMIN?List.of(Area.values()):List.of(user.area);
         user.createdAt=now;
         user.updatedAt=now;
-        user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():nonNull(request.permissions);
+        user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():new FeaturePermissions();
         users.put(user.id,user);
         return PublicUser.from(user);
     }
@@ -121,6 +126,7 @@ public class LocalStore implements AppStore {
         trustedDevices.removeIf(value->value.startsWith(id+":"));
         challenges.values().removeIf(value->Objects.equals(value.userId,id));
         workClock.values().removeIf(value->Objects.equals(value.userId,id));
+        userSchedules.remove(id);
         completions.values().removeIf(value->Objects.equals(value.userId,id));
     }
 
@@ -176,6 +182,28 @@ public class LocalStore implements AppStore {
 
     public void upsertWorkClockEntries(List<WorkClockEntry> values) {
         safe(values).forEach(v->workClock.put(v.id,v));
+    }
+
+    public List<WorkClockEntry> listWorkClockEntries(String userId, LocalDate from, LocalDate to) {
+        LocalDate start = from == null ? LocalDate.now() : from;
+        LocalDate end = to == null ? start : to;
+        long fromMillis = start.atStartOfDay(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
+        long toMillis = end.plusDays(1).atStartOfDay(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
+        return workClock.values().stream()
+            .filter(entry -> userId == null || userId.isBlank() || Objects.equals(entry.userId, userId))
+            .filter(entry -> entry.registeredAt >= fromMillis && entry.registeredAt < toMillis)
+            .sorted(Comparator.comparingLong(entry -> entry.registeredAt))
+            .toList();
+    }
+
+    public Optional<UserWorkSchedule> getWorkSchedule(String userId) {
+        return Optional.ofNullable(userSchedules.get(userId));
+    }
+
+    public void saveWorkSchedule(String userId, UserWorkSchedule schedule) {
+        if (userId == null || userId.isBlank() || schedule == null) return;
+        schedule.userId = userId;
+        userSchedules.put(userId, schedule);
     }
 
     public DashboardStats dashboard() {

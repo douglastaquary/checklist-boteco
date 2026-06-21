@@ -7,7 +7,7 @@
 <body>
   <aside class="sidebar">
     <a class="brand" href="/"><span>✓</span><strong>{title}</strong></a>
-    <nav><button data-view="dashboard" class="active">Visão geral</button><button data-view="users">Equipe</button><button data-view="activities">Atividades</button><button data-view="inventory">Contagens</button><button data-view="purchases">Compras</button><button data-view="sales">Vendas</button></nav>
+    <nav><button data-view="dashboard" class="active">Visão geral</button><button data-view="users">Equipe</button><button data-view="activities">Atividades</button><button data-view="inventory">Contagens</button><button data-view="workclock">Ponto</button><button data-view="purchases">Compras</button><button data-view="sales">Vendas</button></nav>
     <button id="logout" class="ghost">Sair</button>
   </aside>
   <main>
@@ -29,6 +29,38 @@
         <article><div class="section-title"><div><p class="eyebrow">HISTÓRICO</p><h2>Contagens enviadas</h2></div><button id="refreshCounts" type="button">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>Contado em</th><th>Responsável</th><th>Itens</th><th>Enviado em</th><th>Ações</th></tr></thead><tbody id="countsBody"></tbody></table></div></article>
         <article><div class="section-title"><div><p class="eyebrow">INSIGHTS</p><h2>Auditoria diária</h2><p>Contagem antes da abertura x vendas x saldo teórico. Após confirmar, abate vendas do estoque administrativo.</p></div><div class="form-actions"><button id="runInventoryAudit" type="button">Gerar auditoria</button><button id="applyInventoryAudit" type="button" class="secondary">Confirmar e abater vendas</button></div></div><div id="inventoryMetrics" class="purchase-metrics"></div><div class="table-wrap"><table><thead><tr><th>Status</th><th>Produto</th><th>Contado</th><th>Vendido</th><th>Saldo teórico</th><th>Observação</th></tr></thead><tbody id="inventoryAuditBody"></tbody></table></div></article>
         <article><div class="section-title"><div><p class="eyebrow">ESTOQUE ADMIN</p><h2>Saldo acumulado</h2></div><button id="refreshAdminStock" type="button">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>Produto</th><th>Local</th><th>Quantidade</th><th>Atualizado em</th></tr></thead><tbody id="adminStockBody"></tbody></table></div></article>
+      </section>
+      <section id="workclock" class="view hidden workclock-view">
+        <article>
+          <div class="section-title"><div><p class="eyebrow">PONTO</p><h2>Resumo semanal</h2><p>Horas trabalhadas, extras acima de 40 h, faltas e descansos por colaborador.</p></div><button id="refreshWorkClock" type="button">Atualizar</button></div>
+          <form id="workClockFilters" class="purchase-filters">
+            <label>De<input id="workClockFrom" type="date" required></label>
+            <label>Até<input id="workClockTo" type="date" required></label>
+            <label>Colaborador<select id="workClockUser"><option value="">Todos</option></select></label>
+            <button type="submit">Filtrar</button>
+          </form>
+          <div id="workClockMessage" class="message"></div>
+          <div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Horas</th><th>Extras</th><th>Faltantes</th><th>Descansos</th><th>Faltas (dias)</th><th>Detalhe</th></tr></thead><tbody id="workClockBody"></tbody></table></div>
+        </article>
+        <article>
+          <div class="section-title"><div><p class="eyebrow">ESCALA 4x3</p><h2>Dias de trabalho por colaborador</h2><p>Marque os dias da semana em que o colaborador deve trabalhar (padrão seg–qui).</p></div></div>
+          <form id="workClockScheduleForm" class="schedule-form">
+            <label>Colaborador<select id="scheduleUser" required></select></label>
+            <div class="schedule-days"><label><input type="checkbox" value="1" checked> Seg</label><label><input type="checkbox" value="2" checked> Ter</label><label><input type="checkbox" value="3" checked> Qua</label><label><input type="checkbox" value="4" checked> Qui</label><label><input type="checkbox" value="5"> Sex</label><label><input type="checkbox" value="6"> Sáb</label><label><input type="checkbox" value="7"> Dom</label></div>
+            <div class="form-actions"><button id="saveWorkClockSchedule" type="submit">Salvar escala</button></div>
+          </form>
+          <div id="scheduleMessage" class="message"></div>
+        </article>
+        <article>
+          <div class="section-title"><div><p class="eyebrow">EXPORTAÇÃO</p><h2>Relatório mensal</h2></div></div>
+          <form id="workClockExportForm" class="purchase-filters">
+            <label>Ano<input id="workClockExportYear" type="number" min="2020" max="2100" required></label>
+            <label>Mês<input id="workClockExportMonth" type="number" min="1" max="12" required></label>
+            <button id="exportWorkClockCsv" type="button">Exportar CSV</button>
+            <button id="exportWorkClockPdf" type="button" class="secondary">Exportar PDF</button>
+          </form>
+        </article>
+        <dialog id="workClockEntriesDialog"><article><div class="section-title"><div><p class="eyebrow">DETALHE</p><h2 id="workClockEntriesTitle">Marcações</h2></div><button id="closeWorkClockEntries" type="button" class="secondary">Fechar</button></div><div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Horário</th><th>Distância (m)</th><th>Atraso</th></tr></thead><tbody id="workClockEntriesBody"></tbody></table></div></article></dialog>
       </section>
       <section id="purchases" class="view hidden">
         <article class="purchase-import">

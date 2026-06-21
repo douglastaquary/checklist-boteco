@@ -1,7 +1,10 @@
 package com.checklistboteco.backend.store;
 
 import com.checklistboteco.backend.model.Models.*;
+import com.checklistboteco.backend.workclock.domain.WorkClockModels.UserWorkSchedule;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface AppStore {
     User authenticate(String email,String password);
@@ -16,6 +19,9 @@ public interface AppStore {
     Activity createActivity(CreateActivityRequest request);
     List<Completion> completions();
     void upsertWorkClockEntries(List<WorkClockEntry> values);
+    List<WorkClockEntry> listWorkClockEntries(String userId, LocalDate from, LocalDate to);
+    Optional<UserWorkSchedule> getWorkSchedule(String userId);
+    void saveWorkSchedule(String userId, UserWorkSchedule schedule);
     DashboardStats dashboard();
     PullData pullChanges(String userId,long cursor,int limit);
     SyncPushResult pushSync(String userId,boolean admin,SyncPushRequest request);

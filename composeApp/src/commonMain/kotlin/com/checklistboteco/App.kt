@@ -1,5 +1,7 @@
 package com.checklistboteco
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -8,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.remote.SyncApiClient
 import com.checklistboteco.data.database.DatabaseDriverFactory
@@ -24,6 +27,7 @@ import com.checklistboteco.presentation.navigation.Screen
 import com.checklistboteco.presentation.screen.LoginScreen
 import com.checklistboteco.presentation.screen.MainScreen
 import com.checklistboteco.presentation.screen.UserRegistrationScreen
+import com.checklistboteco.presentation.components.GlobalAppFeedback
 import com.checklistboteco.presentation.theme.ChecklistBotecoTheme
 import com.checklistboteco.presentation.viewmodel.LoginViewModel
 import com.checklistboteco.presentation.viewmodel.UserRegistrationViewModel
@@ -34,6 +38,7 @@ fun App(
     syncScheduler: SyncScheduler = NoOpSyncScheduler
 ) {
     ChecklistBotecoTheme {
+        Box(Modifier.fillMaxSize()) {
         val database = remember {
             ChecklistDatabase(databaseDriverFactory.createDriver())
         }
@@ -137,10 +142,10 @@ fun App(
         var currentScreen by rememberSaveable(stateSaver = screenSaver) { 
             mutableStateOf<Screen>(Screen.Login) 
         }
+        val loginViewModel = remember { LoginViewModel(repository, backendApiClient) }
 
         when (val s = currentScreen) {
             is Screen.Login -> {
-                val loginViewModel = remember { LoginViewModel(repository, backendApiClient) }
                 LoginScreen(
                     viewModel = loginViewModel,
                     onLoginSuccess = { user ->
@@ -166,9 +171,14 @@ fun App(
                     backendApiClient = backendApiClient,
                     authToken = s.authToken,
                     remoteUserId = s.remoteUserId,
-                    onLogout = { currentScreen = Screen.Login }
+                    onLogout = {
+                        loginViewModel.logout()
+                        currentScreen = Screen.Login
+                    }
                 )
             }
+        }
+        GlobalAppFeedback()
         }
     }
 }

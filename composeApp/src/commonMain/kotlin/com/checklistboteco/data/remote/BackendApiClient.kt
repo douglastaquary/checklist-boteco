@@ -8,7 +8,6 @@ import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorkSector
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -16,9 +15,7 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.Url
 import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import com.checklistboteco.domain.model.InventoryCountDraft
 
 class BackendApiClient private constructor(
@@ -63,6 +60,17 @@ class BackendApiClient private constructor(
         }.body<LoginResponseDto>().toResult()
     }
 
+    suspend fun fetchCurrentUser(token: String): RemoteLoginResult {
+        val user = httpClient.get("$baseUrl/api/me") {
+            bearerAuth(token)
+        }.body<PublicUserDto>()
+        return RemoteLoginResult(
+            token = token,
+            user = user.toDomain(),
+            remoteUserId = user.id
+        )
+    }
+
     suspend fun health(): Boolean {
         return runCatching {
             httpClient.get("$baseUrl/api/health").body<Map<String, String>>()["status"] == "ok"
@@ -71,24 +79,27 @@ class BackendApiClient private constructor(
 
     suspend fun pushWorkClockEntry(
         token: String,
+        deviceId: String,
         remoteUserId: String,
+        _localEntryId: Long,
         type: WorkClockType,
         registeredAt: Long,
         latitude: Double,
         longitude: Double,
         distanceFromWorkMeters: Double,
         isLate: Boolean
-    ) {
+    ): String {
         val now = registeredAt
+        val remoteId = "$remoteUserId-${type.name}-$registeredAt"
         httpClient.post("$baseUrl/api/sync/push") {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
             setBody(
                 SyncPushRequestDto(
-                    deviceId = remoteUserId,
+                    deviceId = deviceId,
                     workClockEntries = listOf(
                         WorkClockEntryDto(
-                            id = "$remoteUserId-${type.name}-$registeredAt",
+                            id = remoteId,
                             userId = remoteUserId,
                             type = type.name,
                             registeredAt = registeredAt,
@@ -103,6 +114,7 @@ class BackendApiClient private constructor(
                 )
             )
         }
+        return remoteId
     }
 
     suspend fun submitInventoryCount(token: String, date: String, items: List<InventoryCountDraft>) {
@@ -134,11 +146,7 @@ class BackendApiClient private constructor(
             validateSecureUrl(configuredUrl)
             return BackendApiClient(
                 baseUrl = configuredUrl,
-                httpClient = HttpClient {
-                    install(ContentNegotiation) {
-                        json(Json { ignoreUnknownKeys = true })
-                    }
-                }
+                httpClient = createAppHttpClient()
             )
         }
 

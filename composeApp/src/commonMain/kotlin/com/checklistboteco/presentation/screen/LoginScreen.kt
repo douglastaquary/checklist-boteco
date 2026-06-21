@@ -1,5 +1,6 @@
 package com.checklistboteco.presentation.screen
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +12,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.checklistboteco.domain.model.User
+import com.checklistboteco.platform.AppNetworkFeedback
 import com.checklistboteco.presentation.viewmodel.LoginViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +45,7 @@ fun LoginScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val isNetworkLoading by AppNetworkFeedback.isLoading.collectAsState()
 
     Scaffold(
         topBar = {
@@ -71,9 +76,33 @@ fun LoginScreen(
                 label = { Text("Usuário ou email") },
                 leadingIcon = { Icon(Icons.Default.Person, null) },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                enabled = !state.pendingBiometricUnlock && !state.biometricUnlockInProgress
             )
             Spacer(Modifier.height(16.dp))
+
+            if (state.pendingBiometricUnlock) {
+                Text(
+                    "Login salvo neste aparelho. Confirme sua biometria para preencher usuário e senha.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = viewModel::unlockRememberedUser,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.biometricUnlockInProgress
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = null)
+                        Text(
+                            if (state.biometricUnlockInProgress) "Aguardando biometria..." else "Usar biometria",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
 
             OutlinedTextField(
                 value = state.password,
@@ -83,8 +112,24 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                enabled = !state.pendingBiometricUnlock && !state.biometricUnlockInProgress
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = state.rememberCredentials,
+                    onCheckedChange = viewModel::updateRememberCredentials
+                )
+                Text(
+                    "Lembrar login (biometria)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
 
             if (state.requiresTwoFactor) {
                 Spacer(Modifier.height(16.dp))
@@ -113,11 +158,11 @@ fun LoginScreen(
             Button(
                 onClick = if (state.requiresTwoFactor) viewModel::verifyTwoFactor else viewModel::login,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.isLoading
+                enabled = !isNetworkLoading && !state.biometricUnlockInProgress && !state.pendingBiometricUnlock
             ) {
                 Text(
                     when {
-                        state.isLoading -> "Aguarde..."
+                        isNetworkLoading -> "Aguarde..."
                         state.requiresTwoFactor -> "Confirmar dispositivo"
                         else -> "Entrar"
                     }

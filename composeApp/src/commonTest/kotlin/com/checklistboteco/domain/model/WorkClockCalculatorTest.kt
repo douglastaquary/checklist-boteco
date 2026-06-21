@@ -55,6 +55,13 @@ class WorkClockCalculatorTest {
     }
 
     @Test
+    fun overtimeIsOnlyAboveFortyWeeklyHours() {
+        val fortyHours = 40L * 60L * 60L * 1000L
+        val summary = WorkClockCalculator.summarizeDay(emptyList(), fortyHours + 3_600_000L)
+        assertEquals(1L * 60L * 60L * 1000L, summary.overtimeMillis)
+    }
+
+    @Test
     fun entryIsNotLateWithoutFixedSchedule() {
         assertFalse(
             WorkClockCalculator.isLateEntry()

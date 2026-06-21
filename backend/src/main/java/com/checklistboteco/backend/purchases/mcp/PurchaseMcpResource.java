@@ -12,6 +12,7 @@ import com.checklistboteco.backend.sales.domain.SalesModels.SaleQuery;
 import com.checklistboteco.backend.sales.domain.SalesModels.SalesAuditRequest;
 import com.checklistboteco.backend.inventory.application.InventoryService;
 import com.checklistboteco.backend.inventory.domain.InventoryModels.DailyAuditRequest;
+import com.checklistboteco.backend.workclock.application.WorkClockService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -34,6 +35,7 @@ public class PurchaseMcpResource {
     @Inject SalesImportService salesImports;
     @Inject SalesAuditService salesAudits;
     @Inject InventoryService inventory;
+    @Inject WorkClockService workClock;
     @Inject ObjectMapper mapper;
     @ConfigProperty(name="purchases.mcp.token") String expectedToken;
 
@@ -44,7 +46,7 @@ public class PurchaseMcpResource {
         try {
             if(request==null||request.method==null) return rpcError(id,-32600,"Requisição MCP inválida");
             Object result=switch(request.method){
-                case "initialize" -> Map.of("protocolVersion","2025-03-26","capabilities",Map.of("tools",Map.of("listChanged",false)),"serverInfo",Map.of("name","checklist-boteco-analytics","version","1.2.0","defaultLocation",DEFAULT_LOCATION));
+                case "initialize" -> Map.of("protocolVersion","2025-03-26","capabilities",Map.of("tools",Map.of("listChanged",false)),"serverInfo",Map.of("name","checklist-boteco-analytics","version","1.3.0","defaultLocation",DEFAULT_LOCATION));
                 case "notifications/initialized" -> null;
                 case "ping" -> Map.of();
                 case "tools/list" -> Map.of("tools",tools());
@@ -75,6 +77,13 @@ public class PurchaseMcpResource {
             case "inventory_count_sessions" -> inventory.list(
                 args.get("from")==null?null:java.time.LocalDate.parse(args.get("from").toString()),
                 args.get("to")==null?null:java.time.LocalDate.parse(args.get("to").toString()));
+            case "work_clock_summary" -> workClock.summary(
+                parseDate(args.get("from"), java.time.LocalDate.now().with(java.time.DayOfWeek.MONDAY)),
+                parseDate(args.get("to"), java.time.LocalDate.now()),
+                optionalText(args.get("userId")));
+            case "work_clock_entries" -> workClockEntries(args);
+            case "work_clock_schedule" -> workClockSchedule(args);
+            case "work_clock_worksite" -> workClock.worksite();
             default -> throw new NoSuchMethodException("Tool desconhecida: "+name);
         };
         LOG.infof("MCP audit tool=%s durationMs=%d",name,(System.nanoTime()-started)/1_000_000);
@@ -84,6 +93,11 @@ public class PurchaseMcpResource {
     private List<Map<String,Object>> tools(){
         Map<String,Object> purchasePeriodProps=Map.ofEntries(Map.entry("from",Map.of("type","string","format","date")),Map.entry("to",Map.of("type","string","format","date")),Map.entry("datasetId",Map.of("type","string")),Map.entry("text",Map.of("type","string")),Map.entry("categories",Map.of("type","array","items",Map.of("type","string"))),Map.entry("locations",Map.of("type","array","items",Map.of("type","string"))),Map.entry("suppliers",Map.of("type","array","items",Map.of("type","string"))),Map.entry("minTotalInCents",Map.of("type","integer")),Map.entry("maxTotalInCents",Map.of("type","integer")),Map.entry("page",Map.of("type","integer","minimum",0)),Map.entry("pageSize",Map.of("type","integer","minimum",1,"maximum",200)));
         Map<String,Object> salesPeriodProps=Map.ofEntries(Map.entry("from",Map.of("type","string","format","date")),Map.entry("to",Map.of("type","string","format","date")),Map.entry("datasetId",Map.of("type","string")),Map.entry("text",Map.of("type","string")),Map.entry("categories",Map.of("type","array","items",Map.of("type","string"))),Map.entry("locations",Map.of("type","array","items",Map.of("type","string"))),Map.entry("minTotalInCents",Map.of("type","integer")),Map.entry("maxTotalInCents",Map.of("type","integer")),Map.entry("page",Map.of("type","integer","minimum",0)),Map.entry("pageSize",Map.of("type","integer","minimum",1,"maximum",200)));
+        Map<String,Object> workClockPeriodProps=Map.of(
+            "from", Map.of("type","string","format","date"),
+            "to", Map.of("type","string","format","date"),
+            "userId", Map.of("type","string","description","ID do colaborador; omita para listar todos")
+        );
         return List.of(
             tool("purchases_get_schema","Descobre campos, atributos dinâmicos, tipos e cobertura dos dados de compras",Map.of("type","object","properties",Map.of("datasetId",Map.of("type","string")))),
             tool("purchases_list","Lista compras com período obrigatório, filtros e paginação",Map.of("type","object","properties",purchasePeriodProps,"required",List.of("from","to"))),
@@ -97,8 +111,40 @@ public class PurchaseMcpResource {
             tool("sales_get_imports","Lista lotes importados de vendas e sua cobertura",Map.of("type","object","properties",Map.of())),
             tool("sales_audit_stock","Cruza quantidade vendida x quantidade abastecida para apontar extravio, venda sem entrada registrada e perdas. Aceita filtro textual por produto.",Map.of("type","object","properties",Map.of("purchaseDatasetId",Map.of("type","string"),"salesDatasetId",Map.of("type","string"),"from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date"),"locations",Map.of("type","array","items",Map.of("type","string")),"text",Map.of("type","string")),"required",List.of("from","to"))),
             tool("inventory_daily_audit","Auditoria diária do Beco da Praia: cruza a contagem feita antes da abertura com as vendas do dia e calcula o saldo teórico por produto.",Map.of("type","object","properties",Map.of("date",Map.of("type","string","format","date"),"location",Map.of("type","string"),"text",Map.of("type","string")),"required",List.of("date"))),
-            tool("inventory_count_sessions","Lista sessões imutáveis de contagem enviadas em um período.",Map.of("type","object","properties",Map.of("from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date"))))
+            tool("inventory_count_sessions","Lista sessões imutáveis de contagem enviadas em um período.",Map.of("type","object","properties",Map.of("from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date")))),
+            tool("work_clock_summary","Resumo de ponto por colaborador: horas trabalhadas, extras acima de 40 h/semana, faltas e descansos. Use para perguntas sobre jornada, horas extras ou faltas no período.",Map.of("type","object","properties",workClockPeriodProps,"required",List.of("from","to"))),
+            tool("work_clock_entries","Histórico detalhado de marcações de ponto (entrada, almoço, saída etc.) de um colaborador no período.",Map.of("type","object","properties",workClockPeriodProps,"required",List.of("userId","from","to"))),
+            tool("work_clock_schedule","Consulta a escala 4x3 de um colaborador (dias da semana configurados como trabalho).",Map.of("type","object","properties",Map.of("userId",Map.of("type","string")),"required",List.of("userId"))),
+            tool("work_clock_worksite","Retorna coordenadas e raio do local de trabalho (Beco da Praia) usado na geofence de ponto.",Map.of("type","object","properties",Map.of()))
         );
+    }
+
+    private Object workClockEntries(Map<String,Object> args) {
+        String userId = requiredText(args.get("userId"), "userId");
+        java.time.LocalDate from = parseDate(args.get("from"), null);
+        java.time.LocalDate to = parseDate(args.get("to"), from);
+        if (from == null) throw new IllegalArgumentException("from obrigatório (YYYY-MM-DD)");
+        return workClock.entries(userId, from, to == null ? from : to);
+    }
+
+    private Object workClockSchedule(Map<String,Object> args) {
+        return workClock.getSchedule(requiredText(args.get("userId"), "userId"));
+    }
+
+    private static java.time.LocalDate parseDate(Object value, java.time.LocalDate fallback) {
+        if (value == null || Objects.toString(value, "").isBlank()) return fallback;
+        return java.time.LocalDate.parse(value.toString());
+    }
+
+    private static String optionalText(Object value) {
+        String text = Objects.toString(value, "").trim();
+        return text.isBlank() ? null : text;
+    }
+
+    private static String requiredText(Object value, String field) {
+        String text = optionalText(value);
+        if (text == null) throw new IllegalArgumentException(field + " obrigatório");
+        return text;
     }
     private static Map<String,Object> normalizeSalesArgs(Map<String,Object> args){
         Map<String,Object> normalized=new LinkedHashMap<>(args==null?Map.of():args);
