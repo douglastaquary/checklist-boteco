@@ -1,6 +1,6 @@
 # Instruções do projeto para o Codex
 
-Quando a conversa mencionar `beco`, `Beco da Praia`, `compras`, `vendas`, `abastecimento`, `extravio`, `quantas vendeu`, `qual quantidade vendeu`, `quanto vendeu`, use o MCP `checklist-boteco-analytics`.
+Quando a conversa mencionar `beco`, `Beco da Praia`, `compras`, `vendas`, `abastecimento`, `extravio`, `quantas vendeu`, `qual quantidade vendeu`, `quanto vendeu`, `ponto`, `jornada`, `horas extras`, `faltas`, `escala`, use o MCP `checklist-boteco-analytics`.
 
 Fluxo recomendado:
 
@@ -8,6 +8,7 @@ Fluxo recomendado:
 2. Para perguntas por produto, usar `sales_by_product`.
 3. Para agrupamentos, usar `sales_aggregate`.
 4. Para auditoria de perdas, extravio e venda sem abastecimento, usar `sales_audit_stock`.
+5. Para ponto e jornada, usar `work_clock_summary`, `work_clock_entries` e `work_clock_schedule`.
 
 Heurísticas:
 

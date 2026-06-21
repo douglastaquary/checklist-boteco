@@ -1,6 +1,6 @@
 # Instruções do projeto para o Cursor
 
-Sempre que a conversa mencionar `beco`, `vendas`, `compras`, `abastecimento`, `extravio`, `perdas`, `quantas vendeu`, `quanto vendeu`, `qual a quantidade vendida`, use o servidor MCP `checklist-boteco-analytics`.
+Sempre que a conversa mencionar `beco`, `vendas`, `compras`, `abastecimento`, `extravio`, `perdas`, `quantas vendeu`, `quanto vendeu`, `qual a quantidade vendida`, `ponto`, `jornada`, `horas extras`, `faltas`, `escala`, use o servidor MCP `checklist-boteco-analytics`.
 
 Regras:
 
@@ -9,6 +9,9 @@ Regras:
 - Para listagens gerais de vendas, use `sales_list`.
 - Para totalizações por produto, categoria ou local, use `sales_aggregate`.
 - Para auditoria entre vendido e abastecido, use `sales_audit_stock`.
+- Para resumo de ponto (horas, extras, faltas), use `work_clock_summary`.
+- Para histórico de marcações, use `work_clock_entries`.
+- Para escala 4x3 de um colaborador, use `work_clock_schedule`.
 - Para descobrir campos, períodos e cobertura do dataset, use `sales_get_schema`, `sales_get_imports`, `purchases_get_schema` e `purchases_get_imports`.
 
 Interpretação de linguagem natural:

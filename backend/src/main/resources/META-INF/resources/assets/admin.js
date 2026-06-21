@@ -201,6 +201,7 @@ function accessibleViews(user = currentUser) {
   if (canCreateInventoryCounts(user) || canViewInventoryInsights(user) || canManageAdministrativeStock(user)) views.push('inventory');
   if (isAdmin(user)) views.push('purchases');
   if (isAdmin(user)) views.push('sales');
+  if (isAdmin(user)) views.push('workclock');
   return views;
 }
 
@@ -227,6 +228,7 @@ function activateView(viewId) {
   if (viewId === 'purchases' && token) loadPurchases();
   if (viewId === 'sales' && token) loadSales();
   if (viewId === 'inventory' && token) loadCounts();
+  if (viewId === 'workclock' && token) loadWorkClock();
 }
 
 async function load() {
@@ -995,6 +997,134 @@ async function applyInventoryAudit() {
   } catch (error) { $('countMessage').textContent = error.message; }
 }
 
+const workClockTypeLabels = {
+  ENTRADA: 'Entrada',
+  ALMOCO_INICIO: 'Saída almoço',
+  ALMOCO_FIM: 'Retorno almoço',
+  DESCANSO_INICIO: 'Início descanso',
+  DESCANSO_FIM: 'Fim descanso',
+  SAIDA: 'Saída'
+};
+
+function initWorkClockDates() {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  if (!$('workClockFrom').value) $('workClockFrom').value = monday.toISOString().slice(0, 10);
+  if (!$('workClockTo').value) $('workClockTo').value = today.toISOString().slice(0, 10);
+  if (!$('workClockExportYear').value) $('workClockExportYear').value = today.getFullYear();
+  if (!$('workClockExportMonth').value) $('workClockExportMonth').value = today.getMonth() + 1;
+}
+
+function populateWorkClockUsers(users) {
+  const options = users.map(user => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`).join('');
+  $('workClockUser').innerHTML = `<option value="">Todos</option>${options}`;
+  $('scheduleUser').innerHTML = options;
+}
+
+function selectedScheduleDays() {
+  return [...document.querySelectorAll('.schedule-days input:checked')].map(input => Number(input.value));
+}
+
+function setScheduleDays(days) {
+  document.querySelectorAll('.schedule-days input').forEach(input => {
+    input.checked = days.includes(Number(input.value));
+  });
+}
+
+async function loadWorkClockSchedule(userId) {
+  if (!userId) return;
+  const schedule = await api(`/api/work-clock/schedule/${userId}`);
+  setScheduleDays(schedule.workingDaysOfWeek || [1, 2, 3, 4]);
+}
+
+async function loadWorkClockSummary() {
+  initWorkClockDates();
+  const from = $('workClockFrom').value;
+  const to = $('workClockTo').value;
+  const userId = $('workClockUser').value;
+  const query = new URLSearchParams({ from, to });
+  if (userId) query.set('userId', userId);
+  const rows = await api(`/api/work-clock/summary?${query.toString()}`);
+  $('workClockBody').innerHTML = rows.map(row => `<tr>
+    <td>${escapeHtml(row.name)}</td>
+    <td>${Number(row.workedHours).toFixed(2)} h</td>
+    <td>${Number(row.overtimeHours).toFixed(2)} h</td>
+    <td>${Number(row.missingHours).toFixed(2)} h</td>
+    <td>${Number(row.breakHours).toFixed(2)} h</td>
+    <td>${row.absenceDays}</td>
+    <td><button type="button" class="secondary" data-workclock-user="${escapeHtml(row.userId)}" data-workclock-name="${escapeHtml(row.name)}">Ver</button></td>
+  </tr>`).join('');
+  document.querySelectorAll('[data-workclock-user]').forEach(button => {
+    button.addEventListener('click', () => openWorkClockEntries(button.dataset.workclockUser, button.dataset.workclockName));
+  });
+}
+
+async function openWorkClockEntries(userId, name) {
+  const from = $('workClockFrom').value;
+  const to = $('workClockTo').value;
+  const query = new URLSearchParams({ userId, from, to });
+  const entries = await api(`/api/work-clock/entries?${query.toString()}`);
+  $('workClockEntriesTitle').textContent = `Marcações — ${name}`;
+  $('workClockEntriesBody').innerHTML = entries.map(entry => `<tr>
+    <td>${escapeHtml(workClockTypeLabels[entry.type] || entry.type)}</td>
+    <td>${new Date(entry.registeredAt).toLocaleString('pt-BR')}</td>
+    <td>${Number(entry.distanceFromWorkMeters).toFixed(1)}</td>
+    <td>${entry.isLate ? 'Sim' : 'Não'}</td>
+  </tr>`).join('') || '<tr><td colspan="4">Nenhuma marcação no período.</td></tr>';
+  $('workClockEntriesDialog').showModal();
+}
+
+async function loadWorkClock() {
+  if (!isAdmin()) return;
+  try {
+    $('workClockMessage').textContent = '';
+    initWorkClockDates();
+    if (!currentUsers.length) currentUsers = await api('/api/users');
+    populateWorkClockUsers(currentUsers);
+    if ($('scheduleUser').value) await loadWorkClockSchedule($('scheduleUser').value);
+    await loadWorkClockSummary();
+  } catch (error) {
+    $('workClockMessage').textContent = error.message;
+  }
+}
+
+async function saveWorkClockSchedule(event) {
+  event.preventDefault();
+  const userId = $('scheduleUser').value;
+  if (!userId) return;
+  try {
+    await api(`/api/work-clock/schedule/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        workingDaysOfWeek: selectedScheduleDays(),
+        workDateExceptions: [],
+        offDateExceptions: []
+      })
+    });
+    $('scheduleMessage').innerHTML = '<span class="import-ok">Escala salva.</span>';
+  } catch (error) {
+    $('scheduleMessage').textContent = error.message;
+  }
+}
+
+async function downloadWorkClockExport(kind) {
+  const year = Number($('workClockExportYear').value);
+  const month = Number($('workClockExportMonth').value);
+  const path = kind === 'pdf' ? '/api/work-clock/export.pdf' : '/api/work-clock/export.csv';
+  const response = await fetch(`${path}?year=${year}&month=${month}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  if (!response.ok) throw new Error(readApiError({}, response.status));
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `ponto-${year}-${month}.${kind === 'pdf' ? 'pdf' : 'csv'}`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 $('addCountItem').addEventListener('click', () => { activeCountDraft().push(emptyCountItem()); saveCountDraft(); renderCountDraft(); });
 $('clearCount').addEventListener('click', () => { const draft = activeCountDraft(); if (draft.length && !confirm('Descartar a contagem ainda não enviada?')) return; if (isAdminCountMode()) adminCountDraft = []; else countDraft = []; saveCountDraft(); renderCountDraft(); });
 $('submitCount').addEventListener('click', submitCount);
@@ -1004,6 +1134,13 @@ $('runInventoryAudit').addEventListener('click', runInventoryAudit);
 $('applyInventoryAudit').addEventListener('click', applyInventoryAudit);
 $('countModeDaily').addEventListener('click', () => setInventoryCountMode('daily'));
 $('countModeAdmin').addEventListener('click', () => setInventoryCountMode('admin'));
+$('refreshWorkClock').addEventListener('click', loadWorkClock);
+$('workClockFilters').addEventListener('submit', event => { event.preventDefault(); loadWorkClockSummary().catch(error => { $('workClockMessage').textContent = error.message; }); });
+$('workClockScheduleForm').addEventListener('submit', saveWorkClockSchedule);
+$('scheduleUser').addEventListener('change', event => loadWorkClockSchedule(event.target.value).catch(error => { $('scheduleMessage').textContent = error.message; }));
+$('closeWorkClockEntries').addEventListener('click', () => $('workClockEntriesDialog').close());
+$('exportWorkClockCsv').addEventListener('click', () => downloadWorkClockExport('csv').catch(error => { $('workClockMessage').textContent = error.message; }));
+$('exportWorkClockPdf').addEventListener('click', () => downloadWorkClockExport('pdf').catch(error => { $('workClockMessage').textContent = error.message; }));
 renderCountDraft();
 updateCountActions();
 

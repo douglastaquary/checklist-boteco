@@ -100,7 +100,14 @@ curl -X POST http://127.0.0.1:8080/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-Se estiver tudo certo, a resposta lista as ferramentas MCP de compras e vendas.
+Se estiver tudo certo, a resposta lista as ferramentas MCP de compras, vendas, estoque e ponto.
+
+Ferramentas de **ponto** (histórico de jornada):
+
+- `work_clock_summary` — resumo por colaborador (horas, extras, faltas, descansos)
+- `work_clock_entries` — marcações detalhadas de um colaborador
+- `work_clock_schedule` — escala 4x3 (dias de trabalho)
+- `work_clock_worksite` — coordenadas e raio do Beco da Praia
 
 ## Exemplos de teste via chat
 
@@ -123,6 +130,9 @@ Exemplos mais objetivos para validar o fluxo:
 - `Use o MCP checklist-boteco-analytics e agregue vendas por category entre 2026-06-01 e 2026-06-30.`
 - `Use o MCP checklist-boteco-analytics e faça sales_audit_stock de 2026-06-01 a 2026-06-30.`
 - `Use inventory_daily_audit para conferir a contagem de abertura, as vendas e o saldo teórico de 2026-06-20.`
+- `Use work_clock_summary de 2026-06-01 a 2026-06-30 e diga quem teve horas extras.`
+- `Use work_clock_entries para listar as marcações de ponto de um colaborador em 2026-06-18.`
+- `Use work_clock_schedule e informe em quais dias da semana o colaborador trabalha.`
 
 ## Como ensinar o agente a reconhecer "beco" e perguntas de produto
 
@@ -134,6 +144,7 @@ Use uma instrução de projeto com estas regras:
 - para perguntas por produto com período explícito, preferir `sales_quantity_by_product_in_period`;
 - para perguntas de divergência, extravio ou perdas, usar `sales_audit_stock`;
 - para conferência diária de contagem antes da abertura x vendas x saldo restante, usar `inventory_daily_audit`;
+- para perguntas sobre ponto, jornada, horas trabalhadas, horas extras, faltas ou escala 4x3, usar `work_clock_summary`, `work_clock_entries` ou `work_clock_schedule`;
 - se o CSV importado não tiver um campo de local explícito, ainda assim responder a pergunta como referente ao dataset do Beco importado no projeto.
 
 ## Observações

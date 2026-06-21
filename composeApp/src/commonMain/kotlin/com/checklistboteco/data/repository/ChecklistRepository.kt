@@ -3,6 +3,7 @@ package com.checklistboteco.data.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOne
+import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.sync.ActivityPayload
 import com.checklistboteco.data.sync.CompletionPayload
 import com.checklistboteco.data.sync.PendingSyncOperation
@@ -220,11 +221,18 @@ class ChecklistRepository(
         )
     }
 
+    fun getUserById(id: Long): User? {
+        return queries.selectUserById(id).executeAsOneOrNull()?.let(::mapToUser)
+    }
+
+    fun updateUserRemoteId(localUserId: Long, remoteId: String) {
+        queries.updateUserRemoteId(remoteId, localUserId)
+    }
+
     fun syncLocalUserFromRemote(localUserId: Long, remoteUser: User): User? {
         updateUserFeaturePermissions(localUserId, remoteUser.featurePermissions)
-        return getUserByRemoteId(remoteUser.remoteId.orEmpty())
-            ?: getUserByEmail(remoteUser.email)
-            ?: getUserByName(remoteUser.name)
+        remoteUser.remoteId?.takeIf { it.isNotBlank() }?.let { updateUserRemoteId(localUserId, it) }
+        return getUserById(localUserId)
     }
 
     fun addInventoryCountDraft(value: InventoryCountDraft, administrative: Boolean = false) {
@@ -379,7 +387,7 @@ class ChecklistRepository(
         location: GeoPoint,
         distanceFromWorkMeters: Double,
         isLate: Boolean
-    ) {
+    ): Long {
         queries.insertWorkClockEntry(
             userId,
             type.name,
@@ -389,6 +397,44 @@ class ChecklistRepository(
             distanceFromWorkMeters,
             isLate.toLongFlag()
         )
+        return queries.selectWorkClockEntryByRegisteredAt(userId, registeredAt).executeAsOne().id
+    }
+
+    fun markWorkClockEntrySynced(localId: Long, remoteId: String) {
+        queries.updateWorkClockEntrySync("SYNCED", remoteId, localId)
+    }
+
+    fun getPendingWorkClockEntries(userId: Long): List<WorkClockEntry> {
+        return queries.selectPendingWorkClockEntries()
+            .executeAsList()
+            .filter { it.userId == userId }
+            .map(::mapToWorkClockEntry)
+    }
+
+    suspend fun retryPendingWorkClockEntries(
+        userId: Long,
+        remoteUserId: String,
+        deviceId: String,
+        token: String,
+        api: BackendApiClient
+    ) {
+        getPendingWorkClockEntries(userId).forEach { entry ->
+            runCatching {
+                val remoteId = api.pushWorkClockEntry(
+                    token = token,
+                    deviceId = deviceId,
+                    remoteUserId = remoteUserId,
+                    _localEntryId = entry.id,
+                    type = entry.type,
+                    registeredAt = entry.registeredAt,
+                    latitude = entry.location.latitude,
+                    longitude = entry.location.longitude,
+                    distanceFromWorkMeters = entry.distanceFromWorkMeters,
+                    isLate = entry.isLate
+                )
+                markWorkClockEntrySynced(entry.id, remoteId)
+            }
+        }
     }
 
     fun getWorkClockEntriesByUserAndDate(userId: Long, date: LocalDate): Flow<List<WorkClockEntry>> {

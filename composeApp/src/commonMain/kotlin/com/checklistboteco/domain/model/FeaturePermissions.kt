@@ -17,5 +17,13 @@ data class FeaturePermissions(
             canViewInventoryInsights = true,
             canManageAdministrativeStock = true
         )
+
+        /** Novos usuários: somente Checklist e Ponto até o admin conceder permissões. */
+        val Default = FeaturePermissions()
+    }
+
+    fun hasAnyDelegatedPermission(): Boolean {
+        return canRegisterUsers || canCreateActivities || canEditUsers ||
+            canCreateInventoryCounts || canViewInventoryInsights || canManageAdministrativeStock
     }
 }

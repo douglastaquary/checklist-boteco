@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,11 +55,17 @@ fun MainScreen(
     val tabs = remember(user) {
         buildList {
             add(Tab.Checklist)
-            if (!user.canManagePermissions()) add(Tab.WorkClock)
-            if (user.canCreateInventoryCounts() || user.canViewInventoryInsights() || user.canManageAdministrativeStock()) add(Tab.Inventory)
-            if (user.canCreateActivities() || user.canEditUsers() || user.canRegisterUsers()) add(Tab.Dashboard)
-            if (user.canCreateActivities()) add(Tab.Activities)
+            if (user.canUseWorkClock()) add(Tab.WorkClock)
+            if (user.canUseInventoryModule()) add(Tab.Inventory)
+            if (user.canUseDashboardModule()) add(Tab.Dashboard)
+            if (user.canUseActivitiesModule()) add(Tab.Activities)
             if (user.canManagePermissions()) add(Tab.Permissions)
+        }
+    }
+
+    LaunchedEffect(tabs.size) {
+        if (selectedTabIndex >= tabs.size) {
+            selectedTabIndex = 0
         }
     }
 

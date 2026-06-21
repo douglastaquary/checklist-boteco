@@ -1,6 +1,7 @@
 package com.checklistboteco.backend.store;
 
 import com.checklistboteco.backend.model.Models.*;
+import com.checklistboteco.backend.workclock.domain.WorkClockModels.UserWorkSchedule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.annotation.PostConstruct;
@@ -15,7 +16,9 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
+import java.time.LocalDate;
 import java.util.*;
+import java.util.Optional;
 
 /** Single-table DynamoDB adapter. Hydrates lazily on first access to avoid scan during Lambda cold start. */
 @ApplicationScoped
@@ -37,7 +40,7 @@ public class DynamoDbStore extends LocalStore {
 
     private synchronized void ensureHydrated() {
         if (hydrated) return;
-        users.clear(); activities.clear(); completions.clear(); workClock.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear();
+        users.clear(); activities.clear(); completions.clear(); workClock.clear(); userSchedules.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear();
         dynamo.scan(ScanRequest.builder().tableName(table).build()).items().forEach(this::hydrate);
         deletedUsers.forEach(users::remove);
         if (users.isEmpty()) seed();
@@ -60,6 +63,9 @@ public class DynamoDbStore extends LocalStore {
     @Override public synchronized PublicUser updatePermissions(String id,FeaturePermissions permissions){ ensureHydrated(); PublicUser result=super.updatePermissions(id,permissions); put("USER",id,users.get(id)); return result; }
     @Override public synchronized Activity createActivity(CreateActivityRequest request){ ensureHydrated(); Activity result=super.createActivity(request); put("ACTIVITY",result.id,result); return result; }
     @Override public void upsertWorkClockEntries(List<WorkClockEntry> values){ ensureHydrated(); super.upsertWorkClockEntries(values); safe(values).forEach(v->put("WORK_CLOCK",v.id,v)); }
+    @Override public List<WorkClockEntry> listWorkClockEntries(String userId, LocalDate from, LocalDate to){ ensureHydrated(); return super.listWorkClockEntries(userId, from, to); }
+    @Override public Optional<UserWorkSchedule> getWorkSchedule(String userId){ ensureHydrated(); return super.getWorkSchedule(userId); }
+    @Override public synchronized void saveWorkSchedule(String userId, UserWorkSchedule schedule){ ensureHydrated(); super.saveWorkSchedule(userId, schedule); put("USER_SCHEDULE", userId, schedule); }
     @Override public synchronized SyncPushResult pushSync(String userId,boolean admin,SyncPushRequest request){
         ensureHydrated();
         SyncPushResult result=super.pushSync(userId,admin,request);
@@ -99,6 +105,7 @@ public class DynamoDbStore extends LocalStore {
                 case "ACTIVITY" -> { Activity value=mapper.readValue(payload,Activity.class); activities.put(value.id,value); }
                 case "COMPLETION" -> { Completion value=mapper.readValue(payload,Completion.class); completions.put(value.id,value); }
                 case "WORK_CLOCK" -> { WorkClockEntry value=mapper.readValue(payload,WorkClockEntry.class); workClock.put(value.id,value); }
+                case "USER_SCHEDULE" -> { UserWorkSchedule value=mapper.readValue(payload,UserWorkSchedule.class); userSchedules.put(value.userId,value); }
                 case "TOMBSTONE" -> { Tombstone value=mapper.readValue(payload,Tombstone.class); tombstones.put(value.entityId,value); }
                 case "CHALLENGE" -> { DeviceChallenge value=mapper.readValue(payload,DeviceChallenge.class); if(value.expiresAt>System.currentTimeMillis()) challenges.put(value.id,value); }
                 case "TRUSTED" -> trustedDevices.add(payload);

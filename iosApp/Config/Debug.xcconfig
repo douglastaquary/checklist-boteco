@@ -1,0 +1,2 @@
+CHECKLIST_API_BASE_URL = http:/$()/localhost:8181
+PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios

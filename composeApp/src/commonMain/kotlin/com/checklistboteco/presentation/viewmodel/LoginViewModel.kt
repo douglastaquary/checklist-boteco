@@ -5,7 +5,10 @@ import com.checklistboteco.data.remote.RemoteLoginResult
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.data.sync.SyncSession
 import com.checklistboteco.domain.model.User
+import com.checklistboteco.platform.AppErrorMapper
+import com.checklistboteco.platform.AppNetworkFeedback
 import com.checklistboteco.platform.DeviceIdentity
+import com.checklistboteco.platform.LoginCredentialsStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,12 +21,14 @@ import kotlinx.coroutines.launch
 data class LoginUiState(
     val userName: String = "",
     val password: String = "",
+    val rememberCredentials: Boolean = false,
+    val pendingBiometricUnlock: Boolean = false,
+    val biometricUnlockInProgress: Boolean = false,
     val twoFactorCode: String = "",
     val requiresTwoFactor: Boolean = false,
     val challengeId: String? = null,
     val developmentCode: String? = null,
     val error: String? = null,
-    val isLoading: Boolean = false,
     val currentUser: User? = null,
     val authToken: String? = null,
     val remoteUserId: String? = null,
@@ -38,6 +43,10 @@ class LoginViewModel(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+    init {
+        scope.launch { restoreSavedCredentials(autoUnlock = true) }
+    }
+
     fun updateUserName(name: String) {
         _uiState.update { it.copy(userName = name, error = null) }
     }
@@ -46,8 +55,16 @@ class LoginViewModel(
         _uiState.update { it.copy(password = password, error = null) }
     }
 
+    fun updateRememberCredentials(remember: Boolean) {
+        _uiState.update { it.copy(rememberCredentials = remember) }
+    }
+
     fun updateTwoFactorCode(code: String) {
         _uiState.update { it.copy(twoFactorCode = code.filter(Char::isDigit).take(6), error = null) }
+    }
+
+    fun unlockRememberedUser() {
+        scope.launch { restoreSavedCredentials(autoUnlock = true) }
     }
 
     fun login() {
@@ -70,12 +87,15 @@ class LoginViewModel(
             return
         }
 
-        _uiState.update { 
-            it.copy(
-                currentUser = user,
-                isLoggedIn = true,
-                error = null
-            )
+        scope.launch {
+            persistCredentials()
+            _uiState.update {
+                it.copy(
+                    currentUser = user,
+                    isLoggedIn = true,
+                    error = null
+                )
+            }
         }
     }
 
@@ -88,7 +108,7 @@ class LoginViewModel(
             return
         }
 
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update { it.copy(error = null) }
         scope.launch {
             runCatching {
                 api.verifyDevice(
@@ -100,9 +120,7 @@ class LoginViewModel(
             }.fold(
                 onSuccess = ::completeRemoteLogin,
                 onFailure = { error ->
-                    _uiState.update {
-                        it.copy(isLoading = false, error = error.message ?: "Não foi possível validar o dispositivo")
-                    }
+                    AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
                 }
             )
         }
@@ -110,14 +128,75 @@ class LoginViewModel(
 
     fun logout() {
         repository.clearSyncSession()
-        _uiState.update { 
-            LoginUiState()
+        scope.launch { restoreSavedCredentials(autoUnlock = true) }
+    }
+
+    private suspend fun restoreSavedCredentials(autoUnlock: Boolean) {
+        val saved = LoginCredentialsStorage.load()
+        if (saved.requiresBiometricUnlock) {
+            _uiState.update {
+                LoginUiState(
+                    rememberCredentials = true,
+                    pendingBiometricUnlock = true
+                )
+            }
+            if (autoUnlock) {
+                unlockRememberedCredentials()
+            }
+            return
         }
+
+        _uiState.update {
+            LoginUiState(
+                userName = saved.username,
+                password = saved.password,
+                rememberCredentials = saved.remember
+            )
+        }
+    }
+
+    private suspend fun unlockRememberedCredentials() {
+        _uiState.update {
+            it.copy(
+                biometricUnlockInProgress = true,
+                error = null
+            )
+        }
+
+        LoginCredentialsStorage.unlockRememberedCredentials()
+            .onSuccess { credentials ->
+                _uiState.update {
+                    it.copy(
+                        userName = credentials.username,
+                        password = credentials.password,
+                        rememberCredentials = true,
+                        pendingBiometricUnlock = false,
+                        biometricUnlockInProgress = false
+                    )
+                }
+            }
+            .onFailure { error ->
+                val message = error.message.orEmpty()
+                val userMessage = when {
+                    message.contains("cancel", ignoreCase = true) ||
+                        message.contains("Cancelar", ignoreCase = true) ->
+                        "Confirme a biometria para preencher usuário e senha."
+                    message.isNotBlank() -> message
+                    else -> "Não foi possível desbloquear o login salvo."
+                }
+                _uiState.update {
+                    it.copy(
+                        pendingBiometricUnlock = true,
+                        biometricUnlockInProgress = false,
+                        error = userMessage
+                    )
+                }
+            }
     }
 
     private fun loginWithBackend(email: String, password: String) {
         val api = backendApiClient ?: return
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update { it.copy(error = null) }
         scope.launch {
             runCatching {
                 api.login(
@@ -131,7 +210,6 @@ class LoginViewModel(
                     if (result.requiresTwoFactor) {
                         _uiState.update {
                             it.copy(
-                                isLoading = false,
                                 requiresTwoFactor = true,
                                 challengeId = result.challengeId,
                                 developmentCode = result.developmentCode,
@@ -145,75 +223,105 @@ class LoginViewModel(
                     }
                 },
                 onFailure = { error ->
-                    _uiState.update {
-                        it.copy(isLoading = false, error = error.message ?: "Não foi possível entrar pela API")
-                    }
+                    AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
                 }
             )
         }
     }
 
     private fun completeRemoteLogin(result: RemoteLoginResult) {
-        val remoteUser = result.user
+        val api = backendApiClient ?: return
         val token = result.token
         val remoteUserId = result.remoteUserId
-        if (remoteUser == null || token.isNullOrBlank() || remoteUserId.isNullOrBlank()) {
-            _uiState.update { it.copy(isLoading = false, error = "Resposta de login inválida") }
+        if (remoteUserId.isNullOrBlank() || token.isNullOrBlank()) {
+            AppNetworkFeedback.showError("Resposta de login inválida. Tente novamente.")
             return
         }
 
-        val localUser = repository.getUserByRemoteId(remoteUserId)
-            ?: repository.getUserByEmail(remoteUser.email)
-            ?: repository.getUserByName(remoteUser.name)
-            ?: run {
-                repository.insertUser(
-                    name = remoteUser.name,
-                    email = remoteUser.email,
-                    password = _uiState.value.password,
-                    area = remoteUser.area,
-                    workSector = remoteUser.workSector,
-                    permissionLevel = remoteUser.permissionLevel,
-                    allowedAreas = remoteUser.allowedAreas,
-                    createdAt = remoteUser.createdAt,
-                    remoteId = remoteUserId,
-                    featurePermissions = remoteUser.featurePermissions
-                )
-                repository.getUserByRemoteId(remoteUserId)
-                    ?: repository.getUserByEmail(remoteUser.email)
-                    ?: repository.getUserByName(remoteUser.name)
+        scope.launch {
+            val authoritative = runCatching { api.fetchCurrentUser(token) }.getOrElse { result }
+            val remoteUser = authoritative.user ?: result.user
+            if (remoteUser == null) {
+                AppNetworkFeedback.showError("Resposta de login inválida. Tente novamente.")
+                return@launch
             }
 
-        if (localUser == null) {
-            _uiState.update { it.copy(isLoading = false, error = "Não foi possível preparar o usuário local") }
-            return
+            val profile = remoteUser.copy(remoteId = remoteUserId)
+            val localUser = repository.getUserByRemoteId(remoteUserId)
+                ?: repository.getUserByEmail(profile.email)
+                ?: repository.getUserByName(profile.name)
+                ?: run {
+                    repository.insertUser(
+                        name = profile.name,
+                        email = profile.email,
+                        password = _uiState.value.password,
+                        area = profile.area,
+                        workSector = profile.workSector,
+                        permissionLevel = profile.permissionLevel,
+                        allowedAreas = profile.allowedAreas,
+                        createdAt = profile.createdAt,
+                        remoteId = remoteUserId,
+                        featurePermissions = profile.featurePermissions
+                    )
+                    repository.getUserByRemoteId(remoteUserId)
+                        ?: repository.getUserByEmail(profile.email)
+                        ?: repository.getUserByName(profile.name)
+                }
+
+            if (localUser == null) {
+                AppNetworkFeedback.showError("Não foi possível preparar o usuário local. Tente novamente.")
+                return@launch
+            }
+
+            val syncedUser = repository.syncLocalUserFromRemote(
+                localUserId = localUser.id,
+                remoteUser = profile
+            ) ?: localUser.copy(
+                remoteId = remoteUserId,
+                featurePermissions = profile.featurePermissions
+            )
+
+            repository.saveSyncSession(
+                localUserId = syncedUser.id,
+                session = SyncSession(
+                    authToken = token,
+                    remoteUserId = remoteUserId
+                )
+            )
+
+            persistCredentials()
+
+            _uiState.update {
+                it.copy(
+                    currentUser = syncedUser.copy(remoteId = remoteUserId),
+                    authToken = token,
+                    remoteUserId = remoteUserId,
+                    requiresTwoFactor = false,
+                    isLoggedIn = true,
+                    error = null
+                )
+            }
         }
+    }
 
-        val syncedUser = repository.syncLocalUserFromRemote(
-            localUserId = localUser.id,
-            remoteUser = remoteUser.copy(remoteId = remoteUserId)
-        ) ?: localUser.copy(
-            remoteId = remoteUserId,
-            featurePermissions = remoteUser.featurePermissions
-        )
-
-        repository.saveSyncSession(
-            localUserId = syncedUser.id,
-            session = SyncSession(
-                authToken = token,
-                remoteUserId = remoteUserId
-            )
-        )
-
-        _uiState.update {
-            it.copy(
-                currentUser = syncedUser.copy(remoteId = remoteUserId),
-                authToken = token,
-                remoteUserId = remoteUserId,
-                requiresTwoFactor = false,
-                isLoggedIn = true,
-                isLoading = false,
-                error = null
-            )
+    private suspend fun persistCredentials() {
+        val state = _uiState.value
+        LoginCredentialsStorage.save(
+            username = state.userName,
+            password = state.password,
+            remember = state.rememberCredentials
+        ).onFailure { error ->
+            val message = error.message.orEmpty()
+            if (message.contains("cancel", ignoreCase = true) ||
+                message.contains("Cancelar", ignoreCase = true)
+            ) {
+                _uiState.update {
+                    it.copy(
+                        rememberCredentials = false,
+                        error = "Login não salvo. Confirme a biometria para lembrar usuário e senha."
+                    )
+                }
+            }
         }
     }
 }

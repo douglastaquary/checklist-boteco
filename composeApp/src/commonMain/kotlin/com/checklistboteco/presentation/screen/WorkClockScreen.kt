@@ -55,6 +55,8 @@ fun WorkClockScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    WorkClockLocationEffect(viewModel)
+
     if (state.showDetails) {
         WorkClockDetailsScreen(
             entries = state.entries,
@@ -123,8 +125,10 @@ fun WorkClockScreen(
                 InfoRow("Marcação", state.nextType.displayName)
                 InfoRow("Dia e hora", formatDateTime(state.currentTimestamp))
                 InfoRow("Local", WorksiteLocation.address)
-                InfoRow("Distância", "${state.distanceFromWorkMeters.toInt()} m")
+                InfoRow("Distância", if (state.distanceFromWorkMeters == Double.MAX_VALUE) "—" else "${state.distanceFromWorkMeters.toInt()} m")
+                InfoRow("GPS", state.locationStatus)
                 InfoRow("Horas trabalhadas hoje", WorkClockCalculator.formatDuration(state.summary.workedMillis))
+                InfoRow("Horas extras (semana)", WorkClockCalculator.formatDuration(state.summary.overtimeMillis))
                 InfoRow("Descanso devido", WorkClockCalculator.formatDuration(state.summary.missingBreakMillis))
                 InfoRow("Horas devidas hoje", WorkClockCalculator.formatDuration(state.summary.missingDailyMillis))
 
@@ -135,7 +139,7 @@ fun WorkClockScreen(
                     )
                 } else if (!state.canClockIn) {
                     Text(
-                        "A marcação é habilitada somente em um raio de ${WorksiteLocation.allowedRadiusMeters.toInt()} metros.",
+                        state.locationStatus,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -273,6 +277,7 @@ private fun SummaryCard(summary: com.checklistboteco.domain.model.WorkClockSumma
             InfoRow("Descanso excedente", WorkClockCalculator.formatDuration(summary.breakOverageMillis))
             InfoRow("Horas devidas hoje", WorkClockCalculator.formatDuration(summary.missingDailyMillis))
             InfoRow("Horas devidas na semana", WorkClockCalculator.formatDuration(summary.missingWeeklyMillis))
+            InfoRow("Horas extras (semana)", WorkClockCalculator.formatDuration(summary.overtimeMillis))
             if (summary.requiresTwoHoursRest) {
                 Text("Jornada de 12h requer 2h de descanso.", color = MaterialTheme.colorScheme.error)
             }

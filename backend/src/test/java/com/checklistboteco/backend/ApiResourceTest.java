@@ -54,6 +54,15 @@ class ApiResourceTest {
 
         String userId=JsonPath.from(created).getString("id");
 
+        String initialUserToken=login(email,"senha123");
+        given().header("Authorization","Bearer "+initialUserToken).when().get("/api/me").then().statusCode(200)
+            .body("permissions.canRegisterUsers",is(false))
+            .body("permissions.canCreateActivities",is(false))
+            .body("permissions.canEditUsers",is(false))
+            .body("permissions.canCreateInventoryCounts",is(false))
+            .body("permissions.canViewInventoryInsights",is(false))
+            .body("permissions.canManageAdministrativeStock",is(false));
+
         given()
             .header("Authorization","Bearer "+adminToken)
             .contentType("application/json")
@@ -93,6 +102,10 @@ class ApiResourceTest {
             .then().statusCode(200)
             .body("permissions.canCreateInventoryCounts",is(true));
 
+        String userTokenAfterGrant=login("editado+"+suffix+"@checklistboteco.com","novaSenha123");
+        given().header("Authorization","Bearer "+userTokenAfterGrant).when().get("/api/me").then().statusCode(200)
+            .body("permissions.canCreateInventoryCounts",is(true));
+
         given()
             .header("Authorization","Bearer "+adminToken)
             .when().delete("/api/users/"+userId)
@@ -123,6 +136,18 @@ class ApiResourceTest {
             .when().post("/api/users")
             .then().statusCode(201).extract().asString();
         String managerId=JsonPath.from(managerBody).getString("id");
+
+        given()
+            .header("Authorization","Bearer "+adminToken)
+            .contentType("application/json")
+            .body(Map.of("permissions",Map.of(
+                "canRegisterUsers",true,
+                "canCreateActivities",false,
+                "canEditUsers",false
+            )))
+            .when().patch("/api/users/"+managerId+"/permissions")
+            .then().statusCode(200)
+            .body("permissions.canRegisterUsers",is(true));
 
         String managerToken=login("gestor+"+suffix+"@checklistboteco.com","senha123");
 

@@ -21,6 +21,12 @@ target/
 *.log
 *.tmp
 
+# Swift / Xcode / SPM
+iosApp/.build/
+Packages/.build/
+DerivedData/
+*.xcuserstate
+
 # Local persistent datasets
 backend/.data/
 backend/backend-data/

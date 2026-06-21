@@ -18,6 +18,7 @@ public class ApiResource {
     @Inject TokenService tokens;
     @Inject AdminGuard guard;
     @ConfigProperty(name="checklist.auth.expose-device-code") boolean exposeDeviceCode;
+    @ConfigProperty(name="worksite.radiusMeters", defaultValue="5") double worksiteRadiusMeters;
 
     @GET @Path("/health") public Object health(){ return java.util.Map.of("status","ok"); }
 
@@ -35,7 +36,10 @@ public class ApiResource {
     }
     @POST @Path("/auth/verify-device") public LoginResponse verifyDevice(VerifyDeviceRequest request){
         if(request==null) fail(Response.Status.BAD_REQUEST,"Requisição inválida");
-        User user=store.verifyDeviceChallenge(request.challengeId,request.code,request.deviceId,request.deviceName);
+        String challengeId=request.challengeId==null?null:request.challengeId.trim();
+        String code=request.code==null?null:request.code.trim();
+        String device=request.deviceId==null||request.deviceId.isBlank()?"unknown-device":request.deviceId.trim();
+        User user=store.verifyDeviceChallenge(challengeId,code,device,request.deviceName);
         if(user==null) fail(Response.Status.UNAUTHORIZED,"Código de verificação inválido ou expirado");
         return authenticated(user);
     }
@@ -69,7 +73,10 @@ public class ApiResource {
     }
     @POST @Path("/sync/push") public SyncPushResult push(@HeaderParam("Authorization") String auth,SyncPushRequest request){
         TokenService.Payload payload=requireToken(auth); if(request==null) request=new SyncPushRequest();
-        List<WorkClockEntry> own=(request.workClockEntries==null?List.<WorkClockEntry>of():request.workClockEntries).stream().filter(e->payload.userId.equals(e.userId)).toList();
+        List<WorkClockEntry> own=(request.workClockEntries==null?List.<WorkClockEntry>of():request.workClockEntries).stream()
+            .filter(e->payload.userId.equals(e.userId))
+            .filter(e->e.distanceFromWorkMeters<=worksiteRadiusMeters)
+            .toList();
         request.workClockEntries=own;
         return store.pushSync(payload.userId,payload.isAdmin,request);
     }

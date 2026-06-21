@@ -36,4 +36,16 @@ data class User(
     fun canManagePermissions(): Boolean {
         return permissionLevel == PermissionLevel.ADMIN
     }
+
+    fun canUseWorkClock(): Boolean = permissionLevel != PermissionLevel.ADMIN
+
+    fun canUseInventoryModule(): Boolean {
+        return canCreateInventoryCounts() || canViewInventoryInsights() || canManageAdministrativeStock()
+    }
+
+    fun canUseDashboardModule(): Boolean {
+        return canCreateActivities() || canEditUsers() || canRegisterUsers()
+    }
+
+    fun canUseActivitiesModule(): Boolean = canCreateActivities()
 }
