@@ -2,11 +2,13 @@
 import SwiftUI
 import Env
 import Persistence
+import DesignSystem
 
 struct LoginView_Previews: PreviewProvider {
   static var previews: some View {
     LoginView(onLoginSuccess: {}, onRegisterTap: {})
       .environmentObject(previewSession)
+      .environmentObject(AppTheme.shared)
   }
 
   private static var previewSession: AppSession {

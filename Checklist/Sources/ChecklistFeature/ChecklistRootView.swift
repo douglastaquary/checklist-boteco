@@ -5,8 +5,7 @@ import Env
 import DesignSystem
 
 public struct ChecklistRootView: View {
-  @EnvironmentObject private var session: AppSession
-
+  private let user: User
   private let repository: ChecklistRepository
   private let syncController: SyncController
   private let onLogout: () -> Void
@@ -16,48 +15,52 @@ public struct ChecklistRootView: View {
   @State private var cameraCapture: CameraCaptureRequest?
   @State private var alert: ChecklistAlert?
 
-  public init(repository: ChecklistRepository, syncController: SyncController, onLogout: @escaping () -> Void) {
+  public init(
+    user: User,
+    repository: ChecklistRepository,
+    syncController: SyncController,
+    onLogout: @escaping () -> Void
+  ) {
+    self.user = user
     self.repository = repository
     self.syncController = syncController
     self.onLogout = onLogout
   }
 
   public var body: some View {
-    NavigationStack {
-      VStack {
-        Picker("Área", selection: $selectedArea) {
-          ForEach(Area.allCases.filter { session.currentUser?.canAccessArea($0) == true }, id: \.self) { area in
-            Text(area.displayName).tag(area)
-          }
+    VStack {
+      Picker("Área", selection: $selectedArea) {
+        ForEach(Area.allCases.filter { user.canAccessArea($0) }, id: \.self) { area in
+          Text(area.displayName).tag(area)
         }
-        .pickerStyle(.segmented)
-        .padding()
+      }
+      .pickerStyle(.segmented)
+      .padding()
 
-        List(items) { item in
-          ActivityChecklistRow(item: item) {
-            cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
-          }
+      List(items) { item in
+        ActivityChecklistRow(item: item) {
+          cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
         }
       }
-      .navigationTitle("Checklist")
-      .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Sair", action: onLogout)
-        }
+    }
+    .navigationTitle("Checklist")
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button("Sair", action: onLogout)
       }
-      .task(id: selectedArea) { await reload() }
-      .sheet(item: $cameraCapture) { request in
-        CameraCaptureView { path in
-          Task { await complete(activityId: request.activityId, imagePath: path) }
-        }
+    }
+    .task(id: selectedArea) { await reload() }
+    .sheet(item: $cameraCapture) { request in
+      CameraCaptureView { path in
+        Task { await complete(activityId: request.activityId, imagePath: path) }
       }
-      .alert(item: $alert) { item in
-        Alert(
-          title: Text("Erro"),
-          message: Text(item.message),
-          dismissButton: .cancel(Text("OK"))
-        )
-      }
+    }
+    .alert(item: $alert) { item in
+      Alert(
+        title: Text("Erro"),
+        message: Text(item.message),
+        dismissButton: .cancel(Text("OK"))
+      )
     }
   }
 
@@ -70,9 +73,8 @@ public struct ChecklistRootView: View {
   }
 
   private func complete(activityId: Int64, imagePath: String?) async {
-    guard let userId = session.currentUser?.id else { return }
     do {
-      try repository.completeActivity(activityId: activityId, userId: userId, imagePath: imagePath, isLate: false)
+      try repository.completeActivity(activityId: activityId, userId: user.id, imagePath: imagePath, isLate: false)
       syncController.requestSync()
       await reload()
     } catch {

@@ -1,6 +1,7 @@
 import SwiftUI
 import Models
 import Persistence
+
 public struct DashboardRootView: View {
   private let repository: ChecklistRepository
   @State private var activities: [Activity] = []
@@ -10,20 +11,18 @@ public struct DashboardRootView: View {
   }
 
   public var body: some View {
-    NavigationStack {
-      List {
-        Section("Atividades cadastradas") {
-          Text("\(activities.count) atividades ativas")
-        }
-        ForEach(Area.allCases, id: \.self) { area in
-          let count = activities.filter { $0.area == area }.count
-          LabeledContent(area.displayName, value: "\(count)")
-        }
+    List {
+      Section("Atividades cadastradas") {
+        Text("\(activities.count) atividades ativas")
       }
-      .navigationTitle("Dashboard")
-      .task {
-        activities = (try? repository.allActivities()) ?? []
+      ForEach(Area.allCases, id: \.self) { area in
+        let count = activities.filter { $0.area == area }.count
+        LabeledContent(area.displayName, value: "\(count)")
       }
+    }
+    .navigationTitle("Dashboard")
+    .task {
+      activities = (try? repository.allActivities()) ?? []
     }
   }
 }
