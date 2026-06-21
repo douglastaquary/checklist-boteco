@@ -6,7 +6,7 @@ import Models
 import Network
 import Persistence
 
-enum LoginPhase: Equatable {
+public enum LoginPhase: Equatable {
   case credentials
   case biometricUnlock
   case twoFactor
