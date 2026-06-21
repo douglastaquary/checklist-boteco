@@ -53,7 +53,7 @@ struct AppLaunchGate: View {
         Text(message)
           .font(.footnote)
           .multilineTextAlignment(.center)
-          .foregroundStyle(.secondary)
+          .foregroundColor(.secondary)
       }
       .padding()
     }
@@ -87,8 +87,13 @@ private enum AuthScreen: Equatable {
 
 struct RootView: View {
   @ObservedObject var holder: AppDependenciesHolder
-  @EnvironmentObject private var session: AppSession
+  @ObservedObject private var session: AppSession
   @State private var authScreen: AuthScreen = .login
+
+  init(holder: AppDependenciesHolder) {
+    self.holder = holder
+    _session = ObservedObject(wrappedValue: holder.session)
+  }
 
   var body: some View {
     ZStack {

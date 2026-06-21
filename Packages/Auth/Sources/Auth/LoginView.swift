@@ -39,6 +39,7 @@ public struct LoginView: View {
     debugPhase: LoginPhase? = nil,
     debugTwoFactorHint: String? = nil,
     debugUsername: String = "",
+    debugLocalError: String? = nil,
     skipsRestore: Bool = false
   ) {
     self.credentialStore = credentialStore
@@ -48,6 +49,7 @@ public struct LoginView: View {
     _phase = State(initialValue: debugPhase ?? .credentials)
     _twoFactorHint = State(initialValue: debugTwoFactorHint)
     _username = State(initialValue: debugUsername)
+    _localError = State(initialValue: debugLocalError)
   }
 
   public var body: some View {

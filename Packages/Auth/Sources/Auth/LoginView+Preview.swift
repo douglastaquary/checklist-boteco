@@ -23,7 +23,13 @@ struct LoginView_Previews: PreviewProvider {
         debugTwoFactorHint: "Código de desenvolvimento: 123456",
         debugUsername: "admin@checklistboteco.com"
       )
-      .previewDisplayName("2FA")
+      LoginView(
+        onLoginSuccess: {},
+        onRegisterTap: {},
+        debugUsername: "admin@checklistboteco.com",
+        debugLocalError: "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente."
+      )
+      .previewDisplayName("Erro de rede")
     }
     .environmentObject(previewSession)
     .environmentObject(AppTheme.shared)

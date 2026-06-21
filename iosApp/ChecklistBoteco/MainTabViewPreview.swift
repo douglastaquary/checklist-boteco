@@ -22,10 +22,6 @@ struct MainTabView_Previews: PreviewProvider {
     return ChecklistRepository(dbQueue: db)
   }
 
-  private static var previewSession: AppSession {
-    AppSession(repository: previewRepository, authClient: nil, deviceId: "preview")
-  }
-
   private static var previewSyncController: SyncController {
     SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil))
   }
@@ -33,7 +29,6 @@ struct MainTabView_Previews: PreviewProvider {
   private static var previewContext: MainTabContext {
     MainTabContext(
       repository: previewRepository,
-      session: previewSession,
       syncController: previewSyncController,
       inventoryClient: nil,
       authToken: nil,

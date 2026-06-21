@@ -13,7 +13,7 @@ extension View {
 }
 
 private struct AppDependencyGraphModifier: ViewModifier {
-  @ObservedObject var session: AppSession
+  let session: AppSession
   @ObservedObject var syncController: SyncController
 
   func body(content: Content) -> some View {

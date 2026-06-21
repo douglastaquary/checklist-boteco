@@ -12,7 +12,6 @@ import Persistence
 /// Dependências compartilhadas entre tabs — passadas para `AppTab.makeContentView`.
 struct MainTabContext {
   let repository: ChecklistRepository
-  let session: AppSession
   let syncController: SyncController
   let inventoryClient: InventoryClient?
   let authToken: String?

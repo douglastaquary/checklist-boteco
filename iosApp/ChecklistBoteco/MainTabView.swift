@@ -64,7 +64,6 @@ extension MainTabView {
     self.init(
       context: MainTabContext(
         repository: dependencies.repository,
-        session: dependencies.session,
         syncController: dependencies.syncController,
         inventoryClient: dependencies.inventoryClient,
         authToken: dependencies.authToken,

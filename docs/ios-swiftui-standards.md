@@ -120,12 +120,15 @@ Itens **já implementados** (2026-06):
 - Atividades: editar/excluir com sheet + alert de confirmação — [`AdminFeaturesViews.swift`](../Packages/AdminFeatures/Sources/AdminFeatures/AdminFeaturesViews.swift)
 - `MainTabView`: lazy load de tabs (`loadedTabs`) + `onOpenURL` para deep links
 - Previews: estados vazios (Inventory, Admin atividades) — `*+Preview.swift` nos packages
+- Previews de erro de rede (Login `debugLocalError`, Inventory `networkError` banner)
+- Inventário: erros de sync inline via banner (sem depender só do overlay global)
+- `AppDependencyGraph`: `session` injetado sem `@ObservedObject` no modifier (menos re-render global)
+- `RootView`: observa `session` localmente; `MainTabContext` sem referência a `AppSession`
 
 **Próximos PRs:**
 
-1. **Previews**: estados de erro de rede (Login, Inventory sync).
-2. **Inventory**: sheets adicionais quando necessário (criação/edição de contagem).
-3. **Performance**: reduzir escopo de `@ObservedObject session` onde ainda restar.
+1. **Inventory**: sheets adicionais quando necessário (criação/edição de contagem).
+2. **Performance**: revisar `@ObservedObject` em `AppDependenciesHolder` / sync lifecycle.
 
 ## Precedência em caso de conflito
 
