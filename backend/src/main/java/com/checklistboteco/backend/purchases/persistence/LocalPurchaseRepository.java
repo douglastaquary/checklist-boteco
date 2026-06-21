@@ -13,7 +13,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
-@IfBuildProfile("dev")
+@IfBuildProfile("dev") // test usa TestPurchaseRepository; prod usa DynamoPurchaseRepository
 public class LocalPurchaseRepository implements PurchaseRepository {
     static final class Snapshot {
         public List<ImportBatch> imports=new ArrayList<>();
