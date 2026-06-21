@@ -35,6 +35,19 @@ public final class ChecklistRepository: Sendable {
           Area.allCases.map(\.rawValue).joined(separator: ","), Date.nowMillis,
         ]
       )
+      try db.execute(
+        sql: """
+        INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt,
+          canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts,
+          canViewInventoryInsights, canManageAdministrativeStock)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0)
+        """,
+        arguments: [
+          "Colaborador", "colaborador@checklistboteco.com", "colab123", Area.atendimento.rawValue,
+          WorkSector.atendimento.rawValue, PermissionLevel.user.rawValue,
+          Area.atendimento.rawValue, Date.nowMillis,
+        ]
+      )
       let activities: [(String, Area, Frequency)] = [
         ("Abrir caixa", .atendimento, .daily),
         ("Conferir estoque geladeira", .estoque, .daily),

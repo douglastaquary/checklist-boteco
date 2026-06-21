@@ -22,7 +22,8 @@ public final class AppSession: ObservableObject {
   }
 
   public func loginOffline(name: String, password: String) throws -> User {
-    guard let user = try repository.getUserByName(name), user.password == password else {
+    let user = try repository.getUserByEmail(name) ?? repository.getUserByName(name)
+    guard let user, user.password == password else {
       throw NSError(domain: "Auth", code: 1, userInfo: [NSLocalizedDescriptionKey: "Usuário ou senha inválidos"])
     }
     currentUser = user
