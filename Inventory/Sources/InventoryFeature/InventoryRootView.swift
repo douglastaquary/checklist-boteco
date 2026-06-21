@@ -37,7 +37,30 @@ public struct InventoryRootView: View {
     self.canViewInsights = canViewInsights
     self.canManageAdministrativeStock = canManageAdministrativeStock
     self.onSelectAuditItem = onSelectAuditItem
+    _banner = State(initialValue: nil)
   }
+
+  #if DEBUG
+  init(
+    repository: ChecklistRepository,
+    inventoryClient: InventoryClient?,
+    token: String?,
+    canCreate: Bool,
+    canViewInsights: Bool,
+    canManageAdministrativeStock: Bool,
+    onSelectAuditItem: ((InventoryAuditItemSnapshot) -> Void)?,
+    initialBanner: InventoryBanner
+  ) {
+    self.repository = repository
+    self.inventoryClient = inventoryClient
+    self.token = token
+    self.canCreate = canCreate
+    self.canViewInsights = canViewInsights
+    self.canManageAdministrativeStock = canManageAdministrativeStock
+    self.onSelectAuditItem = onSelectAuditItem
+    _banner = State(initialValue: initialBanner)
+  }
+  #endif
 
   public var body: some View {
     List {
@@ -73,7 +96,7 @@ public struct InventoryRootView: View {
       if let banner {
         Section {
           Text(banner.message)
-            .foregroundColor(banner.isSuccess ? .green : .primary)
+            .foregroundColor(banner.textColor)
         }
       }
     }
@@ -138,7 +161,7 @@ public struct InventoryRootView: View {
       reload()
     } catch {
       await MainActor.run {
-        NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
+        banner = .networkError(AppErrorMapper.toUserMessage(error))
       }
     }
   }
@@ -152,7 +175,7 @@ public struct InventoryRootView: View {
       banner = nil
     } catch {
       await MainActor.run {
-        NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
+        banner = .networkError(AppErrorMapper.toUserMessage(error))
       }
     }
   }
@@ -171,26 +194,31 @@ public struct InventoryRootView: View {
       )
     } catch {
       await MainActor.run {
-        NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
+        banner = .networkError(AppErrorMapper.toUserMessage(error))
       }
     }
   }
 }
 
-private enum InventoryBanner: Equatable {
+enum InventoryBanner: Equatable {
   case info(String)
   case success(String)
   case validation(String)
+  case networkError(String)
 
   var message: String {
     switch self {
-    case .info(let text), .success(let text), .validation(let text): return text
+    case .info(let text), .success(let text), .validation(let text), .networkError(let text):
+      return text
     }
   }
 
-  var isSuccess: Bool {
-    if case .success = self { return true }
-    return false
+  var textColor: Color {
+    switch self {
+    case .success: return .green
+    case .validation, .networkError: return .red
+    case .info: return .primary
+    }
   }
 }
 

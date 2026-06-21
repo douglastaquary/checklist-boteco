@@ -5,18 +5,36 @@ import DesignSystem
 
 struct InventoryRootView_Previews: PreviewProvider {
   static var previews: some View {
-    NavigationStack {
-      InventoryRootView(
-        repository: previewRepository,
-        inventoryClient: nil,
-        token: nil,
-        canCreate: true,
-        canViewInsights: true,
-        canManageAdministrativeStock: false
-      )
+    Group {
+      NavigationStack {
+        InventoryRootView(
+          repository: previewRepository,
+          inventoryClient: nil,
+          token: nil,
+          canCreate: true,
+          canViewInsights: true,
+          canManageAdministrativeStock: false
+        )
+      }
+      .previewDisplayName("Rascunho vazio")
+
+      NavigationStack {
+        InventoryRootView(
+          repository: previewRepository,
+          inventoryClient: nil,
+          token: "preview-token",
+          canCreate: true,
+          canViewInsights: true,
+          canManageAdministrativeStock: true,
+          onSelectAuditItem: nil,
+          initialBanner: .networkError(
+            "Não foi possível enviar a contagem. Verifique sua conexão e tente novamente."
+          )
+        )
+      }
+      .previewDisplayName("Erro de rede")
     }
     .environmentObject(AppTheme.shared)
-    .previewDisplayName("Rascunho vazio")
   }
 
   private static var previewRepository: ChecklistRepository {
