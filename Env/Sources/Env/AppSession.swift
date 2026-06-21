@@ -37,32 +37,39 @@ public final class AppSession: ObservableObject {
       _ = try loginOffline(name: email, password: password)
       return RemoteLoginResult(user: currentUser)
     }
-    let result = try await authClient.login(
-      email: email,
-      password: password,
-      deviceId: deviceId,
-      deviceName: deviceName()
-    )
-    if result.requiresTwoFactor {
-      guard let challengeId = result.challengeId?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !challengeId.isEmpty
-      else {
-        throw NSError(
-          domain: "Auth",
-          code: 3,
-          userInfo: [NSLocalizedDescriptionKey: "Resposta de verificação inválida. Tente entrar novamente."]
-        )
-      }
-      pendingDeviceVerification = PendingDeviceVerification(
-        challengeId: challengeId,
+    do {
+      let result = try await authClient.login(
+        email: email,
+        password: password,
         deviceId: deviceId,
-        developmentCode: result.developmentCode
+        deviceName: deviceName()
       )
+      if result.requiresTwoFactor {
+        guard let challengeId = result.challengeId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !challengeId.isEmpty
+        else {
+          throw NSError(
+            domain: "Auth",
+            code: 3,
+            userInfo: [NSLocalizedDescriptionKey: "Resposta de verificação inválida. Tente entrar novamente."]
+          )
+        }
+        pendingDeviceVerification = PendingDeviceVerification(
+          challengeId: challengeId,
+          deviceId: deviceId,
+          developmentCode: result.developmentCode
+        )
+        return result
+      }
+      pendingDeviceVerification = nil
+      try await completeRemoteLogin(result: result, password: password)
       return result
+    } catch {
+      if let user = try? loginOffline(name: email, password: password) {
+        return RemoteLoginResult(user: user)
+      }
+      throw error
     }
-    pendingDeviceVerification = nil
-    try await completeRemoteLogin(result: result, password: password)
-    return result
   }
 
   public func verifyTwoFactor(
