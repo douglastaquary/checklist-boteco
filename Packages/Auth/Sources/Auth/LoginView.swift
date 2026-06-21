@@ -5,6 +5,13 @@ import Env
 import Models
 import Network
 import Persistence
+
+public enum LoginPhase: Equatable {
+  case credentials
+  case biometricUnlock
+  case twoFactor
+}
+
 public struct LoginView: View {
   @EnvironmentObject private var session: AppSession
   @ObservedObject private var feedback = NetworkFeedback.shared
@@ -12,30 +19,41 @@ public struct LoginView: View {
   private let credentialStore: CredentialStoreProtocol
   private let onLoginSuccess: () -> Void
   private let onRegisterTap: () -> Void
+  private let skipsRestore: Bool
 
   @State private var username = ""
   @State private var password = ""
   @State private var rememberLogin = false
-  @State private var pendingBiometricUnlock = false
+  @State private var phase: LoginPhase = .credentials
   @State private var biometricInProgress = false
-  @State private var requiresTwoFactor = false
   @State private var twoFactorCode = ""
+  @State private var twoFactorHint: String?
   @State private var localError: String?
+
+  @FocusState private var focusedField: Field?
 
   public init(
     credentialStore: CredentialStoreProtocol = KeychainCredentialStore(),
     onLoginSuccess: @escaping () -> Void,
-    onRegisterTap: @escaping () -> Void
+    onRegisterTap: @escaping () -> Void,
+    debugPhase: LoginPhase? = nil,
+    debugTwoFactorHint: String? = nil,
+    debugUsername: String = "",
+    skipsRestore: Bool = false
   ) {
     self.credentialStore = credentialStore
     self.onLoginSuccess = onLoginSuccess
     self.onRegisterTap = onRegisterTap
+    self.skipsRestore = skipsRestore || debugPhase != nil
+    _phase = State(initialValue: debugPhase ?? .credentials)
+    _twoFactorHint = State(initialValue: debugTwoFactorHint)
+    _username = State(initialValue: debugUsername)
   }
 
   public var body: some View {
     NavigationStack {
       Form {
-        if pendingBiometricUnlock {
+        if phase == .biometricUnlock {
           Section {
             Text("Login salvo neste aparelho. Confirme sua biometria para preencher usuário e senha.")
               .font(.footnote)
@@ -53,18 +71,24 @@ public struct LoginView: View {
 
         Section("Acesso") {
           TextField("Usuário ou email", text: $username)
-            .disabled(pendingBiometricUnlock || biometricInProgress)
+            .disabled(biometricInProgress)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+            .focused($focusedField, equals: .username)
           SecureField("Senha", text: $password)
-            .disabled(pendingBiometricUnlock || biometricInProgress)
-          Toggle("Lembrar login (Face ID)", isOn: $rememberLogin)
+            .disabled(phase == .biometricUnlock || biometricInProgress)
+            .focused($focusedField, equals: .password)
+          Toggle(rememberToggleTitle, isOn: $rememberLogin)
         }
 
-        if requiresTwoFactor {
+        if phase == .twoFactor {
           Section("Verificação") {
+            if let twoFactorHint {
+              Text(twoFactorHint).font(.footnote).foregroundStyle(.secondary)
+            }
             TextField("Código de 6 dígitos", text: $twoFactorCode)
               .keyboardType(.numberPad)
+              .focused($focusedField, equals: .twoFactorCode)
               .onChange(of: twoFactorCode) { newValue in
                 let filtered = String(newValue.filter(\.isNumber).prefix(6))
                 if filtered != newValue { twoFactorCode = filtered }
@@ -79,37 +103,60 @@ public struct LoginView: View {
         }
 
         Section {
-          Button(requiresTwoFactor ? "Confirmar dispositivo" : "Entrar") {
+          Button(phase == .twoFactor ? "Confirmar dispositivo" : "Entrar") {
             Task { await submit() }
           }
           .buttonStyle(PrimaryButtonStyle())
           .disabled(
-            pendingBiometricUnlock
+            phase == .biometricUnlock
               || biometricInProgress
               || feedback.isLoading
-              || (requiresTwoFactor && twoFactorCode.count != 6)
+              || (phase == .twoFactor && twoFactorCode.count != 6)
           )
           Button("Novo usuário", action: onRegisterTap)
         }
       }
+      .themedFormStyle()
       .navigationTitle("Checklist Boteco")
-      .task { await restoreSavedLogin(autoUnlock: true) }
-      .onReceive(session.$currentUser) { user in
-        if user != nil { onLoginSuccess() }
+      .task {
+        guard !skipsRestore else { return }
+        await restoreSavedLogin(autoUnlock: true)
+      }
+      .onChange(of: phase) { newPhase in
+        switch newPhase {
+        case .twoFactor: focusedField = .twoFactorCode
+        case .credentials: focusedField = .username
+        case .biometricUnlock: focusedField = nil
+        }
       }
     }
+  }
+
+  private var rememberToggleTitle: String {
+    #if targetEnvironment(simulator)
+    "Lembrar login"
+    #else
+    #if DEBUG
+    "Lembrar login"
+    #else
+    "Lembrar login (Face ID)"
+    #endif
+    #endif
   }
 
   private func restoreSavedLogin(autoUnlock: Bool) async {
     let metadata = credentialStore.loadMetadata()
     rememberLogin = metadata.remember
-    if metadata.requiresBiometricUnlock {
-      pendingBiometricUnlock = true
-      if autoUnlock { await unlockSavedLogin() }
-      return
-    }
     username = metadata.username
     password = metadata.password
+    phase = .credentials
+    twoFactorCode = ""
+    twoFactorHint = nil
+    if metadata.requiresBiometricUnlock {
+      password = ""
+      phase = .biometricUnlock
+      if autoUnlock { await unlockSavedLogin() }
+    }
   }
 
   private func unlockSavedLogin() async {
@@ -120,9 +167,9 @@ public struct LoginView: View {
       let credentials = try await credentialStore.unlock()
       username = credentials.username
       password = credentials.password
-      pendingBiometricUnlock = false
+      phase = .credentials
     } catch {
-      pendingBiometricUnlock = true
+      phase = .biometricUnlock
       localError = error.localizedDescription
     }
   }
@@ -130,20 +177,25 @@ public struct LoginView: View {
   private func submit() async {
     localError = nil
     do {
-      if requiresTwoFactor {
+      if phase == .twoFactor {
         _ = try await session.verifyTwoFactor(code: twoFactorCode, password: password)
       } else {
         let result = try await session.loginRemote(email: username, password: password)
         if result.requiresTwoFactor {
-          requiresTwoFactor = true
+          phase = .twoFactor
           twoFactorCode = result.developmentCode ?? ""
-          localError = result.developmentCode.map { "Código de desenvolvimento: \($0)" }
+          twoFactorHint = result.developmentCode.map { "Código de desenvolvimento: \($0)" }
             ?? result.deliveryHint
             ?? "Confirme este dispositivo"
           return
         }
       }
-      try credentialStore.save(username: username, password: password, remember: rememberLogin)
+      do {
+        try credentialStore.save(username: username, password: password, remember: rememberLogin)
+      } catch {
+        rememberLogin = false
+        localError = "Login concluído, mas não foi salvo neste aparelho: \(error.localizedDescription)"
+      }
       onLoginSuccess()
     } catch {
       if let api = error as? APIError {
@@ -153,6 +205,12 @@ public struct LoginView: View {
       }
     }
   }
+}
+
+private enum Field: Hashable {
+  case username
+  case password
+  case twoFactorCode
 }
 
 public struct RegisterUserView: View {

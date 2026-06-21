@@ -1,4 +1,8 @@
-# MCP local para Codex e Cursor
+# MCP local para agentes de IA
+
+**Regras MCP canônicas:** [`AGENTS.md`](../AGENTS.md) (seção **Servidor MCP `checklist-boteco-analytics`**).
+
+Este guia cobre setup local e testes. Não duplique heurísticas de linguagem natural aqui — elas vivem em `AGENTS.md`.
 
 ## Endpoint local
 
@@ -39,9 +43,7 @@ Passos:
 5. Reabra o chat/agente no Cursor.
 6. Confirme que o servidor `checklist-boteco-analytics` aparece como disponível.
 
-Se quiser orientar o agente do Cursor a usar automaticamente o MCP do projeto para perguntas de vendas e compras, use também este texto como instrução de projeto:
-
-- [.cursor/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.cursor/checklist-boteco-agent-instructions.md)
+Para orientar o agente a usar o MCP e as regras do projeto, configure as instruções apontando para [`AGENTS.md`](../AGENTS.md) ou o stub [`.cursor/checklist-boteco-agent-instructions.md`](../.cursor/checklist-boteco-agent-instructions.md).
 
 ## Como colar no Codex
 
@@ -71,9 +73,7 @@ Passos:
 4. Salve e reinicie a sessão/chat que vai usar o MCP.
 5. Verifique se o servidor MCP aparece disponível antes de testar as perguntas.
 
-Se quiser orientar o agente do Codex a usar automaticamente o MCP do projeto para perguntas como `quantas vendeu`, `quanto vendeu` e menções a `beco`, use também este texto como instrução do projeto:
-
-- [.codex/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.codex/checklist-boteco-agent-instructions.md)
+Para orientar o agente às regras MCP e roteamento do projeto, use [`AGENTS.md`](../AGENTS.md) ou o stub [`.codex/checklist-boteco-agent-instructions.md`](../.codex/checklist-boteco-agent-instructions.md).
 
 ## Ferramentas disponíveis
 
@@ -136,16 +136,13 @@ Exemplos mais objetivos para validar o fluxo:
 
 ## Como ensinar o agente a reconhecer "beco" e perguntas de produto
 
-Use uma instrução de projeto com estas regras:
+Configure as instruções de projeto para ler [`AGENTS.md`](../AGENTS.md). A seção **Servidor MCP** contém:
 
-- sempre que o usuário mencionar `beco`, tratar como contexto do estabelecimento Beco da Praia;
-- sempre que perguntar `quantas X vendeu`, `quanto vendeu de X`, `qual a quantidade de X vendida`, usar o MCP `checklist-boteco-analytics`;
-- para perguntas por produto, usar primeiro `sales_by_product`;
-- para perguntas por produto com período explícito, preferir `sales_quantity_by_product_in_period`;
-- para perguntas de divergência, extravio ou perdas, usar `sales_audit_stock`;
-- para conferência diária de contagem antes da abertura x vendas x saldo restante, usar `inventory_daily_audit`;
-- para perguntas sobre ponto, jornada, horas trabalhadas, horas extras, faltas ou escala 4x3, usar `work_clock_summary`, `work_clock_entries` ou `work_clock_schedule`;
-- se o CSV importado não tiver um campo de local explícito, ainda assim responder a pergunta como referente ao dataset do Beco importado no projeto.
+- contexto fixo do Beco da Praia;
+- mapeamento pergunta → ferramenta MCP;
+- heurísticas de linguagem natural (`quantas X vendeu`, extravio, ponto, contagem diária).
+
+Atalho para colagem inline: copie essa seção de `AGENTS.md` ou use [docs/ai-agent-instructions.md](ai-agent-instructions.md).
 
 ## Observações
 

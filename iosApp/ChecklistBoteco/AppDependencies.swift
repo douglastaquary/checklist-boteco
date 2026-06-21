@@ -20,10 +20,7 @@ public final class AppDependencies {
     let db = try AppDatabase.open()
     let repository = ChecklistRepository(dbQueue: db)
     let apiConfiguration = APIConfiguration.fromBundle()
-
-    if apiConfiguration == nil {
-      try repository.seedInitialDataIfNeeded()
-    }
+    try repository.seedInitialDataIfNeeded()
 
     let apiClient = apiConfiguration.map { APIClient(config: $0) }
     let authClient = apiClient.map(AuthClient.init)

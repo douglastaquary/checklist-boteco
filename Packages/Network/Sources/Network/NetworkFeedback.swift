@@ -1,12 +1,21 @@
 import Foundation
 import Combine
 
+public struct FeedbackAlert: Identifiable, Equatable {
+  public let id = UUID()
+  public let message: String
+
+  public init(message: String) {
+    self.message = message
+  }
+}
+
 @MainActor
 public final class NetworkFeedback: ObservableObject {
   public static let shared = NetworkFeedback()
 
   @Published public private(set) var isLoading = false
-  @Published public var errorDialog: String?
+  @Published public private(set) var activeAlert: FeedbackAlert?
 
   private var activeRequests = 0
 
@@ -26,10 +35,10 @@ public final class NetworkFeedback: ObservableObject {
 
   public func showError(_ message: String) {
     guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-    errorDialog = message
+    activeAlert = FeedbackAlert(message: message)
   }
 
   public func dismissError() {
-    errorDialog = nil
+    activeAlert = nil
   }
 }

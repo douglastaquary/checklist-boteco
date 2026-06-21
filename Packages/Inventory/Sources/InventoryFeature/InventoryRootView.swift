@@ -3,6 +3,7 @@ import Models
 import Persistence
 import Network
 import DesignSystem
+
 public struct InventoryRootView: View {
   private let repository: ChecklistRepository
   private let inventoryClient: InventoryClient?
@@ -13,11 +14,10 @@ public struct InventoryRootView: View {
 
   @State private var drafts: [InventoryCountDraft] = []
   @State private var administrativeMode = false
-  @State private var message: String?
+  @State private var banner: InventoryBanner?
   @State private var name = ""
   @State private var quantity = ""
   @State private var audit: InventoryDailyAudit?
-  @State private var auditAlreadyApplied = false
   @State private var loadingAudit = false
 
   public init(
@@ -37,70 +37,45 @@ public struct InventoryRootView: View {
   }
 
   public var body: some View {
-    NavigationStack {
-      List {
-        if canManageAdministrativeStock {
-          Section {
-            Toggle("Contagem administrativa", isOn: $administrativeMode)
-              .onChange(of: administrativeMode) { _ in reload() }
-          }
+    List {
+      if canManageAdministrativeStock {
+        Section {
+          Toggle("Contagem administrativa", isOn: $administrativeMode)
+            .onChange(of: administrativeMode) { _ in reload() }
         }
-        if canCreate {
-          Section("Adicionar item") {
-            TextField("Produto", text: $name)
-            TextField("Quantidade", text: $quantity).keyboardType(.decimalPad)
-            Button("Incluir no rascunho") { addDraft() }
-          }
-        }
-        Section("Rascunho") {
-          ForEach(drafts) { draft in
-            Text("\(draft.name) — \(draft.quantity, format: .number)")
-          }
-          .onDelete(perform: deleteDrafts)
-        }
-        if canCreate {
+      }
+      if canCreate {
+        InventoryAddItemSection(name: $name, quantity: $quantity, onAdd: addDraft)
+      }
+      InventoryDraftSection(drafts: drafts, onDelete: deleteDrafts)
+      if canCreate {
+        Section {
           Button("Enviar contagem") {
             Task { await submit() }
           }
           .buttonStyle(PrimaryButtonStyle())
           .disabled(drafts.isEmpty)
         }
-        if canViewInsights || canManageAdministrativeStock {
-          Section("Auditoria diária") {
-            Button(loadingAudit ? "Carregando..." : "Consultar auditoria") {
-              Task { await loadAudit() }
-            }
-            .disabled(loadingAudit)
-            if let audit {
-              ForEach(audit.items) { item in
-                VStack(alignment: .leading, spacing: 4) {
-                  Text(item.product).font(.headline)
-                  Text("Abertura: \(item.openingQuantity, format: .number) · Vendido: \(item.soldQuantity, format: .number)")
-                    .font(.caption)
-                  Text("Saldo teórico: \(item.theoreticalRemaining, format: .number)")
-                    .font(.caption)
-                  if !item.notes.isEmpty {
-                    Text(item.notes).font(.caption2).foregroundStyle(.secondary)
-                  }
-                }
-              }
-            }
-            if canManageAdministrativeStock {
-              Button("Aplicar vendas ao estoque") {
-                Task { await applyAudit() }
-              }
-              .buttonStyle(PrimaryButtonStyle())
-              .disabled(loadingAudit)
-            }
-          }
-        }
-        if let message {
-          Section { Text(message) }
+      }
+      if canViewInsights || canManageAdministrativeStock {
+        InventoryAuditSection(
+          audit: audit,
+          loading: loadingAudit,
+          canApply: canManageAdministrativeStock,
+          onLoad: { Task { await loadAudit() } },
+          onApply: { Task { await applyAudit() } }
+        )
+      }
+      if let banner {
+        Section {
+          Text(banner.message)
+            .foregroundStyle(banner.isSuccess ? .green : .primary)
         }
       }
-      .navigationTitle("Contagem")
-      .task { reload() }
     }
+    .navigationTitle("Contagem")
+    .themedListStyle()
+    .task { reload() }
   }
 
   private func reload() {
@@ -120,12 +95,13 @@ public struct InventoryRootView: View {
     )
     let errors = InventoryCountValidator.validate(draft)
     guard errors.isEmpty else {
-      message = errors.joined(separator: "\n")
+      banner = .validation(errors.joined(separator: "\n"))
       return
     }
     try? repository.addInventoryDraft(draft, administrative: administrativeMode)
     name = ""
     quantity = ""
+    banner = nil
     reload()
   }
 
@@ -138,12 +114,10 @@ public struct InventoryRootView: View {
 
   private func submit() async {
     guard let inventoryClient, let token else {
-      message = "Faça login novamente"
+      banner = .info("Faça login novamente")
       return
     }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    let date = formatter.string(from: Date())
+    let date = InventoryDate.today
     do {
       try await inventoryClient.submitCount(
         token: token,
@@ -152,9 +126,11 @@ public struct InventoryRootView: View {
         administrative: administrativeMode
       )
       try repository.clearInventoryDrafts(administrative: administrativeMode)
-      message = administrativeMode
-        ? "Contagem administrativa enviada e saldo atualizado."
-        : "Contagem enviada e bloqueada para edição."
+      banner = .success(
+        administrativeMode
+          ? "Contagem administrativa enviada e saldo atualizado."
+          : "Contagem enviada e bloqueada para edição."
+      )
       reload()
     } catch {
       await MainActor.run {
@@ -167,12 +143,9 @@ public struct InventoryRootView: View {
     guard let inventoryClient, let token else { return }
     loadingAudit = true
     defer { loadingAudit = false }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    let date = formatter.string(from: Date())
     do {
-      audit = try await inventoryClient.dailyAudit(token: token, date: date)
-      message = nil
+      audit = try await inventoryClient.dailyAudit(token: token, date: InventoryDate.today)
+      banner = nil
     } catch {
       await MainActor.run {
         NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
@@ -184,19 +157,112 @@ public struct InventoryRootView: View {
     guard let inventoryClient, let token else { return }
     loadingAudit = true
     defer { loadingAudit = false }
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    let date = formatter.string(from: Date())
     do {
-      let response = try await inventoryClient.applyDailyAudit(token: token, date: date)
+      let response = try await inventoryClient.applyDailyAudit(token: token, date: InventoryDate.today)
       audit = response.audit
-      auditAlreadyApplied = response.alreadyApplied
-      message = response.alreadyApplied
-        ? "Auditoria já havia sido aplicada ao estoque administrativo."
-        : "Vendas abatidas do estoque administrativo conforme planilha."
+      banner = .success(
+        response.alreadyApplied
+          ? "Auditoria já havia sido aplicada ao estoque administrativo."
+          : "Vendas abatidas do estoque administrativo conforme planilha."
+      )
     } catch {
       await MainActor.run {
         NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
+      }
+    }
+  }
+}
+
+private enum InventoryBanner: Equatable {
+  case info(String)
+  case success(String)
+  case validation(String)
+
+  var message: String {
+    switch self {
+    case .info(let text), .success(let text), .validation(let text): return text
+    }
+  }
+
+  var isSuccess: Bool {
+    if case .success = self { return true }
+    return false
+  }
+}
+
+private enum InventoryDate {
+  static var today: String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
+  }
+}
+
+private struct InventoryAddItemSection: View {
+  @Binding var name: String
+  @Binding var quantity: String
+  let onAdd: () -> Void
+
+  var body: some View {
+    Section("Adicionar item") {
+      TextField("Produto", text: $name)
+      TextField("Quantidade", text: $quantity).keyboardType(.decimalPad)
+      Button("Incluir no rascunho", action: onAdd)
+    }
+  }
+}
+
+private struct InventoryDraftSection: View {
+  let drafts: [InventoryCountDraft]
+  let onDelete: (IndexSet) -> Void
+
+  var body: some View {
+    Section("Rascunho") {
+      ForEach(drafts) { draft in
+        Text("\(draft.name) — \(draft.quantity, format: .number)")
+      }
+      .onDelete(perform: onDelete)
+    }
+  }
+}
+
+private struct InventoryAuditSection: View {
+  let audit: InventoryDailyAudit?
+  let loading: Bool
+  let canApply: Bool
+  let onLoad: () -> Void
+  let onApply: () -> Void
+
+  var body: some View {
+    Section("Auditoria diária") {
+      Button(loading ? "Carregando..." : "Consultar auditoria", action: onLoad)
+        .disabled(loading)
+      if let audit {
+        ForEach(audit.items) { item in
+          InventoryAuditRow(item: item)
+        }
+      }
+      if canApply {
+        Button("Aplicar vendas ao estoque", action: onApply)
+          .buttonStyle(PrimaryButtonStyle())
+          .disabled(loading)
+      }
+    }
+  }
+}
+
+private struct InventoryAuditRow: View {
+  let item: InventoryDailyAuditItem
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(item.product).font(.headline)
+      Text("Abertura: \(item.openingQuantity, format: .number) · Vendido: \(item.soldQuantity, format: .number)")
+        .font(.caption)
+      Text("Saldo teórico: \(item.theoreticalRemaining, format: .number)")
+        .font(.caption)
+      if !item.notes.isEmpty {
+        Text(item.notes).font(.caption2).foregroundStyle(.secondary)
       }
     }
   }

@@ -131,9 +131,29 @@ No Android, o build `debug` libera tráfego HTTP claro apenas para `10.0.2.2`, `
 
 ### iOS
 
+App nativo SwiftUI — ver [docs/ios-app.md](docs/ios-app.md).
+
+Padrões de UI e checklist de PR: [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md) · Skill: [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md)
+
 Abra o projeto no Xcode e execute no simulador ou dispositivo.
 
-## Modelo de dados
+## Direcionamento para agentes de IA
+
+**Fonte canônica (agnóstica ao modelo):** [AGENTS.md](AGENTS.md)
+
+| Domínio | Referência |
+|---------|------------|
+| Regras gerais, MCP, roteamento | [AGENTS.md](AGENTS.md) |
+| Backend / admin Quarkus | [.cursor/skills/quarkus-serverless-qute/SKILL.md](.cursor/skills/quarkus-serverless-qute/SKILL.md) |
+| iOS / SwiftUI | [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md) + [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md) |
+| MCP local (setup e testes) | [docs/mcp-local-test.md](docs/mcp-local-test.md) |
+
+Atalhos por ferramenta (stubs que apontam para `AGENTS.md`):
+
+- Cursor: [.cursor/checklist-boteco-agent-instructions.md](.cursor/checklist-boteco-agent-instructions.md)
+- Codex: [.codex/checklist-boteco-agent-instructions.md](.codex/checklist-boteco-agent-instructions.md)
+- Colagem opcional: [docs/ai-agent-instructions.md](docs/ai-agent-instructions.md)
+
 
 - **Áreas**: Atendimento, Cozinha, Estoque, Limpeza
 - **Setores**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente, Barman
@@ -212,10 +232,10 @@ Guia de uso e testes via chat:
 
 - [docs/mcp-local-test.md](docs/mcp-local-test.md)
 
-Snippets de instruções para agentes:
+Regras MCP e heurísticas de linguagem natural estão em [AGENTS.md](AGENTS.md) (seção **Servidor MCP**). Os arquivos abaixo são atalhos que apontam para lá:
 
-- Cursor: [.cursor/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.cursor/checklist-boteco-agent-instructions.md)
-- Codex: [.codex/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.codex/checklist-boteco-agent-instructions.md)
+- Cursor: [.cursor/checklist-boteco-agent-instructions.md](.cursor/checklist-boteco-agent-instructions.md)
+- Codex: [.codex/checklist-boteco-agent-instructions.md](.codex/checklist-boteco-agent-instructions.md)
 
 ## Ponto de colaboradores
 

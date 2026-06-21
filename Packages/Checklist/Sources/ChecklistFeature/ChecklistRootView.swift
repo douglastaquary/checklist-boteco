@@ -3,95 +3,155 @@ import Models
 import Persistence
 import Env
 import DesignSystem
-public struct ChecklistRootView: View {
-  @EnvironmentObject private var session: AppSession
 
+public struct ChecklistRootView: View {
+  private let user: User
   private let repository: ChecklistRepository
   private let syncController: SyncController
   private let onLogout: () -> Void
+  private let onSelectActivity: ((Int64, Area) -> Void)?
 
-  @State private var selectedArea: Area = .atendimento
+  private var accessibleAreas: [Area] {
+    Area.allCases.filter { user.canAccessArea($0) }
+  }
+
+  @State private var selectedArea: Area
   @State private var items: [ActivityWithCompletion] = []
-  @State private var showCamera = false
-  @State private var pendingActivityId: Int64?
-  @State private var errorMessage: String?
+  @State private var cameraCapture: CameraCaptureRequest?
+  @State private var alert: ChecklistAlert?
 
-  public init(repository: ChecklistRepository, syncController: SyncController, onLogout: @escaping () -> Void) {
+  public init(
+    user: User,
+    repository: ChecklistRepository,
+    syncController: SyncController,
+    onLogout: @escaping () -> Void,
+    onSelectActivity: ((Int64, Area) -> Void)? = nil
+  ) {
+    self.user = user
     self.repository = repository
     self.syncController = syncController
     self.onLogout = onLogout
+    self.onSelectActivity = onSelectActivity
+    let areas = Area.allCases.filter { user.canAccessArea($0) }
+    let initialArea = areas.contains(user.area) ? user.area : (areas.first ?? .atendimento)
+    _selectedArea = State(initialValue: initialArea)
   }
 
   public var body: some View {
-    NavigationStack {
-      VStack {
-        Picker("Área", selection: $selectedArea) {
-          ForEach(Area.allCases.filter { session.currentUser?.canAccessArea($0) == true }, id: \.self) { area in
-            Text(area.displayName).tag(area)
-          }
-        }
-        .pickerStyle(.segmented)
-        .padding()
-
-        List(items) { item in
-          HStack {
-            VStack(alignment: .leading) {
-              Text(item.activity.name).font(.headline)
-              Text(item.activity.frequency.displayName).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Toggle(
-              "",
-              isOn: Binding(
-                get: { item.completion != nil },
-                set: { enabled in
-                  if enabled, item.completion == nil {
-                    pendingActivityId = item.activity.id
-                    showCamera = true
-                  }
-                }
-              )
+    List {
+      Section(sectionTitle) {
+        if items.isEmpty {
+          Text("Nenhuma atividade para esta área.")
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(items) { item in
+            ActivityChecklistRow(
+              item: item,
+              onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
+              onMarkComplete: {
+                cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
+              }
             )
-            .disabled(item.completion != nil)
+            .themedListRowBackground()
           }
         }
       }
-      .navigationTitle("Checklist")
-      .toolbar {
-        ToolbarItem(placement: .navigationBarTrailing) {
-          Button("Sair", action: onLogout)
+    }
+    .themedListStyle()
+    .navigationTitle("Checklist")
+    .toolbar {
+      if accessibleAreas.count > 1 {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Picker("Área", selection: $selectedArea) {
+            ForEach(accessibleAreas, id: \.self) { area in
+              Text(area.displayName).tag(area)
+            }
+          }
+          .pickerStyle(.menu)
         }
       }
-      .task(id: selectedArea) { await reload() }
-      .sheet(isPresented: $showCamera) {
-        CameraCaptureView { path in
-          Task { await complete(activityId: pendingActivityId, imagePath: path) }
-        }
+      ToolbarItem(placement: .navigationBarTrailing) {
+        Button("Sair", action: onLogout)
       }
-      .alert("Erro", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-        Button("OK", role: .cancel) {}
-      } message: {
-        Text(errorMessage ?? "")
+    }
+    .task(id: selectedArea) { await reload() }
+    .sheet(item: $cameraCapture) { request in
+      CameraCaptureView { path in
+        Task { await complete(activityId: request.activityId, imagePath: path) }
       }
+    }
+    .alert(item: $alert) { item in
+      Alert(
+        title: Text("Erro"),
+        message: Text(item.message),
+        dismissButton: .cancel(Text("OK"))
+      )
     }
   }
 
+  private var sectionTitle: String {
+    accessibleAreas.count == 1 ? accessibleAreas[0].displayName : "Atividades"
+  }
+
+  @MainActor
   private func reload() async {
     do {
       items = try repository.activitiesByArea(selectedArea)
     } catch {
-      errorMessage = error.localizedDescription
+      alert = ChecklistAlert(message: error.localizedDescription)
     }
   }
 
-  private func complete(activityId: Int64?, imagePath: String?) async {
-    guard let activityId, let userId = session.currentUser?.id else { return }
+  @MainActor
+  private func complete(activityId: Int64, imagePath: String?) async {
     do {
-      try repository.completeActivity(activityId: activityId, userId: userId, imagePath: imagePath, isLate: false)
+      try repository.completeActivity(activityId: activityId, userId: user.id, imagePath: imagePath, isLate: false)
       syncController.requestSync()
       await reload()
     } catch {
-      errorMessage = error.localizedDescription
+      alert = ChecklistAlert(message: error.localizedDescription)
+    }
+  }
+}
+
+private struct CameraCaptureRequest: Identifiable {
+  let activityId: Int64
+  var id: Int64 { activityId }
+}
+
+private struct ChecklistAlert: Identifiable {
+  let message: String
+  var id: String { message }
+}
+
+private struct ActivityChecklistRow: View {
+  let item: ActivityWithCompletion
+  let onSelect: (() -> Void)?
+  let onMarkComplete: () -> Void
+
+  var body: some View {
+    HStack {
+      Button(action: { onSelect?() }) {
+        VStack(alignment: .leading) {
+          Text(item.activity.name).font(.headline)
+          Text(item.activity.frequency.displayName).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .buttonStyle(.plain)
+      .disabled(onSelect == nil)
+      Toggle(
+        "",
+        isOn: Binding(
+          get: { item.completion != nil },
+          set: { enabled in
+            if enabled, item.completion == nil {
+              onMarkComplete()
+            }
+          }
+        )
+      )
+      .disabled(item.completion != nil)
     }
   }
 }

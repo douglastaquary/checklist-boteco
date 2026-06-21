@@ -26,40 +26,60 @@ public final class KeychainCredentialStore: CredentialStoreProtocol, @unchecked 
   private let service = "com.checklistboteco.login"
   private let account = "saved_login"
   private let rememberKey = "remember_login"
+  private let usernameKey = "remembered_username"
 
   public init() {}
 
   public func loadMetadata() -> SavedLoginMetadata {
     let remember = UserDefaults.standard.bool(forKey: rememberKey)
-    guard remember, hasStoredCredentials else {
-      return SavedLoginMetadata(remember: remember)
+    let savedUsername = UserDefaults.standard.string(forKey: usernameKey) ?? ""
+    guard remember else {
+      return SavedLoginMetadata(remember: false)
     }
-    if canEvaluateBiometry() {
-      return SavedLoginMetadata(remember: true, requiresBiometricUnlock: true)
+    guard hasStoredCredentials else {
+      return SavedLoginMetadata(username: savedUsername, remember: true)
+    }
+    if shouldProtectWithBiometry {
+      return SavedLoginMetadata(
+        username: savedUsername,
+        remember: true,
+        requiresBiometricUnlock: true
+      )
     }
     if let unlocked = try? loadCredentials(requireBiometry: false) {
-      return SavedLoginMetadata(username: unlocked.username, password: unlocked.password, remember: true)
+      return SavedLoginMetadata(
+        username: unlocked.username,
+        password: unlocked.password,
+        remember: true
+      )
     }
-    return SavedLoginMetadata(remember: true, requiresBiometricUnlock: true)
+    return SavedLoginMetadata(username: savedUsername, remember: true)
   }
 
   public func save(username: String, password: String, remember: Bool) throws {
+    let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
     UserDefaults.standard.set(remember, forKey: rememberKey)
-    guard remember else {
+    if remember {
+      UserDefaults.standard.set(trimmedUsername, forKey: usernameKey)
+    } else {
+      UserDefaults.standard.removeObject(forKey: usernameKey)
       clear()
       return
     }
-    let payload = CredentialsCodec.pack(username: username, password: password)
-    if canEvaluateBiometry() {
-      try saveSecure(payload: payload, requireBiometry: true)
-    } else {
-      try saveSecure(payload: payload, requireBiometry: false)
+    guard !trimmedUsername.isEmpty, !password.isEmpty else {
+      throw NSError(
+        domain: "Auth",
+        code: 6,
+        userInfo: [NSLocalizedDescriptionKey: "Usuário e senha são obrigatórios para salvar"]
+      )
     }
+    let payload = CredentialsCodec.pack(username: trimmedUsername, password: password)
+    try saveSecure(payload: payload, requireBiometry: shouldProtectWithBiometry)
   }
 
   public func unlock() async throws -> UnlockedLoginCredentials {
     guard hasStoredCredentials else { throw CredentialStoreError.notFound }
-    if canEvaluateBiometry() {
+    if shouldProtectWithBiometry {
       let context = LAContext()
       var error: NSError?
       guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
@@ -75,13 +95,21 @@ public final class KeychainCredentialStore: CredentialStoreProtocol, @unchecked 
   }
 
   public func clear() {
-    let query: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service,
-      kSecAttrAccount as String: account,
-    ]
-    SecItemDelete(query as CFDictionary)
+    deleteStoredCredentials()
     UserDefaults.standard.set(false, forKey: rememberKey)
+    UserDefaults.standard.removeObject(forKey: usernameKey)
+  }
+
+  private var shouldProtectWithBiometry: Bool {
+    #if targetEnvironment(simulator)
+    return false
+    #else
+    #if DEBUG
+    return false
+    #else
+    return canEvaluateBiometry()
+    #endif
+    #endif
   }
 
   private var hasStoredCredentials: Bool {
@@ -100,8 +128,17 @@ public final class KeychainCredentialStore: CredentialStoreProtocol, @unchecked 
     return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
   }
 
+  private func deleteStoredCredentials() {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+    ]
+    SecItemDelete(query as CFDictionary)
+  }
+
   private func saveSecure(payload: String, requireBiometry: Bool) throws {
-    clear()
+    deleteStoredCredentials()
     guard let data = payload.data(using: .utf8) else { return }
     var query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,

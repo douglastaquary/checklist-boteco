@@ -14,13 +14,29 @@ Integração SPM segue o padrão do [Guia WIMB](https://github.com/douglastaquar
 
 Estado da UI: `ObservableObject` + `@EnvironmentObject` (iOS 16). Sem suporte macOS no app nem nos packages.
 
+## Padrões SwiftUI e agentes de IA
+
+Antes de criar ou refatorar telas:
+
+1. [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](../.cursor/skills/swiftui-ui-patterns/SKILL.md) — regras gerais e anti-patterns
+2. [`docs/ios-swiftui-standards.md`](ios-swiftui-standards.md) — restrições iOS 16, checklist de PR e backlog de refatoração
+3. [`references/components-index.md`](../.cursor/skills/swiftui-ui-patterns/references/components-index.md) — referência por componente (TabView, Form, Sheets, …)
+
+Overlay específico Checklist Boteco: [`.cursor/skills/swiftui-ui-patterns/ios-development.md`](../.cursor/skills/swiftui-ui-patterns/ios-development.md).
+
+Instruções gerais do repositório (MCP, roteamento backend/iOS): [`AGENTS.md`](../AGENTS.md).
+
+Formatação: [`.swiftformat`](../.swiftformat) (2 espaços).
+
 ## Configuração da API
 
 Edite [`iosApp/Config/Debug.xcconfig`](../iosApp/Config/Debug.xcconfig):
 
+```xcconfig
+CHECKLIST_API_BASE_URL = http:/$()/localhost:8181
 ```
-CHECKLIST_API_BASE_URL = http://localhost:8181
-```
+
+> Em arquivos `.xcconfig`, `//` inicia comentário. Use `http:/$()/…` para URLs com `//`.
 
 Para dispositivo físico, use o IP da máquina na rede local. Deixe vazio para modo **offline** (admin local `admin@checklistboteco.com` / `admin123`).
 
@@ -124,3 +140,7 @@ Verifique se o package local `Packages` está vinculado ao target **ChecklistBot
 - `NSLocationWhenInUseUsageDescription`
 - `UIBackgroundModes`: `fetch`
 - `BGTaskSchedulerPermittedIdentifiers`: `com.checklistboteco.ios.sync`
+
+## Backlog de refatoração UI
+
+Melhorias de padrões SwiftUI planejadas (sem escopo na fase 1 de docs) estão em [`ios-swiftui-standards.md` — Fase 2](ios-swiftui-standards.md#fase-2--refatoração-ui-backlog).

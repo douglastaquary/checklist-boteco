@@ -41,14 +41,11 @@ struct AppLaunchGate: View {
     switch launch.status {
     case .ready(let holder):
       RootView(holder: holder)
-        .environmentObject(holder.session)
-        .environmentObject(NetworkFeedback.shared)
-        .onAppear {
-          #if os(iOS)
-          BackgroundSyncScheduler.register(syncController: holder.syncController)
-          BackgroundSyncScheduler.schedule()
-          #endif
-        }
+        .withAppDependencyGraph(
+          session: holder.session,
+          syncController: holder.syncController
+        )
+        .environmentObject(AppTheme.shared)
     case .failed(let message):
       VStack(spacing: 16) {
         Text("Não foi possível iniciar o app")
@@ -82,42 +79,48 @@ final class AppDependenciesHolder: ObservableObject {
   }
 }
 
+private enum AuthScreen: Equatable {
+  case login
+  case register
+  case main
+}
+
 struct RootView: View {
   @ObservedObject var holder: AppDependenciesHolder
   @EnvironmentObject private var session: AppSession
-  @State private var isAuthenticated = false
-  @State private var showRegister = false
+  @State private var authScreen: AuthScreen = .login
 
   var body: some View {
     ZStack {
       Group {
-        if isAuthenticated, session.currentUser != nil {
-          MainTabView(dependencies: holder) { logout() }
-        } else if showRegister {
+        switch authScreen {
+        case .main where session.currentUser != nil:
+          MainTabView(dependencies: holder, user: session.currentUser!) { logout() }
+        case .register:
           NavigationStack {
             RegisterUserView(repository: holder.repository)
               .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                  Button("Voltar") { showRegister = false }
+                  Button("Voltar") { authScreen = .login }
                 }
               }
           }
-        } else {
+        default:
           LoginView(
-            onLoginSuccess: { isAuthenticated = true },
-            onRegisterTap: { showRegister = true }
+            onLoginSuccess: { authScreen = .main },
+            onRegisterTap: { authScreen = .register }
           )
         }
       }
       GlobalFeedbackOverlay()
     }
-    .task { await holder.syncController.syncOnce() }
   }
 
   private func logout() {
-    try? session.logout()
-    isAuthenticated = false
-    showRegister = false
+    authScreen = .login
+    Task { @MainActor in
+      try? session.logout()
+    }
   }
 }
 
@@ -126,18 +129,5 @@ import InventoryFeature
 
 extension AppDependenciesHolder {
   var authToken: String? { session.authToken }
-}
-
-extension MainTabView {
-  init(dependencies: AppDependenciesHolder, onLogout: @escaping () -> Void) {
-    self.init(
-      repository: dependencies.repository,
-      session: dependencies.session,
-      syncController: dependencies.syncController,
-      inventoryClient: dependencies.inventoryClient,
-      authToken: dependencies.authToken,
-      deviceId: dependencies.deviceId,
-      onLogout: onLogout
-    )
-  }
+  var remoteUserId: String? { session.remoteUserId }
 }
