@@ -22,6 +22,9 @@ import com.checklistboteco.domain.model.ActivityWithCompletion
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.FeaturePermissions
 import com.checklistboteco.domain.model.Frequency
+import com.checklistboteco.domain.model.InventoryCategory
+import com.checklistboteco.domain.model.InventoryCountDraft
+import com.checklistboteco.domain.model.StorageCondition
 import com.checklistboteco.domain.model.GeoPoint
 import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.SyncState
@@ -167,7 +170,10 @@ class ChecklistRepository(
             remoteId,
             featurePermissions.canRegisterUsers.toLongFlag(),
             featurePermissions.canCreateActivities.toLongFlag(),
-            featurePermissions.canEditUsers.toLongFlag()
+            featurePermissions.canEditUsers.toLongFlag(),
+            featurePermissions.canCreateInventoryCounts.toLongFlag(),
+            featurePermissions.canViewInventoryInsights.toLongFlag(),
+            featurePermissions.canManageAdministrativeStock.toLongFlag()
         )
     }
 
@@ -207,9 +213,30 @@ class ChecklistRepository(
             permissions.canRegisterUsers.toLongFlag(),
             permissions.canCreateActivities.toLongFlag(),
             permissions.canEditUsers.toLongFlag(),
+            permissions.canCreateInventoryCounts.toLongFlag(),
+            permissions.canViewInventoryInsights.toLongFlag(),
+            permissions.canManageAdministrativeStock.toLongFlag(),
             userId
         )
     }
+
+    fun syncLocalUserFromRemote(localUserId: Long, remoteUser: User): User? {
+        updateUserFeaturePermissions(localUserId, remoteUser.featurePermissions)
+        return getUserByRemoteId(remoteUser.remoteId.orEmpty())
+            ?: getUserByEmail(remoteUser.email)
+            ?: getUserByName(remoteUser.name)
+    }
+
+    fun addInventoryCountDraft(value: InventoryCountDraft, administrative: Boolean = false) {
+        queries.insertInventoryCountDraft(value.name,value.quantity,value.category.name,value.volume,value.volumeUnit,value.salePriceInCents,value.costPriceInCents,value.storageCondition.name,Clock.System.now().toEpochMilliseconds(),administrative.toLongFlag())
+    }
+
+    fun inventoryCountDraft(administrative: Boolean = false): Flow<List<InventoryCountDraft>> = queries.selectInventoryCountDraft(administrative.toLongFlag()).asFlow().mapToList(Dispatchers.IO).map { rows -> rows.map { row ->
+        InventoryCountDraft(row.id,row.name,row.quantity,InventoryCategory.valueOf(row.category),row.volume,row.volumeUnit,row.salePriceInCents,row.costPriceInCents,StorageCondition.valueOf(row.storageCondition))
+    } }
+
+    fun deleteInventoryCountDraft(id: Long) = queries.deleteInventoryCountDraft(id)
+    fun clearInventoryCountDraft(administrative: Boolean = false) = queries.clearInventoryCountDraft(administrative.toLongFlag())
 
     fun insertActivity(name: String, area: Area, frequency: Frequency, effort: Int) {
         val now = Clock.System.now().toEpochMilliseconds()
@@ -466,6 +493,9 @@ class ChecklistRepository(
                 null,
                 1L,
                 1L,
+                1L,
+                1L,
+                1L,
                 1L
             )
         }
@@ -641,7 +671,10 @@ class ChecklistRepository(
             featurePermissions = FeaturePermissions(
                 canRegisterUsers = user.canRegisterUsers == 1L,
                 canCreateActivities = user.canCreateActivities == 1L,
-                canEditUsers = user.canEditUsers == 1L
+                canEditUsers = user.canEditUsers == 1L,
+                canCreateInventoryCounts = user.canCreateInventoryCounts == 1L,
+                canViewInventoryInsights = user.canViewInventoryInsights == 1L,
+                canManageAdministrativeStock = user.canManageAdministrativeStock == 1L
             )
         )
     }

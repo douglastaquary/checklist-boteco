@@ -1,0 +1,15 @@
+ALTER TABLE User ADD COLUMN canCreateInventoryCounts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE User ADD COLUMN canViewInventoryInsights INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE InventoryCountDraft (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    category TEXT NOT NULL,
+    volume REAL NOT NULL,
+    volumeUnit TEXT NOT NULL,
+    salePriceInCents INTEGER NOT NULL,
+    costPriceInCents INTEGER,
+    storageCondition TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+);

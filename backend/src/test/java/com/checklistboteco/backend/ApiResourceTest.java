@@ -81,6 +81,20 @@ class ApiResourceTest {
 
         given()
             .header("Authorization","Bearer "+adminToken)
+            .contentType("application/json")
+            .body(Map.of("permissions",Map.of(
+                "canRegisterUsers",false,
+                "canCreateActivities",false,
+                "canEditUsers",false,
+                "canCreateInventoryCounts",true,
+                "canViewInventoryInsights",false
+            )))
+            .when().patch("/api/users/"+userId+"/permissions")
+            .then().statusCode(200)
+            .body("permissions.canCreateInventoryCounts",is(true));
+
+        given()
+            .header("Authorization","Bearer "+adminToken)
             .when().delete("/api/users/"+userId)
             .then().statusCode(204);
 

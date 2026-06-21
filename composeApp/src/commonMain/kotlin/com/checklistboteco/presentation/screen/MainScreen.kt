@@ -8,6 +8,7 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +27,7 @@ import com.checklistboteco.presentation.viewmodel.ChecklistViewModel
 import com.checklistboteco.presentation.viewmodel.DashboardViewModel
 import com.checklistboteco.presentation.viewmodel.PermissionManagementViewModel
 import com.checklistboteco.presentation.viewmodel.WorkClockViewModel
+import com.checklistboteco.presentation.viewmodel.InventoryCountViewModel
 
 sealed class Tab(val title: String, val icon: ImageVector) {
     data object Checklist : Tab("Checklist", Icons.AutoMirrored.Filled.Assignment)
@@ -33,6 +35,7 @@ sealed class Tab(val title: String, val icon: ImageVector) {
     data object Dashboard : Tab("Dashboard", Icons.Default.Dashboard)
     data object Activities : Tab("Atividades", Icons.Default.Settings)
     data object Permissions : Tab("Permissões", Icons.Default.AdminPanelSettings)
+    data object Inventory : Tab("Contagem", Icons.Default.Inventory2)
 }
 
 @Composable
@@ -52,6 +55,7 @@ fun MainScreen(
         buildList {
             add(Tab.Checklist)
             if (!user.canManagePermissions()) add(Tab.WorkClock)
+            if (user.canCreateInventoryCounts() || user.canViewInventoryInsights() || user.canManageAdministrativeStock()) add(Tab.Inventory)
             if (user.canCreateActivities() || user.canEditUsers() || user.canRegisterUsers()) add(Tab.Dashboard)
             if (user.canCreateActivities()) add(Tab.Activities)
             if (user.canManagePermissions()) add(Tab.Permissions)
@@ -123,6 +127,13 @@ fun MainScreen(
                         onBack = { selectedTabIndex = 0 }
                     )
                 }
+                is Tab.Inventory -> InventoryCountScreen(
+                    viewModel=remember(user,authToken){ InventoryCountViewModel(repository,backendApiClient,authToken,scope) },
+                    canCreate=user.canCreateInventoryCounts(),
+                    canViewInsights=user.canViewInventoryInsights(),
+                    canManageAdministrativeStock=user.canManageAdministrativeStock(),
+                    isAdmin=user.canManagePermissions()
+                )
             }
         }
     }

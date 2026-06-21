@@ -8,6 +8,9 @@ let purchasePreview = null;
 let purchaseSchema = null;
 let salesPreview = null;
 let salesSchema = null;
+let countDraft = (() => { try { return JSON.parse(localStorage.getItem('inventory-count-draft') || '[]'); } catch (_) { return []; } })();
+let adminCountDraft = (() => { try { return JSON.parse(localStorage.getItem('inventory-admin-count-draft') || '[]'); } catch (_) { return []; } })();
+let inventoryCountMode = localStorage.getItem('inventory-count-mode') || 'daily';
 
 const deviceId = localStorage.getItem('checklist-device') || crypto.randomUUID();
 localStorage.setItem('checklist-device', deviceId);
@@ -72,17 +75,76 @@ const semanticColumnKey = value => {
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((Number(value) || 0) / 100);
 
+function readApiError(body, status) {
+  if (body?.message) return body.message;
+  if (body?.attributeName) {
+    const labels = {
+      workSector: 'Setor',
+      permissionLevel: 'Perfil',
+      permissions: 'Permissões',
+      name: 'Nome',
+      email: 'Email'
+    };
+    const label = labels[body.attributeName] || body.attributeName;
+    return `Valor inválido para ${label}.`;
+  }
+  if (status === 401) return 'Sessão expirada. Faça login novamente.';
+  if (status === 403) return 'Você não tem permissão para esta operação.';
+  if (status === 404) return 'Recurso não encontrado.';
+  if (typeof body?.raw === 'string' && body.raw.trim()) return body.raw.trim();
+  return `Não foi possível concluir a operação (HTTP ${status}).`;
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(options.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
   });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message || 'Não foi possível concluir a operação');
+
+  if (response.status === 204) {
+    if (!response.ok) throw new Error(readApiError({}, response.status));
+    return null;
+  }
+
+  const text = await response.text();
+  const body = text
+    ? (() => {
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          return { raw: text };
+        }
+      })()
+    : {};
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      token = '';
+      currentUser = null;
+      localStorage.removeItem('checklist-token');
+      setLoggedIn(false);
+    }
+    throw new Error(readApiError(body, response.status));
+  }
+
   return body;
+}
+
+function buildUserPermissions(user, key, value) {
+  const base = user?.permissions || {};
+  return {
+    canRegisterUsers: Boolean(base.canRegisterUsers),
+    canCreateActivities: Boolean(base.canCreateActivities),
+    canEditUsers: Boolean(base.canEditUsers),
+    canCreateInventoryCounts: Boolean(base.canCreateInventoryCounts),
+    canViewInventoryInsights: Boolean(base.canViewInventoryInsights),
+    canManageAdministrativeStock: Boolean(base.canManageAdministrativeStock),
+    [key]: value
+  };
 }
 
 function message(text = '') {
@@ -119,11 +181,24 @@ function isAdmin(user = currentUser) {
   return user?.permissionLevel === 'ADMIN';
 }
 
+function canCreateInventoryCounts(user = currentUser) {
+  return Boolean(user && (isAdmin(user) || user.permissions?.canCreateInventoryCounts));
+}
+
+function canViewInventoryInsights(user = currentUser) {
+  return Boolean(user && (isAdmin(user) || user.permissions?.canViewInventoryInsights));
+}
+
+function canManageAdministrativeStock(user = currentUser) {
+  return Boolean(user && (isAdmin(user) || user.permissions?.canManageAdministrativeStock));
+}
+
 function accessibleViews(user = currentUser) {
   const views = [];
   if (isAdmin(user)) views.push('dashboard');
   if (canManageUsers(user)) views.push('users');
   if (canManageActivities(user)) views.push('activities');
+  if (canCreateInventoryCounts(user) || canViewInventoryInsights(user) || canManageAdministrativeStock(user)) views.push('inventory');
   if (isAdmin(user)) views.push('purchases');
   if (isAdmin(user)) views.push('sales');
   return views;
@@ -151,6 +226,7 @@ function activateView(viewId) {
   $('pageTitle').textContent = selectedButton?.textContent || 'Painel';
   if (viewId === 'purchases' && token) loadPurchases();
   if (viewId === 'sales' && token) loadSales();
+  if (viewId === 'inventory' && token) loadCounts();
 }
 
 async function load() {
@@ -209,7 +285,7 @@ function renderUsers(users) {
         <small>${escapeHtml(user.workSector || '')}</small>
       </td>
       <td>${user.permissionLevel}</td>
-      ${['canRegisterUsers', 'canCreateActivities', 'canEditUsers'].map(key => `
+      ${['canRegisterUsers', 'canCreateActivities', 'canEditUsers', 'canCreateInventoryCounts', 'canViewInventoryInsights', 'canManageAdministrativeStock'].map(key => `
         <td><input type="checkbox" data-user="${user.id}" data-key="${key}" ${user.permissions?.[key] ? 'checked' : ''} ${!allowPermissionEdit || user.permissionLevel === 'ADMIN' ? 'disabled' : ''}></td>
       `).join('')}
       <td class="user-actions">
@@ -221,7 +297,7 @@ function renderUsers(users) {
   `).join('');
 
   document.querySelectorAll('[data-user]').forEach(input => {
-    input.addEventListener('change', () => changePermission(users, input));
+    input.addEventListener('change', () => changePermission(input));
   });
   document.querySelectorAll('[data-user-edit]').forEach(button => {
     button.addEventListener('click', () => startEditUser(button.dataset.userEdit));
@@ -234,9 +310,14 @@ function renderUsers(users) {
   });
 }
 
-async function changePermission(users, input) {
-  const user = users.find(value => value.id === input.dataset.user);
-  const permissions = { ...user.permissions, [input.dataset.key]: input.checked };
+async function changePermission(input) {
+  const user = currentUsers.find(value => value.id === input.dataset.user);
+  if (!user) {
+    alert('Usuário não encontrado. Atualize a página.');
+    input.checked = !input.checked;
+    return;
+  }
+  const permissions = buildUserPermissions(user, input.dataset.key, input.checked);
   try {
     await api(`/api/users/${user.id}/permissions`, { method: 'PATCH', body: JSON.stringify({ permissions }) });
     await load();
@@ -299,7 +380,7 @@ async function saveUser(event) {
     } else {
       await api('/api/users', {
         method: 'POST',
-        body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false } })
+        body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false, canCreateInventoryCounts: false, canViewInventoryInsights: false, canManageAdministrativeStock: false } })
       });
       userMessage('Usuário criado com sucesso.', true);
     }
@@ -787,6 +868,144 @@ $('clearSalesFilters').addEventListener('click', () => {
   setSalesDates();
   loadSales();
 });
+
+const emptyCountItem = () => ({ name: '', quantity: 0, category: 'ALCOOLICO', volume: 600, volumeUnit: 'ML', salePrice: '', costPrice: '', condition: 'GELADO' });
+const isAdminCountMode = () => inventoryCountMode === 'admin';
+const activeCountDraft = () => isAdminCountMode() ? adminCountDraft : countDraft;
+const saveCountDraft = () => {
+  if (isAdminCountMode()) localStorage.setItem('inventory-admin-count-draft', JSON.stringify(adminCountDraft));
+  else localStorage.setItem('inventory-count-draft', JSON.stringify(countDraft));
+};
+const setInventoryCountMode = (mode) => {
+  inventoryCountMode = mode;
+  localStorage.setItem('inventory-count-mode', mode);
+  $('countModeDaily')?.classList.toggle('active', mode === 'daily');
+  $('countModeAdmin')?.classList.toggle('active', mode === 'admin');
+  const adminMode = mode === 'admin';
+  $('countSectionEyebrow').textContent = adminMode ? 'ESTOQUE ADMINISTRATIVO' : 'ABERTURA DO BAR';
+  $('countSectionTitle').textContent = adminMode ? 'Nova contagem administrativa' : 'Nova contagem';
+  $('countSectionHint').textContent = adminMode
+    ? 'Soma ao saldo acumulado. Após confirmar a auditoria, as vendas são abatidas.'
+    : 'Monte a lista completa e envie todos os produtos de uma só vez.';
+  renderCountDraft();
+  updateCountActions();
+};
+
+function updateCountActions() {
+  const adminMode = isAdminCountMode();
+  const canSubmit = adminMode ? canManageAdministrativeStock() : canCreateInventoryCounts();
+  $('addCountItem')?.classList.toggle('hidden', !canSubmit);
+  $('submitCount')?.classList.toggle('hidden', !canSubmit);
+  $('countModeDaily')?.classList.toggle('hidden', !canCreateInventoryCounts());
+  $('countModeAdmin')?.classList.toggle('hidden', !canManageAdministrativeStock());
+  if (!canCreateInventoryCounts() && canManageAdministrativeStock()) setInventoryCountMode('admin');
+  if (canCreateInventoryCounts() && !canManageAdministrativeStock() && adminMode) setInventoryCountMode('daily');
+}
+
+function renderCountDraft() {
+  const draft = activeCountDraft();
+  $('countDraft').innerHTML = draft.map((item, index) => `
+    <div class="count-row" data-count-row="${index}">
+      <label>Produto<input data-count-field="name" value="${escapeHtml(item.name)}" placeholder="Ex.: Heineken 600ml"></label>
+      <label>Quantidade<input data-count-field="quantity" type="number" min="0" step="0.01" value="${item.quantity}"></label>
+      <label>Categoria<select data-count-field="category"><option value="ALCOOLICO" ${item.category === 'ALCOOLICO' ? 'selected' : ''}>Alcoólico</option><option value="NAO_ALCOOLICO" ${item.category === 'NAO_ALCOOLICO' ? 'selected' : ''}>Não alcoólico</option></select></label>
+      <label>Volume<input data-count-field="volume" type="number" min="0.01" step="0.01" value="${item.volume}"></label>
+      <label>Unidade<select data-count-field="volumeUnit"><option>ML</option><option ${item.volumeUnit === 'G' ? 'selected' : ''}>G</option></select></label>
+      <label>Venda (R$)<input data-count-field="salePrice" inputmode="decimal" value="${escapeHtml(item.salePrice)}"></label>
+      <label>Custo opcional<input data-count-field="costPrice" inputmode="decimal" value="${escapeHtml(item.costPrice)}"></label>
+      <label>Conservação<select data-count-field="condition"><option value="GELADO" ${item.condition === 'GELADO' ? 'selected' : ''}>Gelado</option><option value="NATURAL" ${item.condition === 'NATURAL' ? 'selected' : ''}>Natural</option></select></label>
+      <button type="button" class="danger" data-remove-count="${index}">Remover</button>
+    </div>`).join('') || '<div class="empty-state">Adicione o primeiro produto para iniciar a contagem.</div>';
+  document.querySelectorAll('[data-count-row]').forEach(row => row.querySelectorAll('[data-count-field]').forEach(input => input.addEventListener('input', () => { activeCountDraft()[Number(row.dataset.countRow)][input.dataset.countField] = input.value; saveCountDraft(); })));
+  document.querySelectorAll('[data-remove-count]').forEach(button => button.addEventListener('click', () => { activeCountDraft().splice(Number(button.dataset.removeCount), 1); saveCountDraft(); renderCountDraft(); }));
+}
+
+async function loadCounts() {
+  const now = new Date();
+  $('countDate').value ||= new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  setInventoryCountMode(inventoryCountMode);
+  updateCountActions();
+  if (!canViewInventoryInsights() && !canManageAdministrativeStock()) return;
+  try {
+    const values = await api('/api/inventory/counts');
+    $('countsBody').innerHTML = values.map(value => `<tr><td>${new Date(value.countedAt || value.submittedAt).toLocaleString('pt-BR')}</td><td><strong>${escapeHtml(value.createdByName)}</strong><small>${escapeHtml(value.createdBy)}</small></td><td>${value.items?.length || 0}</td><td>${new Date(value.submittedAt).toLocaleString('pt-BR')}</td><td>${isAdmin() ? `<button class="danger" data-delete-count="${value.id}">Apagar</button>` : 'Bloqueada'}</td></tr>`).join('');
+    document.querySelectorAll('[data-delete-count]').forEach(button => button.addEventListener('click', async () => { if (!confirm('Apagar definitivamente esta contagem enviada?')) return; await api(`/api/inventory/counts/${button.dataset.deleteCount}`, { method: 'DELETE' }); await loadCounts(); }));
+    await loadAdminStockBalances();
+  } catch (error) { $('countMessage').textContent = error.message; }
+}
+
+async function loadAdminStockBalances() {
+  if (!canManageAdministrativeStock()) {
+    $('adminStockBody').innerHTML = '<tr><td colspan="4">Sem permissão para visualizar o estoque administrativo.</td></tr>';
+    return;
+  }
+  try {
+    const balances = await api('/api/inventory/admin-stock/balances');
+    $('adminStockBody').innerHTML = balances.length
+      ? balances.map(value => `<tr><td>${escapeHtml(value.productName)}</td><td>${escapeHtml(value.location)}</td><td>${value.quantity}</td><td>${value.updatedAt ? new Date(value.updatedAt).toLocaleString('pt-BR') : '-'}</td></tr>`).join('')
+      : '<tr><td colspan="4">Nenhum saldo registrado ainda.</td></tr>';
+  } catch (error) {
+    $('adminStockBody').innerHTML = `<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+
+async function submitCount() {
+  const draft = activeCountDraft();
+  if (!draft.length) return void ($('countMessage').textContent = 'Adicione ao menos um produto.');
+  const items = draft.map(item => ({ name: item.name.trim(), quantity: Number(item.quantity), category: item.category, volume: Number(item.volume), volumeUnit: item.volumeUnit, salePriceInCents: currencyToCents(item.salePrice) || 0, costPriceInCents: item.costPrice ? currencyToCents(item.costPrice) : null, condition: item.condition }));
+  const adminMode = isAdminCountMode();
+  const confirmText = adminMode
+    ? `Confirma o envio administrativo de ${items.length} itens? O saldo acumulado será atualizado.`
+    : `Confirma o envio de ${items.length} itens? Após enviar, a contagem não poderá ser editada.`;
+  if (!confirm(confirmText)) return;
+  try {
+    const countedAt = new Date($('countDate').value);
+    const payload = { countDate: $('countDate').value.slice(0, 10), countedAt: countedAt.toISOString(), location: 'Beco da Praia', items };
+    const endpoint = adminMode ? '/api/inventory/admin-stock/counts' : '/api/inventory/counts';
+    await api(endpoint, { method: 'POST', body: JSON.stringify(payload) });
+    if (adminMode) adminCountDraft = []; else countDraft = [];
+    saveCountDraft(); renderCountDraft();
+    $('countMessage').innerHTML = adminMode
+      ? '<span class="import-ok">Contagem administrativa enviada e saldo atualizado.</span>'
+      : '<span class="import-ok">Contagem enviada e bloqueada para edição.</span>';
+    await loadCounts();
+  } catch (error) { $('countMessage').textContent = error.message; }
+}
+
+async function runInventoryAudit() {
+  try {
+    const data = await api('/api/inventory/audit/daily', { method: 'POST', body: JSON.stringify({ date: $('countDate').value.slice(0, 10), location: 'Beco da Praia' }) });
+    $('inventoryMetrics').innerHTML = `<span>Contado: <strong>${data.totalOpening}</strong></span><span>Vendido: <strong>${data.totalSold}</strong></span><span>Saldo: <strong>${data.totalRemaining}</strong></span>`;
+    $('inventoryAuditBody').innerHTML = data.items.map(item => `<tr><td><strong>${escapeHtml(item.status)}</strong></td><td>${escapeHtml(item.product)}</td><td>${item.openingQuantity}</td><td>${item.soldQuantity}</td><td>${item.theoreticalRemaining}</td><td>${escapeHtml(item.notes)}</td></tr>`).join('');
+  } catch (error) { $('countMessage').textContent = error.message; }
+}
+
+async function applyInventoryAudit() {
+  if (!confirm('Confirmar auditoria e abater as vendas do estoque administrativo conforme a planilha?')) return;
+  try {
+    const data = await api('/api/inventory/audit/daily/apply', { method: 'POST', body: JSON.stringify({ date: $('countDate').value.slice(0, 10), location: 'Beco da Praia' }) });
+    if (data.audit) {
+      $('inventoryMetrics').innerHTML = `<span>Contado: <strong>${data.audit.totalOpening}</strong></span><span>Vendido: <strong>${data.audit.totalSold}</strong></span><span>Saldo: <strong>${data.audit.totalRemaining}</strong></span>`;
+      $('inventoryAuditBody').innerHTML = data.audit.items.map(item => `<tr><td><strong>${escapeHtml(item.status)}</strong></td><td>${escapeHtml(item.product)}</td><td>${item.openingQuantity}</td><td>${item.soldQuantity}</td><td>${item.theoreticalRemaining}</td><td>${escapeHtml(item.notes)}</td></tr>`).join('');
+    }
+    $('countMessage').innerHTML = data.alreadyApplied
+      ? '<span class="import-ok">Auditoria já havia sido aplicada ao estoque administrativo.</span>'
+      : '<span class="import-ok">Vendas abatidas do estoque administrativo conforme planilha.</span>';
+    await loadAdminStockBalances();
+  } catch (error) { $('countMessage').textContent = error.message; }
+}
+
+$('addCountItem').addEventListener('click', () => { activeCountDraft().push(emptyCountItem()); saveCountDraft(); renderCountDraft(); });
+$('clearCount').addEventListener('click', () => { const draft = activeCountDraft(); if (draft.length && !confirm('Descartar a contagem ainda não enviada?')) return; if (isAdminCountMode()) adminCountDraft = []; else countDraft = []; saveCountDraft(); renderCountDraft(); });
+$('submitCount').addEventListener('click', submitCount);
+$('refreshCounts').addEventListener('click', loadCounts);
+$('refreshAdminStock').addEventListener('click', loadAdminStockBalances);
+$('runInventoryAudit').addEventListener('click', runInventoryAudit);
+$('applyInventoryAudit').addEventListener('click', applyInventoryAudit);
+$('countModeDaily').addEventListener('click', () => setInventoryCountMode('daily'));
+$('countModeAdmin').addEventListener('click', () => setInventoryCountMode('admin'));
+renderCountDraft();
+updateCountActions();
 
 document.querySelectorAll('[data-view]').forEach(button => {
   button.addEventListener('click', () => activateView(button.dataset.view));

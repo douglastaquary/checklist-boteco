@@ -10,6 +10,8 @@ import com.checklistboteco.backend.sales.application.SalesQueryService;
 import com.checklistboteco.backend.sales.domain.SalesModels.ProductSearchRequest;
 import com.checklistboteco.backend.sales.domain.SalesModels.SaleQuery;
 import com.checklistboteco.backend.sales.domain.SalesModels.SalesAuditRequest;
+import com.checklistboteco.backend.inventory.application.InventoryService;
+import com.checklistboteco.backend.inventory.domain.InventoryModels.DailyAuditRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -31,6 +33,7 @@ public class PurchaseMcpResource {
     @Inject SalesQueryService salesQueries;
     @Inject SalesImportService salesImports;
     @Inject SalesAuditService salesAudits;
+    @Inject InventoryService inventory;
     @Inject ObjectMapper mapper;
     @ConfigProperty(name="purchases.mcp.token") String expectedToken;
 
@@ -68,6 +71,10 @@ public class PurchaseMcpResource {
             case "sales_quantity_by_product_in_period" -> salesQueries.byProduct(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),ProductSearchRequest.class));
             case "sales_get_imports" -> salesImports.list();
             case "sales_audit_stock" -> salesAudits.audit(mapper.convertValue(normalizeSalesArgs(args),SalesAuditRequest.class));
+            case "inventory_daily_audit" -> inventory.audit(mapper.convertValue(normalizeSalesArgs(args),DailyAuditRequest.class));
+            case "inventory_count_sessions" -> inventory.list(
+                args.get("from")==null?null:java.time.LocalDate.parse(args.get("from").toString()),
+                args.get("to")==null?null:java.time.LocalDate.parse(args.get("to").toString()));
             default -> throw new NoSuchMethodException("Tool desconhecida: "+name);
         };
         LOG.infof("MCP audit tool=%s durationMs=%d",name,(System.nanoTime()-started)/1_000_000);
@@ -88,7 +95,9 @@ public class PurchaseMcpResource {
             tool("sales_by_product","Busca vendas por produto no Beco da Praia e retorna quantidade vendida, valor total e quebra por produto/local. Use para perguntas como 'quantas cervejas vendeu?' ou 'quanto vendeu no beco?'",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product"))),
             tool("sales_quantity_by_product_in_period","Retorna a quantidade vendida e o total em reais de um produto no Beco da Praia em um período específico. Use para perguntas como 'quantas heinekens vendeu em maio no beco?'",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product","from","to"))),
             tool("sales_get_imports","Lista lotes importados de vendas e sua cobertura",Map.of("type","object","properties",Map.of())),
-            tool("sales_audit_stock","Cruza quantidade vendida x quantidade abastecida para apontar extravio, venda sem entrada registrada e perdas. Aceita filtro textual por produto.",Map.of("type","object","properties",Map.of("purchaseDatasetId",Map.of("type","string"),"salesDatasetId",Map.of("type","string"),"from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date"),"locations",Map.of("type","array","items",Map.of("type","string")),"text",Map.of("type","string")),"required",List.of("from","to")))
+            tool("sales_audit_stock","Cruza quantidade vendida x quantidade abastecida para apontar extravio, venda sem entrada registrada e perdas. Aceita filtro textual por produto.",Map.of("type","object","properties",Map.of("purchaseDatasetId",Map.of("type","string"),"salesDatasetId",Map.of("type","string"),"from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date"),"locations",Map.of("type","array","items",Map.of("type","string")),"text",Map.of("type","string")),"required",List.of("from","to"))),
+            tool("inventory_daily_audit","Auditoria diária do Beco da Praia: cruza a contagem feita antes da abertura com as vendas do dia e calcula o saldo teórico por produto.",Map.of("type","object","properties",Map.of("date",Map.of("type","string","format","date"),"location",Map.of("type","string"),"text",Map.of("type","string")),"required",List.of("date"))),
+            tool("inventory_count_sessions","Lista sessões imutáveis de contagem enviadas em um período.",Map.of("type","object","properties",Map.of("from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date"))))
         );
     }
     private static Map<String,Object> normalizeSalesArgs(Map<String,Object> args){

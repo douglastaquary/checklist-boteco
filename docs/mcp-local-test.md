@@ -88,6 +88,8 @@ Se quiser orientar o agente do Codex a usar automaticamente o MCP do projeto par
 - `sales_quantity_by_product_in_period`
 - `sales_get_imports`
 - `sales_audit_stock`
+- `inventory_count_sessions`
+- `inventory_daily_audit`
 
 ## Teste manual por HTTP
 
@@ -120,6 +122,7 @@ Exemplos mais objetivos para validar o fluxo:
 - `Use o MCP checklist-boteco-analytics e responda quantas heinekens foram vendidas no beco entre 2026-05-01 e 2026-05-31 e qual o total em reais.`
 - `Use o MCP checklist-boteco-analytics e agregue vendas por category entre 2026-06-01 e 2026-06-30.`
 - `Use o MCP checklist-boteco-analytics e faça sales_audit_stock de 2026-06-01 a 2026-06-30.`
+- `Use inventory_daily_audit para conferir a contagem de abertura, as vendas e o saldo teórico de 2026-06-20.`
 
 ## Como ensinar o agente a reconhecer "beco" e perguntas de produto
 
@@ -130,6 +133,7 @@ Use uma instrução de projeto com estas regras:
 - para perguntas por produto, usar primeiro `sales_by_product`;
 - para perguntas por produto com período explícito, preferir `sales_quantity_by_product_in_period`;
 - para perguntas de divergência, extravio ou perdas, usar `sales_audit_stock`;
+- para conferência diária de contagem antes da abertura x vendas x saldo restante, usar `inventory_daily_audit`;
 - se o CSV importado não tiver um campo de local explícito, ainda assim responder a pergunta como referente ao dataset do Beco importado no projeto.
 
 ## Observações

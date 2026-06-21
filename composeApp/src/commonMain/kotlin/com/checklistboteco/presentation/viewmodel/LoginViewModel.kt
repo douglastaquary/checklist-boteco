@@ -162,7 +162,8 @@ class LoginViewModel(
             return
         }
 
-        val localUser = repository.getUserByEmail(remoteUser.email)
+        val localUser = repository.getUserByRemoteId(remoteUserId)
+            ?: repository.getUserByEmail(remoteUser.email)
             ?: repository.getUserByName(remoteUser.name)
             ?: run {
                 repository.insertUser(
@@ -187,8 +188,16 @@ class LoginViewModel(
             return
         }
 
-        repository.saveSyncSession(
+        val syncedUser = repository.syncLocalUserFromRemote(
             localUserId = localUser.id,
+            remoteUser = remoteUser.copy(remoteId = remoteUserId)
+        ) ?: localUser.copy(
+            remoteId = remoteUserId,
+            featurePermissions = remoteUser.featurePermissions
+        )
+
+        repository.saveSyncSession(
+            localUserId = syncedUser.id,
             session = SyncSession(
                 authToken = token,
                 remoteUserId = remoteUserId
@@ -197,7 +206,7 @@ class LoginViewModel(
 
         _uiState.update {
             it.copy(
-                currentUser = localUser.copy(remoteId = remoteUserId),
+                currentUser = syncedUser.copy(remoteId = remoteUserId),
                 authToken = token,
                 remoteUserId = remoteUserId,
                 requiresTwoFactor = false,
