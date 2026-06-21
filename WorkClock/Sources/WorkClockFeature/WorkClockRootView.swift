@@ -124,7 +124,7 @@ public struct WorkClockRootView: View {
       }
       .padding(.horizontal)
       .padding(.vertical, 12)
-      .background(.bar)
+      .background(Color(uiColor: .systemBackground))
     }
     .onAppear { tracker.start() }
     .task { await reload() }
@@ -279,13 +279,7 @@ private struct WorkClockStatusSection: View {
   var body: some View {
     Section("Próxima marcação") {
       Text(nextType.displayName).font(.title2.bold())
-      HStack {
-        Image(systemName: isWithinRadius ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-          .foregroundStyle(isWithinRadius ? .green : .red)
-        Text(locationStatus)
-          .font(.footnote)
-          .foregroundStyle(isWithinRadius ? .secondary : .red)
-      }
+      statusRow
       if let distance {
         Text(String(format: "Distância do local: %.1f m", distance))
       }
@@ -298,6 +292,17 @@ private struct WorkClockStatusSection: View {
           UIApplication.shared.open(url)
         }
       }
+    }
+  }
+
+  @ViewBuilder
+  private var statusRow: some View {
+    HStack {
+      Image(systemName: isWithinRadius ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+        .foregroundColor(isWithinRadius ? .green : .red)
+      Text(locationStatus)
+        .font(.footnote)
+        .foregroundColor(isWithinRadius ? .secondary : .red)
     }
   }
 }
