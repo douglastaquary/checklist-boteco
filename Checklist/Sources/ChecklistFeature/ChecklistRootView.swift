@@ -11,7 +11,11 @@ public struct ChecklistRootView: View {
   private let onLogout: () -> Void
   private let onSelectActivity: ((Int64, Area) -> Void)?
 
-  @State private var selectedArea: Area = .atendimento
+  private var accessibleAreas: [Area] {
+    Area.allCases.filter { user.canAccessArea($0) }
+  }
+
+  @State private var selectedArea: Area
   @State private var items: [ActivityWithCompletion] = []
   @State private var cameraCapture: CameraCaptureRequest?
   @State private var alert: ChecklistAlert?
@@ -28,32 +32,44 @@ public struct ChecklistRootView: View {
     self.syncController = syncController
     self.onLogout = onLogout
     self.onSelectActivity = onSelectActivity
+    let areas = Area.allCases.filter { user.canAccessArea($0) }
+    let initialArea = areas.contains(user.area) ? user.area : (areas.first ?? .atendimento)
+    _selectedArea = State(initialValue: initialArea)
   }
 
   public var body: some View {
-    VStack {
-      Picker("Área", selection: $selectedArea) {
-        ForEach(Area.allCases.filter { user.canAccessArea($0) }, id: \.self) { area in
-          Text(area.displayName).tag(area)
+    List {
+      Section(sectionTitle) {
+        if items.isEmpty {
+          Text("Nenhuma atividade para esta área.")
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(items) { item in
+            ActivityChecklistRow(
+              item: item,
+              onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
+              onMarkComplete: {
+                cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
+              }
+            )
+            .themedListRowBackground()
+          }
         }
       }
-      .pickerStyle(.segmented)
-      .padding()
-
-      List(items) { item in
-        ActivityChecklistRow(
-          item: item,
-          onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
-          onMarkComplete: {
-            cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
-          }
-        )
-        .themedListRowBackground()
-      }
-      .themedListStyle()
     }
+    .themedListStyle()
     .navigationTitle("Checklist")
     .toolbar {
+      if accessibleAreas.count > 1 {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Picker("Área", selection: $selectedArea) {
+            ForEach(accessibleAreas, id: \.self) { area in
+              Text(area.displayName).tag(area)
+            }
+          }
+          .pickerStyle(.menu)
+        }
+      }
       ToolbarItem(placement: .navigationBarTrailing) {
         Button("Sair", action: onLogout)
       }
@@ -71,6 +87,10 @@ public struct ChecklistRootView: View {
         dismissButton: .cancel(Text("OK"))
       )
     }
+  }
+
+  private var sectionTitle: String {
+    accessibleAreas.count == 1 ? accessibleAreas[0].displayName : "Atividades"
   }
 
   @MainActor

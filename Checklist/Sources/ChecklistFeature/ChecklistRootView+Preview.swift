@@ -7,13 +7,26 @@ import DesignSystem
 
 struct ChecklistRootView_Previews: PreviewProvider {
   static var previews: some View {
-    NavigationStack {
-      ChecklistRootView(
-        user: previewUser,
-        repository: previewRepository,
-        syncController: previewSyncController,
-        onLogout: {}
-      )
+    Group {
+      NavigationStack {
+        ChecklistRootView(
+          user: singleAreaUser,
+          repository: previewRepository,
+          syncController: previewSyncController,
+          onLogout: {}
+        )
+      }
+      .previewDisplayName("Colaborador — 1 área")
+
+      NavigationStack {
+        ChecklistRootView(
+          user: multiAreaUser,
+          repository: previewRepository,
+          syncController: previewSyncController,
+          onLogout: {}
+        )
+      }
+      .previewDisplayName("Admin — menu de áreas")
     }
     .environmentObject(AppTheme.shared)
   }
@@ -27,16 +40,30 @@ struct ChecklistRootView_Previews: PreviewProvider {
     SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil))
   }
 
-  private static var previewUser: User {
+  private static var singleAreaUser: User {
     User(
       id: 1,
-      name: "Preview",
-      email: "preview@test.com",
+      name: "Colaborador",
+      email: "colab@test.com",
       password: "x",
       area: .atendimento,
       permissionLevel: .user,
-      allowedAreas: Area.allCases,
+      allowedAreas: [.atendimento],
       createdAt: 0
+    )
+  }
+
+  private static var multiAreaUser: User {
+    User(
+      id: 2,
+      name: "Admin",
+      email: "admin@test.com",
+      password: "x",
+      area: .atendimento,
+      permissionLevel: .admin,
+      allowedAreas: Area.allCases,
+      createdAt: 0,
+      featurePermissions: .admin
     )
   }
 }

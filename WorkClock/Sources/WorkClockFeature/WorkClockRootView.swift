@@ -8,6 +8,7 @@ import DesignSystem
 public final class LocationTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
   @Published public var location: CLLocation?
   @Published public var authorizationDenied = false
+  @Published public var locationError: String?
   private let manager = CLLocationManager()
 
   public override init() {
@@ -22,8 +23,14 @@ public final class LocationTracker: NSObject, ObservableObject, CLLocationManage
   }
 
   public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-    location = locations.last
+    guard let latest = locations.last, latest.horizontalAccuracy >= 0 else { return }
+    location = latest
     authorizationDenied = false
+    locationError = nil
+  }
+
+  public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    locationError = error.localizedDescription
   }
 
   public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -48,9 +55,11 @@ public struct WorkClockRootView: View {
   private let deviceId: String
   private let onShowDayEntries: (() -> Void)?
 
+  @EnvironmentObject private var theme: AppTheme
   @StateObject private var tracker = LocationTracker()
   @State private var entries: [WorkClockEntry] = []
-  @State private var feedback: String?
+  @State private var feedbackAlert: WorkClockFeedbackAlert?
+  @State private var isRegistering = false
 
   public init(
     userId: Int64,
@@ -81,44 +90,59 @@ public struct WorkClockRootView: View {
         nextType: nextType,
         distance: distance,
         accuracy: effectiveAccuracy,
-        locationStatus: locationStatus
+        locationStatus: locationStatus,
+        isWithinRadius: canRegister,
+        authorizationDenied: tracker.authorizationDenied
       )
       WorkClockSummarySection(summary: summary)
-      if let feedback {
-        Section {
-          Text(feedback).foregroundStyle(.orange)
-        }
-      }
       if let onShowDayEntries, !entries.isEmpty {
         Section {
           Button("Ver marcações do dia", action: onShowDayEntries)
         }
       }
-      Section {
-        Button("Registrar \(nextType.displayName)") {
-          if canRegister {
-            Task { await register(type: nextType, distance: distance ?? 0) }
-          } else {
-            feedback = locationStatus
-          }
-        }
-        .buttonStyle(PrimaryButtonStyle())
-      }
     }
     .themedFormStyle()
     .navigationTitle("Ponto")
+    .safeAreaInset(edge: .bottom) {
+      VStack(spacing: 12) {
+        Button {
+          handleRegisterTap(type: nextType, distance: distance ?? 0, canRegister: canRegister)
+        } label: {
+          Group {
+            if isRegistering {
+              ProgressView()
+                .tint(.white)
+            } else {
+              Text("Registrar \(nextType.displayName)")
+            }
+          }
+          .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(theme.tint)
+        .disabled(isRegistering)
+      }
+      .padding(.horizontal)
+      .padding(.vertical, 12)
+      .background(.bar)
+    }
     .onAppear { tracker.start() }
     .task { await reload() }
+    .alert(item: $feedbackAlert) { alert in
+      Alert(
+        title: Text(alert.title),
+        message: Text(alert.message),
+        dismissButton: .default(Text("OK"))
+      )
+    }
   }
 
   private var effectiveLocation: CLLocation? {
-    if let location = tracker.location, location.horizontalAccuracy >= 0 {
-      return location
-    }
     #if targetEnvironment(simulator)
     return Self.simulatorWorksiteLocation
     #else
-    return nil
+    guard let location = tracker.location, location.horizontalAccuracy >= 0 else { return nil }
+    return location
     #endif
   }
 
@@ -138,6 +162,9 @@ public struct WorkClockRootView: View {
     if tracker.authorizationDenied {
       return "Permita o acesso ao GPS para registrar ponto."
     }
+    if let locationError = tracker.locationError {
+      return locationError
+    }
     guard effectiveLocation != nil else {
       return "Aguardando sinal GPS…"
     }
@@ -156,6 +183,17 @@ public struct WorkClockRootView: View {
     return accuracy <= 20 && distance <= WorksiteLocation.allowedRadiusMeters
   }
 
+  private func handleRegisterTap(type: WorkClockType, distance: Double, canRegister: Bool) {
+    if canRegister {
+      Task { await register(type: type, distance: distance) }
+    } else {
+      feedbackAlert = WorkClockFeedbackAlert(
+        title: "Ponto",
+        message: locationStatus
+      )
+    }
+  }
+
   @MainActor
   private func reload() async {
     let start = Date.startOfDayMillis
@@ -165,10 +203,14 @@ public struct WorkClockRootView: View {
 
   @MainActor
   private func register(type: WorkClockType, distance: Double) async {
+    guard !isRegistering else { return }
     guard let location = effectiveLocation else {
-      feedback = locationStatus
+      feedbackAlert = WorkClockFeedbackAlert(title: "Ponto", message: locationStatus)
       return
     }
+    isRegistering = true
+    defer { isRegistering = false }
+
     let entry = WorkClockEntry(
       id: 0,
       userId: userId,
@@ -187,13 +229,22 @@ public struct WorkClockRootView: View {
           token: token,
           deviceId: deviceId
         )
-        feedback = "\(type.displayName) registrada."
+        feedbackAlert = WorkClockFeedbackAlert(
+          title: "Ponto",
+          message: "\(type.displayName) registrada."
+        )
       } else {
-        feedback = "\(type.displayName) registrada localmente. Sincronização pendente."
+        feedbackAlert = WorkClockFeedbackAlert(
+          title: "Ponto",
+          message: "\(type.displayName) registrada localmente. Sincronização pendente."
+        )
       }
       await reload()
     } catch {
-      feedback = "Não foi possível registrar: \(error.localizedDescription)"
+      feedbackAlert = WorkClockFeedbackAlert(
+        title: "Ponto",
+        message: "Não foi possível registrar: \(error.localizedDescription)"
+      )
     }
   }
 
@@ -211,23 +262,41 @@ public struct WorkClockRootView: View {
   #endif
 }
 
+private struct WorkClockFeedbackAlert: Identifiable {
+  let title: String
+  let message: String
+  var id: String { "\(title)-\(message)" }
+}
+
 private struct WorkClockStatusSection: View {
   let nextType: WorkClockType
   let distance: Double?
   let accuracy: Double?
   let locationStatus: String
+  let isWithinRadius: Bool
+  let authorizationDenied: Bool
 
   var body: some View {
     Section("Próxima marcação") {
       Text(nextType.displayName).font(.title2.bold())
-      Text(locationStatus)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
+      HStack {
+        Image(systemName: isWithinRadius ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+          .foregroundStyle(isWithinRadius ? .green : .red)
+        Text(locationStatus)
+          .font(.footnote)
+          .foregroundStyle(isWithinRadius ? .secondary : .red)
+      }
       if let distance {
         Text(String(format: "Distância do local: %.1f m", distance))
       }
       if let accuracy {
         Text(String(format: "Precisão GPS: %.0f m", accuracy))
+      }
+      if authorizationDenied {
+        Button("Abrir Ajustes") {
+          guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+          UIApplication.shared.open(url)
+        }
       }
     }
   }
@@ -250,3 +319,5 @@ private extension Date {
     Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000)
   }
 }
+
+import UIKit
