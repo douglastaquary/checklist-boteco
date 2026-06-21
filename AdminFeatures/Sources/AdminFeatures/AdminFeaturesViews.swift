@@ -1,6 +1,7 @@
 import SwiftUI
 import Models
 import Persistence
+import DesignSystem
 
 public struct ActivitiesManagementView: View {
   private let repository: ChecklistRepository
@@ -23,6 +24,7 @@ public struct ActivitiesManagementView: View {
       }
       ActivityListSection(activities: activities)
     }
+    .themedFormStyle()
     .navigationTitle("Atividades")
     .task { activities = (try? repository.allActivities()) ?? [] }
   }
@@ -31,38 +33,99 @@ public struct ActivitiesManagementView: View {
 public struct PermissionManagementView: View {
   private let repository: ChecklistRepository
   @State private var users: [User] = []
-  @State private var selectedUserId: Int64?
-  @State private var permissions = FeaturePermissions.default
+  @State private var editSheet: PermissionEditSheet?
 
   public init(repository: ChecklistRepository) {
     self.repository = repository
   }
 
   public var body: some View {
-    Form {
-      Picker("Usuário", selection: $selectedUserId) {
-        Text("Selecione").tag(Optional<Int64>.none)
+    List {
+      Section("Usuários") {
         ForEach(users, id: \.id) { user in
-          Text(user.name).tag(Optional(user.id))
-        }
-      }
-      .onChange(of: selectedUserId) { newValue in
-        if let user = users.first(where: { $0.id == newValue }) {
-          permissions = user.featurePermissions
-        }
-      }
-      PermissionTogglesSection(permissions: $permissions)
-      Section {
-        Button("Salvar permissões") {
-          if let selectedUserId {
-            try? repository.updateUserPermissions(userId: selectedUserId, permissions: permissions)
-            users = (try? repository.allUsers()) ?? []
+          Button {
+            editSheet = PermissionEditSheet(user: user)
+          } label: {
+            HStack {
+              Text(user.name)
+              Spacer()
+              Text(user.permissionLevel.rawValue)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
           }
+          .buttonStyle(.plain)
         }
       }
     }
+    .themedListStyle()
     .navigationTitle("Permissões")
     .task { users = (try? repository.allUsers()) ?? [] }
+    .sheet(item: $editSheet) { sheet in
+      PermissionEditorSheet(
+        user: sheet.user,
+        repository: repository,
+        onSaved: {
+          users = (try? repository.allUsers()) ?? []
+          editSheet = nil
+        },
+        onCancel: { editSheet = nil }
+      )
+    }
+  }
+}
+
+private struct PermissionEditSheet: Identifiable {
+  let user: User
+  var id: Int64 { user.id }
+}
+
+private struct PermissionEditorSheet: View {
+  let user: User
+  let repository: ChecklistRepository
+  let onSaved: () -> Void
+  let onCancel: () -> Void
+
+  @State private var permissions: FeaturePermissions
+
+  init(
+    user: User,
+    repository: ChecklistRepository,
+    onSaved: @escaping () -> Void,
+    onCancel: @escaping () -> Void
+  ) {
+    self.user = user
+    self.repository = repository
+    self.onSaved = onSaved
+    self.onCancel = onCancel
+    _permissions = State(initialValue: user.featurePermissions)
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          Text(user.name).font(.headline)
+          Text(user.email).font(.caption).foregroundStyle(.secondary)
+        }
+        PermissionTogglesSection(permissions: $permissions)
+        Section {
+          Button("Salvar permissões") {
+            try? repository.updateUserPermissions(userId: user.id, permissions: permissions)
+            onSaved()
+          }
+          .buttonStyle(PrimaryButtonStyle())
+        }
+      }
+      .themedFormStyle()
+      .navigationTitle("Editar permissões")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancelar", action: onCancel)
+        }
+      }
+    }
   }
 }
 

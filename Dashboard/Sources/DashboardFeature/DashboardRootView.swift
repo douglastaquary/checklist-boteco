@@ -1,6 +1,7 @@
 import SwiftUI
 import Models
 import Persistence
+import DesignSystem
 
 public struct DashboardRootView: View {
   private let repository: ChecklistRepository
@@ -20,6 +21,7 @@ public struct DashboardRootView: View {
         LabeledContent(area.displayName, value: "\(count)")
       }
     }
+    .themedListStyle()
     .navigationTitle("Dashboard")
     .task {
       activities = (try? repository.allActivities()) ?? []

@@ -42,6 +42,7 @@ public struct ChecklistRootView: View {
           cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
         }
       }
+      .themedListStyle()
     }
     .navigationTitle("Checklist")
     .toolbar {

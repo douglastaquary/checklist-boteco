@@ -32,6 +32,7 @@ public struct WorkClockRootView: View {
   private let repository: ChecklistRepository
   private let syncController: SyncController
   private let deviceId: String
+  private let onShowDayEntries: (() -> Void)?
 
   @StateObject private var tracker = LocationTracker()
   @State private var entries: [WorkClockEntry] = []
@@ -43,7 +44,8 @@ public struct WorkClockRootView: View {
     remoteUserId: String?,
     repository: ChecklistRepository,
     syncController: SyncController,
-    deviceId: String
+    deviceId: String,
+    onShowDayEntries: (() -> Void)? = nil
   ) {
     self.userId = userId
     self.authToken = authToken
@@ -51,6 +53,7 @@ public struct WorkClockRootView: View {
     self.repository = repository
     self.syncController = syncController
     self.deviceId = deviceId
+    self.onShowDayEntries = onShowDayEntries
   }
 
   public var body: some View {
@@ -71,6 +74,11 @@ public struct WorkClockRootView: View {
           Text(feedback).foregroundStyle(.orange)
         }
       }
+      if let onShowDayEntries, !entries.isEmpty {
+        Section {
+          Button("Ver marcações do dia", action: onShowDayEntries)
+        }
+      }
       Section {
         Button("Registrar \(nextType.displayName)") {
           Task { await register(type: nextType, distance: distance ?? 999) }
@@ -79,6 +87,7 @@ public struct WorkClockRootView: View {
         .disabled(!canRegister)
       }
     }
+    .themedFormStyle()
     .navigationTitle("Ponto")
     .onAppear { tracker.start() }
     .task { await reload() }
@@ -97,12 +106,14 @@ public struct WorkClockRootView: View {
     return accuracy <= 20 && distance <= WorksiteLocation.allowedRadiusMeters
   }
 
+  @MainActor
   private func reload() async {
     let start = Date.startOfDayMillis
     let end = start + 24 * 60 * 60 * 1000
     entries = (try? repository.workClockEntries(userId: userId, dayStart: start, dayEnd: end)) ?? []
   }
 
+  @MainActor
   private func register(type: WorkClockType, distance: Double) async {
     guard let location = tracker.location,
           let token = authToken,

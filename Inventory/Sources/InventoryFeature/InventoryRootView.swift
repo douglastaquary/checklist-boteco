@@ -74,6 +74,7 @@ public struct InventoryRootView: View {
       }
     }
     .navigationTitle("Contagem")
+    .themedListStyle()
     .task { reload() }
   }
 

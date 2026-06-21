@@ -101,6 +101,7 @@ public struct LoginView: View {
           Button("Novo usuário", action: onRegisterTap)
         }
       }
+      .themedFormStyle()
       .navigationTitle("Checklist Boteco")
       .task { await restoreSavedLogin(autoUnlock: true) }
       .onChange(of: phase) { newPhase in
