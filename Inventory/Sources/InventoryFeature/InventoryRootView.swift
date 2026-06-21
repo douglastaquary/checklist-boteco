@@ -4,6 +4,25 @@ import Persistence
 import Network
 import DesignSystem
 
+private enum InventoryDraftSheet: Identifiable {
+  case create
+  case edit(InventoryCountDraft)
+
+  var id: String {
+    switch self {
+    case .create: return "create"
+    case .edit(let draft): return "edit-\(draft.id)"
+    }
+  }
+
+  var formMode: InventoryDraftFormMode {
+    switch self {
+    case .create: return .create
+    case .edit(let draft): return .edit(draft)
+    }
+  }
+}
+
 public struct InventoryRootView: View {
   private let repository: ChecklistRepository
   private let inventoryClient: InventoryClient?
@@ -16,8 +35,7 @@ public struct InventoryRootView: View {
   @State private var drafts: [InventoryCountDraft] = []
   @State private var administrativeMode = false
   @State private var banner: InventoryBanner?
-  @State private var name = ""
-  @State private var quantity = ""
+  @State private var draftSheet: InventoryDraftSheet?
   @State private var audit: InventoryDailyAudit?
   @State private var loadingAudit = false
 
@@ -71,9 +89,20 @@ public struct InventoryRootView: View {
         }
       }
       if canCreate {
-        InventoryAddItemSection(name: $name, quantity: $quantity, onAdd: addDraft)
+        Section {
+          Button("Adicionar produto") {
+            draftSheet = .create
+          }
+          .themedListRowBackground()
+        } header: {
+          themedSectionHeader("Contagem")
+        }
       }
-      InventoryDraftSection(drafts: drafts, onDelete: deleteDrafts)
+      InventoryDraftSection(
+        drafts: drafts,
+        onEdit: { draftSheet = .edit($0) },
+        onDelete: deleteDrafts
+      )
       if canCreate {
         Section {
           Button("Enviar contagem") {
@@ -103,33 +132,34 @@ public struct InventoryRootView: View {
     .navigationTitle("Contagem")
     .themedListStyle()
     .task { reload() }
+    .sheet(item: $draftSheet) { sheet in
+      InventoryDraftFormSheet(
+        mode: sheet.formMode,
+        showCostField: canManageAdministrativeStock,
+        onSave: { saveDraft($0, isEdit: sheet.formMode != .create) },
+        onCancel: { draftSheet = nil }
+      )
+      .environmentObject(AppTheme.shared)
+    }
   }
 
   private func reload() {
     drafts = (try? repository.inventoryDrafts(administrative: administrativeMode)) ?? []
   }
 
-  private func addDraft() {
-    guard let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) else { return }
-    let draft = InventoryCountDraft(
-      name: name,
-      quantity: qty,
-      category: .naoAlcoolico,
-      volume: 350,
-      volumeUnit: "ML",
-      salePriceInCents: 0,
-      storageCondition: .gelado
-    )
-    let errors = InventoryCountValidator.validate(draft)
-    guard errors.isEmpty else {
-      banner = .validation(errors.joined(separator: "\n"))
-      return
+  private func saveDraft(_ draft: InventoryCountDraft, isEdit: Bool) {
+    do {
+      if isEdit {
+        try repository.updateInventoryDraft(draft)
+      } else {
+        try repository.addInventoryDraft(draft, administrative: administrativeMode)
+      }
+      banner = nil
+      draftSheet = nil
+      reload()
+    } catch {
+      banner = .validation(error.localizedDescription)
     }
-    try? repository.addInventoryDraft(draft, administrative: administrativeMode)
-    name = ""
-    quantity = ""
-    banner = nil
-    reload()
   }
 
   private func deleteDrafts(at offsets: IndexSet) {
@@ -230,32 +260,37 @@ private enum InventoryDate {
   }
 }
 
-private struct InventoryAddItemSection: View {
-  @Binding var name: String
-  @Binding var quantity: String
-  let onAdd: () -> Void
-
-  var body: some View {
-    Section {
-      TextField("Produto", text: $name)
-      TextField("Quantidade", text: $quantity).keyboardType(.decimalPad)
-      Button("Incluir no rascunho", action: onAdd)
-    } header: {
-      themedSectionHeader("Adicionar item")
-    }
-  }
-}
-
 private struct InventoryDraftSection: View {
   let drafts: [InventoryCountDraft]
+  let onEdit: (InventoryCountDraft) -> Void
   let onDelete: (IndexSet) -> Void
 
   var body: some View {
     Section {
-      ForEach(drafts) { draft in
-        Text("\(draft.name) — \(draft.quantity, format: .number)")
+      if drafts.isEmpty {
+        Text("Nenhum item no rascunho.")
+          .font(.footnote)
+          .foregroundColor(.secondary)
+          .themedListRowBackground()
+      } else {
+        ForEach(drafts) { draft in
+          Button {
+            onEdit(draft)
+          } label: {
+            VStack(alignment: .leading, spacing: 4) {
+              Text(draft.name)
+                .font(.headline)
+                .foregroundColor(.primary)
+              Text(InventoryDraftFormatting.summary(for: draft))
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+          }
+          .buttonStyle(.plain)
+          .themedListRowBackground()
+        }
+        .onDelete(perform: onDelete)
       }
-      .onDelete(perform: onDelete)
     } header: {
       themedSectionHeader("Rascunho")
     }
