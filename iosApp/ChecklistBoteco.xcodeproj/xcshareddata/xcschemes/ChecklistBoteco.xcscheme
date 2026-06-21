@@ -4,7 +4,7 @@
     <BuildActionEntries>
       <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES"
         buildForArchiving="YES" buildForAnalyzing="YES">
-        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="E12CE992D8C448D3B868B6EB"
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A1B1610E2C20460491C8108D"
           BuildableName="ChecklistBoteco.app" BlueprintName="ChecklistBoteco"
           ReferencedContainer="container:ChecklistBoteco.xcodeproj"/>
       </BuildActionEntry>
@@ -15,7 +15,7 @@
     useCustomWorkingDirectory="NO" debugDocumentVersioning="YES" debugServiceExtension="internal"
     allowLocationSimulation="YES">
     <BuildableProductRunnable runnableDebuggingMode="0">
-      <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="E12CE992D8C448D3B868B6EB"
+      <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A1B1610E2C20460491C8108D"
         BuildableName="ChecklistBoteco.app" BlueprintName="ChecklistBoteco"
         ReferencedContainer="container:ChecklistBoteco.xcodeproj"/>
     </BuildableProductRunnable>

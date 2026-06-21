@@ -1,0 +1,202 @@
+import Foundation
+
+public struct SyncSession: Codable, Equatable, Sendable {
+  public let authToken: String
+  public let remoteUserId: String
+
+  public init(authToken: String, remoteUserId: String) {
+    self.authToken = authToken
+    self.remoteUserId = remoteUserId
+  }
+}
+
+public enum SyncEntityType: String, Codable, Sendable {
+  case activity = "ACTIVITY"
+  case completion = "COMPLETION"
+}
+
+public enum SyncOperationType: String, Codable, Sendable {
+  case activityUpsert = "ACTIVITY_UPSERT"
+  case activityDelete = "ACTIVITY_DELETE"
+  case completionCreate = "COMPLETION_CREATE"
+}
+
+public enum SyncAckStatus: String, Codable, Sendable {
+  case applied = "APPLIED"
+  case alreadyApplied = "ALREADY_APPLIED"
+  case conflict = "CONFLICT"
+  case rejected = "REJECTED"
+}
+
+public struct PendingSyncOperation: Codable, Equatable, Sendable, Identifiable {
+  public var id: String { operationId }
+  public let operationId: String
+  public let entityType: SyncEntityType
+  public let entitySyncId: String
+  public let operationType: SyncOperationType
+  public let payload: String
+  public let createdAt: Int64
+  public let attemptCount: Int64
+  public let nextAttemptAt: Int64
+  public let lastError: String?
+  public let status: String
+
+  public init(
+    operationId: String,
+    entityType: SyncEntityType,
+    entitySyncId: String,
+    operationType: SyncOperationType,
+    payload: String,
+    createdAt: Int64,
+    attemptCount: Int64,
+    nextAttemptAt: Int64,
+    lastError: String? = nil,
+    status: String = "PENDING"
+  ) {
+    self.operationId = operationId
+    self.entityType = entityType
+    self.entitySyncId = entitySyncId
+    self.operationType = operationType
+    self.payload = payload
+    self.createdAt = createdAt
+    self.attemptCount = attemptCount
+    self.nextAttemptAt = nextAttemptAt
+    self.lastError = lastError
+    self.status = status
+  }
+}
+
+public struct RemoteActivityRecord: Codable, Equatable, Sendable {
+  public let syncId: String
+  public let name: String
+  public let area: String
+  public let frequency: String
+  public let effort: Int
+  public let serverRevision: Int64
+  public let updatedAt: Int64
+}
+
+public struct RemoteCompletionRecord: Codable, Equatable, Sendable {
+  public let syncId: String
+  public let activitySyncId: String
+  public let userId: String
+  public let completedAt: Int64
+  public let imagePath: String?
+  public let isLate: Bool
+  public let serverRevision: Int64
+  public let updatedAt: Int64
+}
+
+public struct RemoteTombstone: Codable, Equatable, Sendable {
+  public let entityType: SyncEntityType
+  public let entityId: String
+  public let revision: Int64
+  public let deletedAt: Int64
+}
+
+public struct SyncAcknowledgement: Codable, Equatable, Sendable {
+  public let operationId: String
+  public let status: SyncAckStatus
+  public let serverRevision: Int64
+  public let conflict: RemoteActivityRecord?
+  public let message: String?
+
+  public init(
+    operationId: String,
+    status: SyncAckStatus,
+    serverRevision: Int64 = 0,
+    conflict: RemoteActivityRecord? = nil,
+    message: String? = nil
+  ) {
+    self.operationId = operationId
+    self.status = status
+    self.serverRevision = serverRevision
+    self.conflict = conflict
+    self.message = message
+  }
+}
+
+public struct SyncPushResponse: Codable, Sendable {
+  public let serverTime: Int64
+  public let cursor: String
+  public let acknowledgements: [SyncAcknowledgement]
+}
+
+public struct SyncPullResponse: Codable, Sendable {
+  public let nextCursor: String
+  public let hasMore: Bool
+  public let activities: [RemoteActivityRecord]
+  public let completions: [RemoteCompletionRecord]
+  public let tombstones: [RemoteTombstone]
+
+  public init(
+    nextCursor: String,
+    hasMore: Bool,
+    activities: [RemoteActivityRecord] = [],
+    completions: [RemoteCompletionRecord] = [],
+    tombstones: [RemoteTombstone] = []
+  ) {
+    self.nextCursor = nextCursor
+    self.hasMore = hasMore
+    self.activities = activities
+    self.completions = completions
+    self.tombstones = tombstones
+  }
+}
+
+public struct RemoteLoginResult: Sendable {
+  public let token: String?
+  public let user: User?
+  public let remoteUserId: String?
+  public let requiresTwoFactor: Bool
+  public let challengeId: String?
+  public let deliveryHint: String?
+  public let developmentCode: String?
+
+  public init(
+    token: String? = nil,
+    user: User? = nil,
+    remoteUserId: String? = nil,
+    requiresTwoFactor: Bool = false,
+    challengeId: String? = nil,
+    deliveryHint: String? = nil,
+    developmentCode: String? = nil
+  ) {
+    self.token = token
+    self.user = user
+    self.remoteUserId = remoteUserId
+    self.requiresTwoFactor = requiresTwoFactor
+    self.challengeId = challengeId
+    self.deliveryHint = deliveryHint
+    self.developmentCode = developmentCode
+  }
+}
+
+public struct UnlockedLoginCredentials: Equatable, Sendable {
+  public let username: String
+  public let password: String
+
+  public init(username: String, password: String) {
+    self.username = username
+    self.password = password
+  }
+}
+
+public struct SavedLoginMetadata: Equatable, Sendable {
+  public let username: String
+  public let password: String
+  public let remember: Bool
+  public let requiresBiometricUnlock: Bool
+
+  public init(
+    username: String = "",
+    password: String = "",
+    remember: Bool = false,
+    requiresBiometricUnlock: Bool = false
+  ) {
+    self.username = username
+    self.password = password
+    self.remember = remember
+    self.requiresBiometricUnlock = requiresBiometricUnlock
+  }
+}

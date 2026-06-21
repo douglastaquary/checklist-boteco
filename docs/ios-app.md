@@ -33,16 +33,16 @@ python3 iosApp/generate_xcodeproj.py
 ```
 
 2. Abra `iosApp/ChecklistBoteco.xcodeproj`.
-3. O Xcode resolve **um** package local: `Packages/` (branch `main`, repositório git em [`Packages/`](../Packages/)).
+3. O Xcode resolve **um** package local: `Packages/` (pasta do monorepo, no mesmo repositório que `iosApp/`).
 4. Selecione simulador iPhone e **Run** (⌘R).
 
 ### Adicionar manualmente (se necessário)
 
 1. **File → Add Package Dependencies... → Add Local...**
-2. Selecione a pasta **`Packages`** (não subpastas individuais)
+2. Selecione a pasta **`Packages`** na raiz do repositório (não subpastas individuais)
 3. Vincule os produtos ao target **ChecklistBoteco**
 
-> Após editar código em `Packages/`, commitar **dentro de `Packages/`** para o Xcode resolver as mudanças.
+> Após editar código em `Packages/`, commitar **no repositório principal** (mesmo fluxo do backend/composeApp).
 
 ## Estrutura de pacotes (umbrella)
 
@@ -100,11 +100,11 @@ xcodebuild -project iosApp/ChecklistBoteco.xcodeproj -scheme ChecklistBoteco \
 
 ### `No such module 'Models'`
 
-Verifique se o package local `Packages` está vinculado ao target **ChecklistBoteco** e se existe commit na branch `main` dentro de `Packages/`.
+Verifique se o package local `Packages` está vinculado ao target **ChecklistBoteco** e se a pasta existe na raiz do repositório.
 
 ### Package não atualiza após editar código
 
-Commit em `Packages/` ou **File → Packages → Reset Package Caches** no Xcode.
+**File → Packages → Reset Package Caches** no Xcode.
 
 ## Funcionalidades (paridade Android)
 
