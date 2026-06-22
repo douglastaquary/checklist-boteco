@@ -17,6 +17,16 @@ data class User(
         return permissionLevel == PermissionLevel.ADMIN || area in allowedAreas
     }
 
+    /** Áreas do checklist derivadas do setor (admin vê todas). */
+    val checklistAccessibleAreas: List<Area>
+        get() = if (permissionLevel == PermissionLevel.ADMIN) {
+            Area.entries.toList()
+        } else {
+            workSector.checklistAreas
+        }
+
+    fun canAccessChecklistArea(area: Area): Boolean = area in checklistAccessibleAreas
+
     fun canRegisterUsers(): Boolean {
         return permissionLevel == PermissionLevel.ADMIN || featurePermissions.canRegisterUsers
     }

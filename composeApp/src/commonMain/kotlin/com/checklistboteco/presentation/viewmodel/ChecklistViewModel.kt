@@ -25,7 +25,7 @@ class ChecklistViewModel(
     private val currentUser: User?,
     private val scope: CoroutineScope
 ) {
-    private val initialArea = currentUser?.allowedAreas?.firstOrNull() ?: Area.ATENDIMENTO
+    private val initialArea = currentUser?.checklistAccessibleAreas?.firstOrNull() ?: Area.ATENDIMENTO
     private val _uiState = MutableStateFlow(
         ChecklistUiState(
             selectedArea = initialArea,
@@ -47,7 +47,7 @@ class ChecklistViewModel(
     }
 
     fun selectArea(area: Area) {
-        if (currentUser?.canAccessArea(area) != true) return
+        if (currentUser?.canAccessChecklistArea(area) != true) return
         _uiState.update { it.copy(selectedArea = area) }
         scope.launch {
             repository.getActivitiesWithCompletion(area).collect { activities ->

@@ -235,7 +235,8 @@ private data class PublicUserDto(
             allowedAreas = if (level == PermissionLevel.ADMIN) {
                 Area.entries.toList()
             } else {
-                allowedAreas.map { Area.fromString(it) }
+                val parsed = allowedAreas.map { Area.fromString(it) }
+                if (parsed.isEmpty()) listOf(WorkSector.fromString(workSector).activityArea) else parsed
             },
             createdAt = createdAt,
             featurePermissions = permissions.toDomain()

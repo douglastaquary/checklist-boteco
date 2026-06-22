@@ -27,7 +27,7 @@ fun ChecklistScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
-    val accessibleAreas = Area.entries.filter { user.canAccessArea(it) }
+    val accessibleAreas = user.checklistAccessibleAreas
 
     CameraCaptureTrigger(
         trigger = state.showCameraForActivity != null,
@@ -53,19 +53,28 @@ fun ChecklistScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                accessibleAreas.forEach { area ->
-                    FilterChip(
-                        selected = state.selectedArea == area,
-                        onClick = { viewModel.selectArea(area) },
-                        label = { Text(area.displayName) }
-                    )
+            if (accessibleAreas.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    accessibleAreas.forEach { area ->
+                        FilterChip(
+                            selected = state.selectedArea == area,
+                            onClick = { viewModel.selectArea(area) },
+                            label = { Text(area.displayName) }
+                        )
+                    }
                 }
+            } else if (accessibleAreas.size == 1) {
+                Text(
+                    text = accessibleAreas.first().displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
             }
 
             LazyColumn(
