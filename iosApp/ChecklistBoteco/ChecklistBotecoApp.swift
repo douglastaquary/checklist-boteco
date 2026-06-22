@@ -6,11 +6,9 @@ import Network
 
 @main
 struct ChecklistBotecoApp: App {
-  @StateObject private var launch = AppLaunchState()
-
   var body: some Scene {
     WindowGroup {
-      AppLaunchGate(launch: launch)
+      AppLaunchGate()
     }
   }
 }
@@ -35,7 +33,7 @@ final class AppLaunchState: ObservableObject {
 }
 
 struct AppLaunchGate: View {
-  @ObservedObject var launch: AppLaunchState
+  @StateObject private var launch = AppLaunchState()
 
   var body: some View {
     switch launch.status {
@@ -61,7 +59,7 @@ struct AppLaunchGate: View {
 }
 
 @MainActor
-final class AppDependenciesHolder: ObservableObject {
+final class AppDependenciesHolder {
   let repository: ChecklistRepository
   let session: AppSession
   let syncController: SyncController
@@ -86,7 +84,7 @@ private enum AuthScreen: Equatable {
 }
 
 struct RootView: View {
-  @ObservedObject var holder: AppDependenciesHolder
+  let holder: AppDependenciesHolder
   @ObservedObject private var session: AppSession
   @State private var authScreen: AuthScreen = .login
 

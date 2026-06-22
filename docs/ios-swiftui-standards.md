@@ -57,7 +57,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 | Feedback global | [`overlay.md`](../.cursor/skills/swiftui-ui-patterns/references/overlay.md) | [`DesignSystem.swift`](../Packages/DesignSystem/Sources/DesignSystem/DesignSystem.swift) | Cores de linha via `AppTheme` |
 | Listas / features | [`list.md`](../.cursor/skills/swiftui-ui-patterns/references/list.md) | Inventory, WorkClock, AdminFeatures | Extrair subviews; estados loading/error explícitos |
 | Previews | [`previews.md`](../.cursor/skills/swiftui-ui-patterns/references/previews.md) | [`LoginView+Preview.swift`](../Packages/Auth/Sources/Auth/LoginView+Preview.swift) | `#Preview` / PreviewProvider por feature |
-| Performance | [`performance.md`](../.cursor/skills/swiftui-ui-patterns/references/performance.md) | Várias views com `@ObservedObject session` | Reduzir escopo de re-render |
+| Performance | [`performance.md`](../.cursor/skills/swiftui-ui-patterns/references/performance.md) | Várias views com `@ObservedObject session` | — |
 
 ## Anti-patterns (do skill — aplicar sempre)
 
@@ -125,10 +125,9 @@ Itens **já implementados** (2026-06):
 - `AppDependencyGraph`: `session` injetado sem `@ObservedObject` no modifier (menos re-render global)
 - `RootView`: observa `session` localmente; `MainTabContext` sem referência a `AppSession`
 - Inventário: criar/editar rascunho via `.sheet(item:)` — [`InventoryDraftFormSheet.swift`](../Packages/Inventory/Sources/InventoryFeature/InventoryDraftFormSheet.swift), `updateInventoryDraft` no repositório
+- Performance shell: `AppDependenciesHolder` e `SyncController` sem `ObservableObject` desnecessário; `RootView` observa só `AppSession`; sync lifecycle via `let` no `AppDependencyGraphModifier`
 
-**Próximos PRs:**
-
-1. **Performance**: revisar `@ObservedObject` em `AppDependenciesHolder` / sync lifecycle.
+**Backlog fase 2 (iOS UI): concluído** — próximas melhorias entram como demanda de produto ou subida de deployment target (iOS 17+).
 
 ## Precedência em caso de conflito
 

@@ -14,7 +14,7 @@ extension View {
 
 private struct AppDependencyGraphModifier: ViewModifier {
   let session: AppSession
-  @ObservedObject var syncController: SyncController
+  let syncController: SyncController
 
   func body(content: Content) -> some View {
     content

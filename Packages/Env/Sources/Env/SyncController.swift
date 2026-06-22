@@ -1,8 +1,7 @@
 import Foundation
-import Combine
 
 @MainActor
-public final class SyncController: ObservableObject {
+public final class SyncController: Sendable {
   private let engine: SyncEngine
 
   public init(engine: SyncEngine) {
