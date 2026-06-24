@@ -23,7 +23,7 @@ struct MainTabView_Previews: PreviewProvider {
   }
 
   private static var previewSyncController: SyncController {
-    SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil))
+    SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil, deviceId: "preview-device"))
   }
 
   private static var previewContext: MainTabContext {

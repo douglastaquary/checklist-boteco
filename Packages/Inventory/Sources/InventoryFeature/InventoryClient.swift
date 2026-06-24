@@ -113,7 +113,7 @@ public final class InventoryClient: Sendable {
     let body = Request(
       countDate: date,
       countedAt: ISO8601DateFormatter().string(from: Date()),
-      location: "Beco da Praia",
+      location: WorksiteLocation.name,
       items: items.map {
         Request.Item(
           name: $0.name,
@@ -139,7 +139,7 @@ public final class InventoryClient: Sendable {
       path: "/api/inventory/audit/daily",
       method: "POST",
       token: token,
-      body: Request(date: date, location: "Beco da Praia")
+      body: Request(date: date, location: WorksiteLocation.name)
     )
   }
 
@@ -152,7 +152,30 @@ public final class InventoryClient: Sendable {
       path: "/api/inventory/audit/daily/apply",
       method: "POST",
       token: token,
-      body: Request(date: date, location: "Beco da Praia")
+      body: Request(date: date, location: WorksiteLocation.name)
     )
   }
+
+  public func listCounts(token: String) async throws -> [InventoryCountSession] {
+    try await api.request(path: "/api/inventory/counts", token: token)
+  }
+
+  public func listAdminStockBalances(token: String) async throws -> [InventoryAdminStockBalance] {
+    try await api.request(path: "/api/inventory/admin-stock/balances", token: token)
+  }
+}
+
+public struct InventoryCountSession: Decodable, Sendable, Identifiable {
+  public let id: String
+  public let countDate: String
+  public let countedAt: String
+  public let location: String
+}
+
+public struct InventoryAdminStockBalance: Decodable, Sendable, Identifiable {
+  public var id: String { productKey }
+  public let productKey: String
+  public let productName: String
+  public let location: String
+  public let quantity: Double
 }

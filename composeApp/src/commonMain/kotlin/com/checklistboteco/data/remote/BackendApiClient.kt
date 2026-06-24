@@ -6,10 +6,12 @@ import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorkSector
+import com.checklistboteco.domain.model.WorksiteInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -69,6 +71,81 @@ class BackendApiClient private constructor(
             user = user.toDomain(),
             remoteUserId = user.id
         )
+    }
+
+    suspend fun listUsers(token: String): List<User> {
+        return httpClient.get("$baseUrl/api/users") {
+            bearerAuth(token)
+        }.body<List<PublicUserDto>>().map { it.toDomain().copy(remoteId = it.id) }
+    }
+
+    suspend fun createUser(
+        token: String,
+        name: String,
+        email: String,
+        password: String,
+        workSector: WorkSector,
+        permissionLevel: PermissionLevel = PermissionLevel.USER,
+        permissions: FeaturePermissions = FeaturePermissions()
+    ): User {
+        val created = httpClient.post("$baseUrl/api/users") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                CreateUserRequestDto(
+                    name = name,
+                    email = email,
+                    password = password,
+                    workSector = workSector.name,
+                    permissionLevel = permissionLevel.name,
+                    permissions = FeaturePermissionsDto.fromDomain(permissions)
+                )
+            )
+        }.body<PublicUserDto>()
+        return created.toDomain().copy(remoteId = created.id)
+    }
+
+    suspend fun updateUserPermissions(
+        token: String,
+        userId: String,
+        permissions: FeaturePermissions
+    ): User {
+        val updated = httpClient.patch("$baseUrl/api/users/$userId/permissions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(PermissionUpdateRequestDto(FeaturePermissionsDto.fromDomain(permissions)))
+        }.body<PublicUserDto>()
+        return updated.toDomain().copy(remoteId = updated.id)
+    }
+
+    suspend fun fetchWorksite(token: String): WorksiteInfo {
+        val dto = httpClient.get("$baseUrl/api/work-clock/worksite") {
+            bearerAuth(token)
+        }.body<WorksiteInfoDto>()
+        return WorksiteInfo(
+            name = dto.name,
+            latitude = dto.latitude,
+            longitude = dto.longitude,
+            radiusMeters = dto.radiusMeters
+        )
+    }
+
+    suspend fun fetchDashboardStats(token: String): DashboardStatsDto {
+        return httpClient.get("$baseUrl/api/admin/dashboard") {
+            bearerAuth(token)
+        }.body()
+    }
+
+    suspend fun listInventoryCounts(token: String): List<InventoryCountSessionDto> {
+        return httpClient.get("$baseUrl/api/inventory/counts") {
+            bearerAuth(token)
+        }.body()
+    }
+
+    suspend fun listAdminStockBalances(token: String): List<RemoteAdminStockBalance> {
+        return httpClient.get("$baseUrl/api/inventory/admin-stock/balances") {
+            bearerAuth(token)
+        }.body()
     }
 
     suspend fun health(): Boolean {
@@ -263,7 +340,60 @@ private data class FeaturePermissionsDto(
             canManageAdministrativeStock = canManageAdministrativeStock
         )
     }
+
+    companion object {
+        fun fromDomain(permissions: FeaturePermissions): FeaturePermissionsDto {
+            return FeaturePermissionsDto(
+                canRegisterUsers = permissions.canRegisterUsers,
+                canCreateActivities = permissions.canCreateActivities,
+                canEditUsers = permissions.canEditUsers,
+                canCreateInventoryCounts = permissions.canCreateInventoryCounts,
+                canViewInventoryInsights = permissions.canViewInventoryInsights,
+                canManageAdministrativeStock = permissions.canManageAdministrativeStock
+            )
+        }
+    }
 }
+
+@Serializable
+private data class CreateUserRequestDto(
+    val name: String,
+    val email: String,
+    val password: String,
+    val workSector: String,
+    val permissionLevel: String,
+    val permissions: FeaturePermissionsDto
+)
+
+@Serializable
+private data class PermissionUpdateRequestDto(
+    val permissions: FeaturePermissionsDto
+)
+
+@Serializable
+private data class WorksiteInfoDto(
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double,
+    val name: String
+)
+
+@Serializable
+data class DashboardStatsDto(
+    val totalUsers: Int = 0,
+    val totalActivities: Int = 0,
+    val totalCompletions: Int = 0,
+    val pendingSyncItems: Int = 0,
+    val activitiesByArea: Map<String, Int> = emptyMap()
+)
+
+@Serializable
+data class InventoryCountSessionDto(
+    val id: String,
+    val countDate: String,
+    val countedAt: String,
+    val location: String
+)
 
 @Serializable private data class InventoryCountRequestDto(val countDate:String,val countedAt:String,val location:String="Beco da Praia",val items:List<InventoryCountItemDto>)
 @Serializable private data class InventoryCountItemDto(val name:String,val quantity:Double,val category:String,val volume:Double,val volumeUnit:String,val salePriceInCents:Long,val costPriceInCents:Long?,val condition:String)

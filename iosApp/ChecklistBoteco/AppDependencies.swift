@@ -12,7 +12,10 @@ public final class AppDependencies {
   public let syncController: SyncController
   public let apiClient: APIClient?
   public let authClient: AuthClient?
+  public let userClient: UserClient?
   public let syncClient: SyncClient?
+  public let workClockClient: WorkClockClient?
+  public let dashboardClient: DashboardClient?
   public let inventoryClient: InventoryClient?
   public let deviceId: String
 
@@ -20,16 +23,32 @@ public final class AppDependencies {
     let db = try AppDatabase.open()
     let repository = ChecklistRepository(dbQueue: db)
     let apiConfiguration = APIConfiguration.fromBundle()
-    try repository.seedInitialDataIfNeeded()
+    if apiConfiguration == nil {
+      try repository.seedInitialDataIfNeeded()
+    } else {
+      try repository.purgeLocalSeedArtifactsIfNeeded()
+    }
 
     let apiClient = apiConfiguration.map { APIClient(config: $0) }
     let authClient = apiClient.map(AuthClient.init)
+    let userClient = apiClient.map(UserClient.init)
     let syncClient = apiClient.map(SyncClient.init)
+    let workClockClient = apiClient.map(WorkClockClient.init)
+    let dashboardClient = apiClient.map(DashboardClient.init)
     let inventoryClient = apiClient.map(InventoryClient.init)
     let deviceId = DeviceIdentity.current
-    let session = AppSession(repository: repository, authClient: authClient, deviceId: deviceId)
-    let engine = SyncEngine(repository: repository, syncClient: syncClient)
+    let session = AppSession(
+      repository: repository,
+      authClient: authClient,
+      workClockClient: workClockClient,
+      deviceId: deviceId
+    )
+    let engine = SyncEngine(repository: repository, syncClient: syncClient, deviceId: deviceId)
     let syncController = SyncController(engine: engine)
+
+    session.onRemoteLoginCompleted = {
+      await syncController.syncOnce()
+    }
 
     repository.bindSyncHandler {
       Task { @MainActor in syncController.requestSync() }
@@ -40,7 +59,10 @@ public final class AppDependencies {
     self.syncController = syncController
     self.apiClient = apiClient
     self.authClient = authClient
+    self.userClient = userClient
     self.syncClient = syncClient
+    self.workClockClient = workClockClient
+    self.dashboardClient = dashboardClient
     self.inventoryClient = inventoryClient
     self.deviceId = deviceId
   }

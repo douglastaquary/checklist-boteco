@@ -53,10 +53,41 @@ data class WorkClockSummary(
 )
 
 object WorksiteLocation {
-    const val name = "Beco da Praia"
+    private var cached: WorksiteInfo? = null
+
+    val defaultInfo = WorksiteInfo(
+        name = "Beco da Praia",
+        latitude = -23.85491,
+        longitude = -46.13872,
+        radiusMeters = 5.0
+    )
+
+    fun applyCached(info: WorksiteInfo) {
+        cached = info
+    }
+
+    val current: WorksiteInfo
+        get() = cached ?: defaultInfo
+
+    val name: String
+        get() = current.name
+
     const val address = "Av. Vicente de Carvalho, 761 Centro - Bertioga"
-    const val allowedRadiusMeters = 5.0
-    val point = GeoPoint(latitude = -23.85491, longitude = -46.13872)
+
+    val allowedRadiusMeters: Double
+        get() = current.radiusMeters
+
+    val point: GeoPoint
+        get() = current.point
+}
+
+data class WorksiteInfo(
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double
+) {
+    val point = GeoPoint(latitude = latitude, longitude = longitude)
 }
 
 object WorkClockCalculator {

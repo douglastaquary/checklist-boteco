@@ -218,6 +218,8 @@ private enum Field: Hashable {
 public struct RegisterUserView: View {
   @Environment(\.dismiss) private var dismiss
   private let repository: ChecklistRepository
+  private let userClient: UserClient?
+  private let authToken: String?
 
   @State private var firstName = ""
   @State private var lastName = ""
@@ -226,8 +228,14 @@ public struct RegisterUserView: View {
   @State private var confirmPassword = ""
   @State private var message: String?
 
-  public init(repository: ChecklistRepository) {
+  public init(
+    repository: ChecklistRepository,
+    userClient: UserClient? = nil,
+    authToken: String? = nil
+  ) {
     self.repository = repository
+    self.userClient = userClient
+    self.authToken = authToken
   }
 
   public var body: some View {
@@ -241,28 +249,7 @@ public struct RegisterUserView: View {
         Text(message).foregroundStyle(message.contains("sucesso") ? .green : .red)
       }
       Button("Cadastrar") {
-        do {
-          guard password == confirmPassword else {
-            message = "Senhas não conferem"
-            return
-          }
-          let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-          _ = try repository.insertUser(
-            User(
-              id: 0,
-              name: fullName,
-              email: email,
-              password: password,
-              area: .atendimento,
-              permissionLevel: .user,
-              allowedAreas: [.atendimento],
-              createdAt: Date.nowMillis
-            )
-          )
-          message = "Cadastro realizado com sucesso"
-        } catch {
-          message = error.localizedDescription
-        }
+        Task { await register() }
       }
     }
     .navigationTitle("Novo usuário")
@@ -270,6 +257,51 @@ public struct RegisterUserView: View {
       ToolbarItem(placement: .cancellationAction) {
         Button("Voltar") { dismiss() }
       }
+    }
+  }
+
+  private func register() async {
+    guard password == confirmPassword else {
+      message = "Senhas não conferem"
+      return
+    }
+    let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+    if let userClient, let authToken, !authToken.isEmpty {
+      do {
+        let remote = try await userClient.createUser(
+          token: authToken,
+          name: fullName,
+          email: email,
+          password: password,
+          workSector: .atendimento
+        )
+        try repository.upsertRemoteUser(remote)
+        message = "Cadastro realizado com sucesso"
+      } catch {
+        message = error.localizedDescription
+      }
+      return
+    }
+    if userClient != nil {
+      message = "Com a API ativa, solicite cadastro ao administrador."
+      return
+    }
+    do {
+      _ = try repository.insertUser(
+        User(
+          id: 0,
+          name: fullName,
+          email: email,
+          password: password,
+          area: .atendimento,
+          permissionLevel: .user,
+          allowedAreas: [.atendimento],
+          createdAt: Date.nowMillis
+        )
+      )
+      message = "Cadastro realizado com sucesso"
+    } catch {
+      message = error.localizedDescription
     }
   }
 }

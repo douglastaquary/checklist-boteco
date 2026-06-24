@@ -2,6 +2,8 @@
 
 Documentação do módulo de contagem e auditoria diária: [docs/inventory-counting-module.md](docs/inventory-counting-module.md).
 
+Sincronização mobile (offline-first + API): [docs/mobile-api-sync.md](docs/mobile-api-sync.md).
+
 Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform**, backend **Quarkus serverless** e administração web em **Qute + JavaScript vanilla**.
 
 ## Direcionamento backend/web (Cursor)
@@ -122,7 +124,7 @@ Assim, os dados importados continuam disponíveis após reiniciar o backend loca
 Para apontar o app Android para o backend, informe a URL da API no build:
 
 ```bash
-./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8080
+./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8181
 ```
 
 `10.0.2.2` aponta o Android Emulator para o backend da máquina. Para AWS, troque pela URL HTTPS exibida no output `ApiUrl` do SAM. O app rejeita HTTP fora dos hosts locais de desenvolvimento.

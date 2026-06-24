@@ -34,6 +34,8 @@ import com.checklistboteco.domain.model.ValidatedUserRegistration
 import com.checklistboteco.domain.model.WorkClockEntry
 import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorkSector
+import com.checklistboteco.domain.model.WorksiteInfo
+import com.checklistboteco.domain.model.WorksiteLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
@@ -525,6 +527,71 @@ class ChecklistRepository(
         }
     }
 
+    fun purgeLocalSeedArtifactsIfNeeded() {
+        if (queries.selectSyncMetadata(METADATA_SEED_PURGED).executeAsOneOrNull() == "1") return
+        queries.transaction {
+            queries.deleteSeedActivities()
+            queries.clearAllActivityCompletions()
+            queries.deleteSeedUsers()
+            queries.clearSyncOutbox()
+            queries.upsertSyncMetadata(METADATA_SEED_PURGED, "1")
+        }
+    }
+
+    fun upsertRemoteUser(remote: User) {
+        val remoteId = remote.remoteId?.takeIf { it.isNotBlank() } ?: return
+        val existing = queries.selectUserByRemoteId(remoteId).executeAsOneOrNull()
+            ?: queries.selectUserByEmail(remote.email).executeAsOneOrNull()
+        if (existing == null) {
+            insertUser(
+                name = remote.name,
+                email = remote.email,
+                password = "",
+                area = remote.area,
+                workSector = remote.workSector,
+                permissionLevel = remote.permissionLevel,
+                allowedAreas = remote.allowedAreas,
+                createdAt = remote.createdAt,
+                remoteId = remoteId,
+                featurePermissions = remote.featurePermissions
+            )
+            return
+        }
+        queries.updateUserFeaturePermissions(
+            remote.featurePermissions.canRegisterUsers.toLongFlag(),
+            remote.featurePermissions.canCreateActivities.toLongFlag(),
+            remote.featurePermissions.canEditUsers.toLongFlag(),
+            remote.featurePermissions.canCreateInventoryCounts.toLongFlag(),
+            remote.featurePermissions.canViewInventoryInsights.toLongFlag(),
+            remote.featurePermissions.canManageAdministrativeStock.toLongFlag(),
+            existing.id
+        )
+        updateUserRemoteId(existing.id, remoteId)
+    }
+
+    fun upsertRemoteUsers(users: List<User>) {
+        users.forEach(::upsertRemoteUser)
+    }
+
+    fun saveWorksite(info: WorksiteInfo) {
+        queries.upsertSyncMetadata(METADATA_WORKSITE_NAME, info.name)
+        queries.upsertSyncMetadata(METADATA_WORKSITE_LATITUDE, info.latitude.toString())
+        queries.upsertSyncMetadata(METADATA_WORKSITE_LONGITUDE, info.longitude.toString())
+        queries.upsertSyncMetadata(METADATA_WORKSITE_RADIUS, info.radiusMeters.toString())
+        WorksiteLocation.applyCached(info)
+    }
+
+    fun loadWorksite(): WorksiteInfo {
+        val name = queries.selectSyncMetadata(METADATA_WORKSITE_NAME).executeAsOneOrNull()
+        val lat = queries.selectSyncMetadata(METADATA_WORKSITE_LATITUDE).executeAsOneOrNull()?.toDoubleOrNull()
+        val lng = queries.selectSyncMetadata(METADATA_WORKSITE_LONGITUDE).executeAsOneOrNull()?.toDoubleOrNull()
+        val radius = queries.selectSyncMetadata(METADATA_WORKSITE_RADIUS).executeAsOneOrNull()?.toDoubleOrNull()
+        if (name != null && lat != null && lng != null && radius != null) {
+            return WorksiteInfo(name, lat, lng, radius).also { WorksiteLocation.applyCached(it) }
+        }
+        return WorksiteLocation.defaultInfo
+    }
+
     fun seedInitialData() {
         if (queries.selectUserByName("admin").executeAsOneOrNull() == null) {
             queries.insertUser(
@@ -776,6 +843,11 @@ private const val DEFAULT_SYNC_BATCH_SIZE = 100
 private const val METADATA_AUTH_TOKEN = "sync.authToken"
 private const val METADATA_REMOTE_USER_ID = "sync.remoteUserId"
 private const val METADATA_SYNC_CURSOR = "sync.cursor"
+private const val METADATA_SEED_PURGED = "seed.purged"
+private const val METADATA_WORKSITE_NAME = "worksite.name"
+private const val METADATA_WORKSITE_LATITUDE = "worksite.latitude"
+private const val METADATA_WORKSITE_LONGITUDE = "worksite.longitude"
+private const val METADATA_WORKSITE_RADIUS = "worksite.radius"
 private const val OUTBOX_PENDING = "PENDING"
 private const val CONFLICT_RETRY_DELAY_MILLIS = 60_000L
 

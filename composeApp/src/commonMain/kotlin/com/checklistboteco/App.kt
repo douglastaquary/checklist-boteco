@@ -70,6 +70,8 @@ fun App(
         LaunchedEffect(backendApiClient) {
             if (backendApiClient == null) {
                 repository.seedInitialData()
+            } else {
+                repository.purgeLocalSeedArtifactsIfNeeded()
             }
         }
 
@@ -142,7 +144,9 @@ fun App(
         var currentScreen by rememberSaveable(stateSaver = screenSaver) { 
             mutableStateOf<Screen>(Screen.Login) 
         }
-        val loginViewModel = remember { LoginViewModel(repository, backendApiClient) }
+        val loginViewModel = remember(repository, backendApiClient, syncCoordinator) {
+            LoginViewModel(repository, backendApiClient, syncCoordinator)
+        }
 
         when (val s = currentScreen) {
             is Screen.Login -> {

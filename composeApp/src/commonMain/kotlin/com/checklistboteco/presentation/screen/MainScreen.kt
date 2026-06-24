@@ -128,7 +128,15 @@ fun MainScreen(
                     )
                 }
                 is Tab.Permissions -> {
-                    val viewModel = remember(user) { PermissionManagementViewModel(repository, user, scope) }
+                    val viewModel = remember(user, authToken) {
+                        PermissionManagementViewModel(
+                            repository = repository,
+                            currentUser = user,
+                            backendApiClient = backendApiClient,
+                            authToken = authToken,
+                            scope = scope
+                        )
+                    }
                     PermissionManagementScreen(
                         viewModel = viewModel,
                         onBack = { selectedTabIndex = 0 }

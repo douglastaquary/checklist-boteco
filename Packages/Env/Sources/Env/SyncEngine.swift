@@ -2,14 +2,17 @@ import Foundation
 import Models
 import Network
 import Persistence
+
 public actor SyncEngine {
   private let repository: ChecklistRepository
   private let syncClient: SyncClient?
+  private let deviceId: String
   private var isSyncing = false
 
-  public init(repository: ChecklistRepository, syncClient: SyncClient?) {
+  public init(repository: ChecklistRepository, syncClient: SyncClient?, deviceId: String) {
     self.repository = repository
     self.syncClient = syncClient
+    self.deviceId = deviceId
   }
 
   public func requestSync() {
@@ -28,21 +31,13 @@ public actor SyncEngine {
   private func pushPending(syncClient: SyncClient, session: SyncSession) async {
     while true {
       guard let pending = try? repository.listPendingSyncOperations(), !pending.isEmpty else { return }
-      let envelopes = pending.map { op in
-        SyncOperationEnvelopeDTO(
-          operationId: op.operationId,
-          type: op.operationType,
-          entityId: op.entitySyncId,
-          baseRevision: 0,
-          occurredAt: op.createdAt,
-          payload: [:]
-        )
-      }
+      let envelopes = pending.compactMap(SyncPayloadMapper.envelope)
+      guard !envelopes.isEmpty else { return }
       do {
         let response = try await syncClient.push(
           token: session.authToken,
           batchId: UUID().uuidString,
-          request: SyncPushRequestDTO(deviceId: UUID().uuidString, operations: envelopes)
+          request: SyncPushRequestDTO(deviceId: deviceId, operations: envelopes)
         )
         for ack in response.acknowledgements {
           try? repository.acknowledgeSyncOperation(ack)
@@ -71,18 +66,22 @@ public actor SyncEngine {
   }
 
   private func pullRemote(syncClient: SyncClient, session: SyncSession) async {
-    let cursor = try? repository.getSyncCursor()
-    do {
-      let response = try await syncClient.pull(token: session.authToken, cursor: cursor, limit: 500)
-      try repository.applyRemoteSync(response)
-      try repository.setSyncCursor(response.nextCursor)
-    } catch {
-      if isAuthError(error) {
-        try? repository.clearSyncSession()
+    while true {
+      let cursor = try? repository.getSyncCursor()
+      do {
+        let response = try await syncClient.pull(token: session.authToken, cursor: cursor, limit: 500)
+        try repository.applyRemoteSync(response)
+        try repository.setSyncCursor(response.nextCursor)
+        if !response.hasMore { return }
+      } catch {
+        if isAuthError(error) {
+          try? repository.clearSyncSession()
+          return
+        }
+        await MainActor.run {
+          NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
+        }
         return
-      }
-      await MainActor.run {
-        NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
       }
     }
   }

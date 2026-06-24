@@ -1,5 +1,6 @@
 import SwiftUI
 import Models
+import Network
 import Persistence
 import DesignSystem
 
@@ -32,24 +33,44 @@ public struct DashboardAreaDetailView: View {
 
 public struct DashboardRootView: View {
   private let repository: ChecklistRepository
+  private let dashboardClient: DashboardClient?
+  private let authToken: String?
   private let onSelectArea: ((Area) -> Void)?
 
   @State private var activities: [Activity] = []
+  @State private var remoteStats: DashboardStats?
 
-  public init(repository: ChecklistRepository, onSelectArea: ((Area) -> Void)? = nil) {
+  public init(
+    repository: ChecklistRepository,
+    dashboardClient: DashboardClient? = nil,
+    authToken: String? = nil,
+    onSelectArea: ((Area) -> Void)? = nil
+  ) {
     self.repository = repository
+    self.dashboardClient = dashboardClient
+    self.authToken = authToken
     self.onSelectArea = onSelectArea
   }
 
   public var body: some View {
     List {
+      if let remoteStats {
+        Section("Servidor") {
+          Text("Usuários: \(remoteStats.totalUsers)")
+            .themedListRowBackground()
+          Text("Conclusões: \(remoteStats.totalCompletions)")
+            .themedListRowBackground()
+          Text("Pendências de sync: \(remoteStats.pendingSyncItems)")
+            .themedListRowBackground()
+        }
+      }
       Section("Atividades cadastradas") {
-        Text("\(activities.count) atividades ativas")
+        Text("\(displayedActivityCount) atividades ativas")
           .themedListRowBackground()
       }
       Section("Por área") {
         ForEach(Area.allCases, id: \.self) { area in
-          let count = activities.filter { $0.area == area }.count
+          let count = areaCount(for: area)
           Button {
             onSelectArea?(area)
           } label: {
@@ -68,8 +89,24 @@ public struct DashboardRootView: View {
     }
     .themedListStyle()
     .navigationTitle("Dashboard")
-    .task {
-      activities = (try? repository.allActivities()) ?? []
+    .task { await reload() }
+  }
+
+  private var displayedActivityCount: Int {
+    remoteStats?.totalActivities ?? activities.count
+  }
+
+  private func areaCount(for area: Area) -> Int {
+    if let remoteStats,
+       let remoteCount = remoteStats.activitiesByArea[area.rawValue] {
+      return remoteCount
     }
+    return activities.filter { $0.area == area }.count
+  }
+
+  private func reload() async {
+    activities = (try? repository.allActivities()) ?? []
+    guard let dashboardClient, let authToken, !authToken.isEmpty else { return }
+    remoteStats = try? await dashboardClient.fetchStats(token: authToken)
   }
 }

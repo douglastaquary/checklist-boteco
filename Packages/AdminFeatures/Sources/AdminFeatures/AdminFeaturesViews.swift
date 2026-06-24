@@ -1,5 +1,6 @@
 import SwiftUI
 import Models
+import Network
 import Persistence
 import DesignSystem
 
@@ -154,15 +155,31 @@ private struct ActivityFormSheet: View {
 
 public struct PermissionManagementView: View {
   private let repository: ChecklistRepository
+  private let userClient: UserClient?
+  private let authToken: String?
   @State private var users: [User] = []
   @State private var editSheet: PermissionEditSheet?
+  @State private var loadError: String?
 
-  public init(repository: ChecklistRepository) {
+  public init(
+    repository: ChecklistRepository,
+    userClient: UserClient? = nil,
+    authToken: String? = nil
+  ) {
     self.repository = repository
+    self.userClient = userClient
+    self.authToken = authToken
   }
 
   public var body: some View {
     List {
+      if let loadError {
+        Section {
+          Text(loadError)
+            .foregroundColor(.secondary)
+            .themedListRowBackground()
+        }
+      }
       Section {
         ForEach(users, id: \.id) { user in
           Button {
@@ -185,18 +202,35 @@ public struct PermissionManagementView: View {
     }
     .themedListStyle()
     .navigationTitle("Permissões")
-    .task { users = (try? repository.allUsers()) ?? [] }
+    .task { await reloadUsers() }
     .sheet(item: $editSheet) { sheet in
       PermissionEditorSheet(
         user: sheet.user,
         repository: repository,
+        userClient: userClient,
+        authToken: authToken,
         onSaved: {
-          users = (try? repository.allUsers()) ?? []
+          Task { await reloadUsers() }
           editSheet = nil
         },
         onCancel: { editSheet = nil }
       )
     }
+  }
+
+  private func reloadUsers() async {
+    if let userClient, let authToken, !authToken.isEmpty {
+      do {
+        let remoteUsers = try await userClient.listUsers(token: authToken)
+        try repository.upsertRemoteUsers(remoteUsers)
+        users = (try? repository.allUsers()) ?? []
+        loadError = nil
+        return
+      } catch {
+        loadError = error.localizedDescription
+      }
+    }
+    users = (try? repository.allUsers()) ?? []
   }
 }
 
@@ -208,19 +242,26 @@ private struct PermissionEditSheet: Identifiable {
 private struct PermissionEditorSheet: View {
   let user: User
   let repository: ChecklistRepository
+  let userClient: UserClient?
+  let authToken: String?
   let onSaved: () -> Void
   let onCancel: () -> Void
 
   @State private var permissions: FeaturePermissions
+  @State private var saveError: String?
 
   init(
     user: User,
     repository: ChecklistRepository,
+    userClient: UserClient? = nil,
+    authToken: String? = nil,
     onSaved: @escaping () -> Void,
     onCancel: @escaping () -> Void
   ) {
     self.user = user
     self.repository = repository
+    self.userClient = userClient
+    self.authToken = authToken
     self.onSaved = onSaved
     self.onCancel = onCancel
     _permissions = State(initialValue: user.featurePermissions)
@@ -238,10 +279,15 @@ private struct PermissionEditorSheet: View {
           themedSectionHeader("Usuário")
         }
         PermissionTogglesSection(permissions: $permissions)
+        if let saveError {
+          Section {
+            Text(saveError).foregroundColor(.red)
+              .themedListRowBackground()
+          }
+        }
         Section {
           Button("Salvar permissões") {
-            try? repository.updateUserPermissions(userId: user.id, permissions: permissions)
-            onSaved()
+            Task { await savePermissions() }
           }
           .buttonStyle(PrimaryButtonStyle())
         }
@@ -256,6 +302,31 @@ private struct PermissionEditorSheet: View {
         }
       }
     }
+  }
+
+  private func savePermissions() async {
+    if let userClient,
+       let authToken,
+       !authToken.isEmpty,
+       let remoteId = user.remoteId,
+       !remoteId.isEmpty {
+      do {
+        let updated = try await userClient.updatePermissions(
+          token: authToken,
+          userId: remoteId,
+          permissions: permissions
+        )
+        try repository.updateUserPermissions(userId: user.id, permissions: updated.featurePermissions)
+        saveError = nil
+        onSaved()
+        return
+      } catch {
+        saveError = error.localizedDescription
+        return
+      }
+    }
+    try? repository.updateUserPermissions(userId: user.id, permissions: permissions)
+    onSaved()
   }
 }
 

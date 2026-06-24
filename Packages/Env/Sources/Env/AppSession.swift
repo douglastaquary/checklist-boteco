@@ -10,17 +10,61 @@ public final class AppSession: ObservableObject {
   @Published public private(set) var remoteUserId: String?
   public var isLoggedIn: Bool { currentUser != nil }
 
+  public var onRemoteLoginCompleted: (() async -> Void)?
+
   private let repository: ChecklistRepository
   private let authClient: AuthClient?
+  private let workClockClient: WorkClockClient?
   private let deviceId: String
   private var pendingDeviceVerification: PendingDeviceVerification?
+  private var didAttemptSessionRestore = false
 
-  public init(repository: ChecklistRepository, authClient: AuthClient?, deviceId: String) {
+  public init(
+    repository: ChecklistRepository,
+    authClient: AuthClient?,
+    workClockClient: WorkClockClient? = nil,
+    deviceId: String
+  ) {
     self.repository = repository
     self.authClient = authClient
+    self.workClockClient = workClockClient
     self.deviceId = deviceId
-    // Cold start não restaura sessão em memória; remove token órfão que disparava sync/401 na tela de login.
-    try? repository.clearSyncSession()
+    _ = repository.loadWorksite()
+  }
+
+  public func restorePersistedSessionIfPossible() async {
+    guard !didAttemptSessionRestore else { return }
+    didAttemptSessionRestore = true
+    guard let authClient,
+          let session = try? repository.getSyncSession(),
+          !session.authToken.isEmpty
+    else { return }
+
+    do {
+      let result = try await authClient.fetchCurrentUser(token: session.authToken)
+      guard let remoteUser = result.user, let remoteUserId = result.remoteUserId ?? remoteUser.remoteId else {
+        try? repository.clearSyncSession()
+        return
+      }
+      let profile = remoteUser
+      let localUser = try repository.getUserByRemoteId(remoteUserId)
+        ?? repository.getUserByEmail(profile.email)
+        ?? repository.getUserByName(profile.name)
+      guard let localUser else {
+        try? repository.clearSyncSession()
+        return
+      }
+      let synced = try repository.syncLocalUserFromRemote(localUserId: localUser.id, remoteUser: profile)
+      currentUser = synced
+      authToken = session.authToken
+      self.remoteUserId = remoteUserId
+      await refreshWorksite(token: session.authToken)
+      await onRemoteLoginCompleted?()
+    } catch {
+      if isAuthError(error) {
+        try? repository.clearSyncSession()
+      }
+    }
   }
 
   public func loginOffline(name: String, password: String) throws -> User {
@@ -150,6 +194,8 @@ public final class AppSession: ObservableObject {
     currentUser = synced
     authToken = token
     self.remoteUserId = remoteUserId
+    await refreshWorksite(token: token)
+    await onRemoteLoginCompleted?()
   }
 
   public func logout() throws {
@@ -158,6 +204,23 @@ public final class AppSession: ObservableObject {
     authToken = nil
     remoteUserId = nil
     pendingDeviceVerification = nil
+  }
+
+  private func refreshWorksite(token: String) async {
+    guard let workClockClient else { return }
+    do {
+      let worksite = try await workClockClient.fetchWorksite(token: token)
+      try repository.saveWorksite(worksite)
+    } catch {
+      _ = repository.loadWorksite()
+    }
+  }
+
+  private func isAuthError(_ error: Error) -> Bool {
+    if case let APIError.http(status, _) = error {
+      return status == 401 || status == 403
+    }
+    return false
   }
 
   private struct PendingDeviceVerification: Sendable {

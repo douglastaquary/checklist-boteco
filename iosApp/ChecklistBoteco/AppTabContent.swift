@@ -1,5 +1,6 @@
 import SwiftUI
 import Models
+import Network
 import Auth
 import ChecklistFeature
 import WorkClockFeature
@@ -14,6 +15,8 @@ struct MainTabContext {
   let repository: ChecklistRepository
   let syncController: SyncController
   let inventoryClient: InventoryClient?
+  let userClient: UserClient?
+  let dashboardClient: DashboardClient?
   let authToken: String?
   let remoteUserId: String?
   let deviceId: String
@@ -84,7 +87,11 @@ extension AppTab {
         }
       )
     case .dashboard:
-      DashboardRootView(repository: context.repository) { area in
+      DashboardRootView(
+        repository: context.repository,
+        dashboardClient: context.dashboardClient,
+        authToken: context.authToken
+      ) { area in
         Task { @MainActor in
           tabRouter.push(.dashboardAreaDetail(area: area), on: .dashboard)
         }
@@ -92,7 +99,11 @@ extension AppTab {
     case .activities:
       ActivitiesManagementView(repository: context.repository)
     case .permissions:
-      PermissionManagementView(repository: context.repository)
+      PermissionManagementView(
+        repository: context.repository,
+        userClient: context.userClient,
+        authToken: context.authToken
+      )
     }
   }
 }

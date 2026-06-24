@@ -64,6 +64,8 @@ final class AppDependenciesHolder {
   let session: AppSession
   let syncController: SyncController
   let apiClient: APIClient?
+  let userClient: UserClient?
+  let dashboardClient: DashboardClient?
   let inventoryClient: InventoryClient?
   let deviceId: String
 
@@ -72,6 +74,8 @@ final class AppDependenciesHolder {
     session = deps.session
     syncController = deps.syncController
     apiClient = deps.apiClient
+    userClient = deps.userClient
+    dashboardClient = deps.dashboardClient
     inventoryClient = deps.inventoryClient
     deviceId = deps.deviceId
   }
@@ -101,7 +105,11 @@ struct RootView: View {
           MainTabView(dependencies: holder, user: session.currentUser!) { logout() }
         case .register:
           NavigationStack {
-            RegisterUserView(repository: holder.repository)
+            RegisterUserView(
+              repository: holder.repository,
+              userClient: holder.userClient,
+              authToken: session.authToken
+            )
               .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                   Button("Voltar") { authScreen = .login }
@@ -116,6 +124,12 @@ struct RootView: View {
         }
       }
       GlobalFeedbackOverlay()
+    }
+    .task {
+      await session.restorePersistedSessionIfPossible()
+      if session.isLoggedIn {
+        authScreen = .main
+      }
     }
   }
 

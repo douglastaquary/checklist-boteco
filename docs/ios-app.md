@@ -40,6 +40,8 @@ CHECKLIST_API_BASE_URL = http:/$()/localhost:8181
 
 Para dispositivo físico, use o IP da máquina na rede local. Deixe vazio para modo **offline** (admin local `admin@checklistboteco.com` / `admin123`).
 
+Com API configurada: **sem seed local** — dados vêm do pull pós-login. Detalhes e checklist de teste: [docs/mobile-api-sync.md](mobile-api-sync.md).
+
 ## Abrir no Xcode
 
 1. Gere o projeto (se necessário):

@@ -66,6 +66,8 @@ extension MainTabView {
         repository: dependencies.repository,
         syncController: dependencies.syncController,
         inventoryClient: dependencies.inventoryClient,
+        userClient: dependencies.userClient,
+        dashboardClient: dependencies.dashboardClient,
         authToken: dependencies.authToken,
         remoteUserId: dependencies.remoteUserId,
         deviceId: dependencies.deviceId,

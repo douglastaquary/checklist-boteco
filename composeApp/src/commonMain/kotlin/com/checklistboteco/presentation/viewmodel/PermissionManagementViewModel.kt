@@ -1,5 +1,6 @@
 package com.checklistboteco.presentation.viewmodel
 
+import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.domain.model.FeaturePermissions
 import com.checklistboteco.domain.model.User
@@ -20,6 +21,8 @@ data class PermissionManagementUiState(
 class PermissionManagementViewModel(
     private val repository: ChecklistRepository,
     private val currentUser: User,
+    private val backendApiClient: BackendApiClient?,
+    private val authToken: String?,
     private val scope: CoroutineScope
 ) {
     private val _uiState = MutableStateFlow(
@@ -35,6 +38,18 @@ class PermissionManagementViewModel(
 
     private fun loadUsers() {
         scope.launch {
+            val api = backendApiClient
+            val token = authToken
+            if (api != null && !token.isNullOrBlank()) {
+                runCatching { api.listUsers(token) }
+                    .onSuccess { remoteUsers ->
+                        repository.upsertRemoteUsers(remoteUsers)
+                        _uiState.update { it.copy(error = null) }
+                    }
+                    .onFailure { error ->
+                        _uiState.update { it.copy(error = error.message) }
+                    }
+            }
             repository.getAllUsers().collect { users ->
                 _uiState.update { state ->
                     state.copy(
@@ -78,12 +93,31 @@ class PermissionManagementViewModel(
 
         val user = _uiState.value.selectedUser ?: return
         val permissions = transform(user.featurePermissions)
+        val api = backendApiClient
+        val token = authToken
+        val remoteId = user.remoteId
+        if (api != null && !token.isNullOrBlank() && !remoteId.isNullOrBlank()) {
+            scope.launch {
+                runCatching { api.updateUserPermissions(token, remoteId, permissions) }
+                    .onSuccess { updated ->
+                        repository.updateUserFeaturePermissions(user.id, updated.featurePermissions)
+                        applyUpdatedUser(user.copy(featurePermissions = updated.featurePermissions))
+                    }
+                    .onFailure { error ->
+                        _uiState.update { it.copy(error = error.message) }
+                    }
+            }
+            return
+        }
         repository.updateUserFeaturePermissions(user.id, permissions)
-        val updatedUser = user.copy(featurePermissions = permissions)
+        applyUpdatedUser(user.copy(featurePermissions = permissions))
+    }
+
+    private fun applyUpdatedUser(updatedUser: User) {
         _uiState.update { state ->
             state.copy(
                 selectedUser = updatedUser,
-                users = state.users.map { if (it.id == user.id) updatedUser else it },
+                users = state.users.map { if (it.id == updatedUser.id) updatedUser else it },
                 error = null
             )
         }
