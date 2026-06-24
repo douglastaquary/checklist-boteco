@@ -57,9 +57,28 @@ public final class ChecklistRepository: Sendable {
       for (name, area, frequency) in activities {
         try db.execute(
           sql: "INSERT INTO Activity(syncId, name, area, frequency, effort) VALUES (?, ?, ?, ?, 1)",
-          arguments: [UUID().uuidString, name, area.rawValue, frequency.rawValue]
+          arguments: ["seed-\(UUID().uuidString)", name, area.rawValue, frequency.rawValue]
         )
       }
+    }
+  }
+
+  public func purgeLocalSeedArtifactsIfNeeded() throws {
+    try dbQueue.write { db in
+      let purged = try String.fetchOne(
+        db,
+        sql: "SELECT value FROM SyncMetadata WHERE key = ?",
+        arguments: [MetadataKey.seedPurged]
+      )
+      guard purged != "1" else { return }
+      try db.execute(sql: "DELETE FROM Activity WHERE syncId LIKE 'seed-%'")
+      try db.execute(sql: "DELETE FROM ActivityCompletion")
+      try db.execute(
+        sql: "DELETE FROM User WHERE email IN (?, ?)",
+        arguments: ["admin@checklistboteco.com", "colaborador@checklistboteco.com"]
+      )
+      try db.execute(sql: "DELETE FROM SyncOutbox")
+      try upsertMetadata(db, key: MetadataKey.seedPurged, value: "1")
     }
   }
 
@@ -73,6 +92,114 @@ public final class ChecklistRepository: Sendable {
     try dbQueue.read { db in
       try UserRecord.fetchOne(db, sql: "SELECT * FROM User WHERE email = ?", arguments: [email])?.toDomain()
     }
+  }
+
+  public func getUserById(_ id: Int64) throws -> User? {
+    try dbQueue.read { db in
+      try UserRecord.fetchOne(db, sql: "SELECT * FROM User WHERE id = ?", arguments: [id])?.toDomain()
+    }
+  }
+
+  public func upsertRemoteUser(_ remote: User) throws {
+    try dbQueue.write { db in
+      guard let remoteId = remote.remoteId, !remoteId.isEmpty else { return }
+      if let existing = try UserRecord.fetchOne(
+        db,
+        sql: "SELECT * FROM User WHERE remoteId = ?",
+        arguments: [remoteId]
+      ) {
+        try db.execute(
+          sql: """
+          UPDATE User SET name = ?, email = ?, area = ?, workSector = ?, permissionLevel = ?, allowedAreas = ?,
+            canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?,
+            canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
+          WHERE id = ?
+          """,
+          arguments: [
+            remote.name, remote.email, remote.area.rawValue, remote.workSector.rawValue,
+            remote.permissionLevel.rawValue, remote.allowedAreas.map(\.rawValue).joined(separator: ","),
+            remote.featurePermissions.canRegisterUsers, remote.featurePermissions.canCreateActivities,
+            remote.featurePermissions.canEditUsers, remote.featurePermissions.canCreateInventoryCounts,
+            remote.featurePermissions.canViewInventoryInsights, remote.featurePermissions.canManageAdministrativeStock,
+            existing.id,
+          ]
+        )
+      } else if let existing = try UserRecord.fetchOne(
+        db,
+        sql: "SELECT * FROM User WHERE email = ?",
+        arguments: [remote.email]
+      ) {
+        try db.execute(
+          sql: """
+          UPDATE User SET name = ?, area = ?, workSector = ?, permissionLevel = ?, allowedAreas = ?, remoteId = ?,
+            canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?,
+            canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
+          WHERE id = ?
+          """,
+          arguments: [
+            remote.name, remote.area.rawValue, remote.workSector.rawValue,
+            remote.permissionLevel.rawValue, remote.allowedAreas.map(\.rawValue).joined(separator: ","),
+            remoteId,
+            remote.featurePermissions.canRegisterUsers, remote.featurePermissions.canCreateActivities,
+            remote.featurePermissions.canEditUsers, remote.featurePermissions.canCreateInventoryCounts,
+            remote.featurePermissions.canViewInventoryInsights, remote.featurePermissions.canManageAdministrativeStock,
+            existing.id,
+          ]
+        )
+      } else {
+        try db.execute(
+          sql: """
+          INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId,
+            canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts,
+            canViewInventoryInsights, canManageAdministrativeStock)
+          VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          """,
+          arguments: [
+            remote.name, remote.email, remote.area.rawValue, remote.workSector.rawValue,
+            remote.permissionLevel.rawValue, remote.allowedAreas.map(\.rawValue).joined(separator: ","),
+            remote.createdAt, remoteId,
+            remote.featurePermissions.canRegisterUsers, remote.featurePermissions.canCreateActivities,
+            remote.featurePermissions.canEditUsers, remote.featurePermissions.canCreateInventoryCounts,
+            remote.featurePermissions.canViewInventoryInsights, remote.featurePermissions.canManageAdministrativeStock,
+          ]
+        )
+      }
+    }
+  }
+
+  public func upsertRemoteUsers(_ users: [User]) throws {
+    for user in users {
+      try upsertRemoteUser(user)
+    }
+  }
+
+  public func saveWorksite(_ info: WorksiteInfo) throws {
+    try dbQueue.write { db in
+      try upsertMetadata(db, key: MetadataKey.worksiteName, value: info.name)
+      try upsertMetadata(db, key: MetadataKey.worksiteLatitude, value: String(info.latitude))
+      try upsertMetadata(db, key: MetadataKey.worksiteLongitude, value: String(info.longitude))
+      try upsertMetadata(db, key: MetadataKey.worksiteRadius, value: String(info.radiusMeters))
+    }
+    WorksiteLocation.applyCached(info)
+  }
+
+  public func loadWorksite() -> WorksiteInfo {
+    let info = (try? dbQueue.read { db -> WorksiteInfo? in
+      guard let name = try selectMetadata(db, key: MetadataKey.worksiteName),
+            let latStr = try selectMetadata(db, key: MetadataKey.worksiteLatitude),
+            let lngStr = try selectMetadata(db, key: MetadataKey.worksiteLongitude),
+            let radiusStr = try selectMetadata(db, key: MetadataKey.worksiteRadius),
+            let lat = Double(latStr),
+            let lng = Double(lngStr),
+            let radius = Double(radiusStr)
+      else { return nil }
+      return WorksiteInfo(name: name, latitude: lat, longitude: lng, radiusMeters: radius)
+    }) ?? nil
+    if let info {
+      WorksiteLocation.applyCached(info)
+      return info
+    }
+    return WorksiteLocation.defaultInfo
   }
 
   public func getUserByRemoteId(_ remoteId: String) throws -> User? {
@@ -297,6 +424,9 @@ public final class ChecklistRepository: Sendable {
           )
         }
       }
+      for completion in response.completions {
+        try upsertRemoteCompletion(db, completion: completion)
+      }
       for tombstone in response.tombstones where tombstone.entityType == .activity {
         try db.execute(
           sql: "UPDATE Activity SET deletedAt = ?, syncState = 'SYNCED' WHERE syncId = ?",
@@ -304,6 +434,58 @@ public final class ChecklistRepository: Sendable {
         )
       }
     }
+  }
+
+  private func upsertRemoteCompletion(_ db: Database, completion: RemoteCompletionRecord) throws {
+    let existing = try Int64.fetchOne(
+      db,
+      sql: "SELECT id FROM ActivityCompletion WHERE syncId = ?",
+      arguments: [completion.syncId]
+    )
+    guard let activityId = try Int64.fetchOne(
+      db,
+      sql: "SELECT id FROM Activity WHERE syncId = ?",
+      arguments: [completion.activitySyncId]
+    ) else { return }
+    let localUserId = try resolveLocalUserId(db, remoteUserId: completion.userId)
+    guard let localUserId else { return }
+    if existing != nil {
+      try db.execute(
+        sql: "UPDATE ActivityCompletion SET serverRevision = ?, syncState = 'SYNCED' WHERE syncId = ?",
+        arguments: [completion.serverRevision, completion.syncId]
+      )
+      return
+    }
+    try db.execute(
+      sql: """
+      INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serverRevision, syncState)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'SYNCED')
+      """,
+      arguments: [
+        completion.syncId, activityId, localUserId, completion.completedAt,
+        completion.imagePath, completion.isLate ? 1 : 0, completion.serverRevision,
+      ]
+    )
+  }
+
+  private func resolveLocalUserId(_ db: Database, remoteUserId: String) throws -> Int64? {
+    if let id = try Int64.fetchOne(
+      db,
+      sql: "SELECT id FROM User WHERE remoteId = ?",
+      arguments: [remoteUserId]
+    ) {
+      return id
+    }
+    let sessionRemoteId = try selectMetadata(db, key: MetadataKey.remoteUserId)
+    if remoteUserId == sessionRemoteId,
+       let id = try Int64.fetchOne(
+         db,
+         sql: "SELECT id FROM User WHERE remoteId = ?",
+         arguments: [remoteUserId]
+       ) {
+      return id
+    }
+    return nil
   }
 
   public func workClockEntries(userId: Int64, dayStart: Int64, dayEnd: Int64) throws -> [WorkClockEntry] {
@@ -421,11 +603,21 @@ public final class ChecklistRepository: Sendable {
   }
 
   public func insertActivity(_ activity: Activity) throws {
-    let syncId = activity.syncId ?? UUID().uuidString
+    let syncId = activity.syncId ?? newSyncId(prefix: "activity")
+    let payload = """
+    {"syncId":"\(syncId)","name":"\(activity.name)","area":"\(activity.area.rawValue)","frequency":"\(activity.frequency.rawValue)","effort":\(activity.effort),"baseRevision":0}
+    """
     try dbQueue.write { db in
       try db.execute(
-        sql: "INSERT INTO Activity(syncId, name, area, frequency, effort) VALUES (?, ?, ?, ?, ?)",
+        sql: "INSERT INTO Activity(syncId, name, area, frequency, effort, syncState) VALUES (?, ?, ?, ?, ?, 'PENDING')",
         arguments: [syncId, activity.name, activity.area.rawValue, activity.frequency.rawValue, activity.effort]
+      )
+      try enqueueOutbox(
+        db,
+        entityType: .activity,
+        entitySyncId: syncId,
+        operationType: .activityUpsert,
+        payload: payload
       )
     }
     notifySyncRequested()
@@ -433,12 +625,32 @@ public final class ChecklistRepository: Sendable {
 
   public func updateActivity(id: Int64, name: String, area: Area, frequency: Frequency) throws {
     try dbQueue.write { db in
+      guard let row = try Row.fetchOne(db, sql: "SELECT * FROM Activity WHERE id = ? AND deletedAt IS NULL", arguments: [id]) else {
+        return
+      }
+      let syncId = (row["syncId"] as String?) ?? newSyncId(prefix: "activity")
+      if row["syncId"] == nil {
+        try db.execute(sql: "UPDATE Activity SET syncId = ? WHERE id = ?", arguments: [syncId, id])
+      }
+      let serverRevision = row["serverRevision"] as Int64? ?? 0
+      let effort = row["effort"] as Int64? ?? 1
       try db.execute(
         sql: """
         UPDATE Activity SET name = ?, area = ?, frequency = ?, syncState = 'PENDING'
         WHERE id = ? AND deletedAt IS NULL
         """,
         arguments: [name, area.rawValue, frequency.rawValue, id]
+      )
+      let payload = """
+      {"syncId":"\(syncId)","name":"\(name)","area":"\(area.rawValue)","frequency":"\(frequency.rawValue)","effort":\(effort),"baseRevision":\(serverRevision)}
+      """
+      try replacePendingActivityUpsert(db, syncId: syncId)
+      try enqueueOutbox(
+        db,
+        entityType: .activity,
+        entitySyncId: syncId,
+        operationType: .activityUpsert,
+        payload: payload
       )
     }
     notifySyncRequested()
@@ -447,9 +659,44 @@ public final class ChecklistRepository: Sendable {
   public func deleteActivity(id: Int64) throws {
     let now = Date.nowMillis
     try dbQueue.write { db in
+      guard let row = try Row.fetchOne(db, sql: "SELECT * FROM Activity WHERE id = ?", arguments: [id]) else {
+        return
+      }
+      let syncId = row["syncId"] as String?
+      let serverRevision = row["serverRevision"] as Int64? ?? 0
+      guard let syncId, !syncId.isEmpty else {
+        try db.execute(sql: "DELETE FROM Activity WHERE id = ?", arguments: [id])
+        return
+      }
+      let pendingCount = try Int.fetchOne(
+        db,
+        sql: """
+        SELECT COUNT(*) FROM SyncOutbox
+        WHERE entityType = ? AND entitySyncId = ? AND operationType = ?
+        """,
+        arguments: [SyncEntityType.activity.rawValue, syncId, SyncOperationType.activityUpsert.rawValue]
+      ) ?? 0
+      let canDropLocalCreate = serverRevision == 0 && pendingCount > 0
+      if canDropLocalCreate {
+        try db.execute(sql: "DELETE FROM SyncOutbox WHERE entitySyncId = ?", arguments: [syncId])
+        try db.execute(sql: "DELETE FROM ActivityCompletion WHERE activityId = ?", arguments: [id])
+        try db.execute(sql: "DELETE FROM Activity WHERE id = ?", arguments: [id])
+        return
+      }
       try db.execute(
         sql: "UPDATE Activity SET deletedAt = ?, syncState = 'PENDING' WHERE id = ?",
         arguments: [now, id]
+      )
+      let payload = """
+      {"syncId":"\(syncId)","name":"\(row["name"] as String? ?? "")","area":"\(row["area"] as String? ?? "")","frequency":"\(row["frequency"] as String? ?? "")","effort":\(row["effort"] as Int64? ?? 1),"baseRevision":\(serverRevision),"deletedAt":\(now)}
+      """
+      try replacePendingActivityUpsert(db, syncId: syncId)
+      try enqueueOutbox(
+        db,
+        entityType: .activity,
+        entitySyncId: syncId,
+        operationType: .activityDelete,
+        payload: payload
       )
     }
     notifySyncRequested()
@@ -518,11 +765,30 @@ private final class SyncCallbackBox: @unchecked Sendable {
   var handler: (@Sendable () -> Void)?
 }
 
-private enum MetadataKey {
-  static let authToken = "auth_token"
-  static let remoteUserId = "remote_user_id"
-  static let syncCursor = "sync_cursor"
-}
+  private func replacePendingActivityUpsert(_ db: Database, syncId: String) throws {
+    try db.execute(
+      sql: """
+      DELETE FROM SyncOutbox
+      WHERE entityType = ? AND entitySyncId = ? AND operationType = ?
+      """,
+      arguments: [SyncEntityType.activity.rawValue, syncId, SyncOperationType.activityUpsert.rawValue]
+    )
+  }
+
+  private func newSyncId(prefix: String) -> String {
+    "\(prefix)-\(Date.nowMillis)-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(16))"
+  }
+
+  private enum MetadataKey {
+    static let authToken = "auth_token"
+    static let remoteUserId = "remote_user_id"
+    static let syncCursor = "sync_cursor"
+    static let seedPurged = "seed_purged"
+    static let worksiteName = "worksite_name"
+    static let worksiteLatitude = "worksite_latitude"
+    static let worksiteLongitude = "worksite_longitude"
+    static let worksiteRadius = "worksite_radius"
+  }
 
 extension Date {
   public static var nowMillis: Int64 { Int64(Date().timeIntervalSince1970 * 1000) }

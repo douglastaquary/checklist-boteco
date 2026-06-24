@@ -58,12 +58,12 @@ let package = Package(
     ),
     .target(
       name: "DashboardFeature",
-      dependencies: ["Models", "Persistence", "DesignSystem"],
+      dependencies: ["Models", "Network", "Persistence", "DesignSystem"],
       path: "Dashboard/Sources/DashboardFeature"
     ),
     .target(
       name: "AdminFeatures",
-      dependencies: ["Models", "Persistence", "DesignSystem"],
+      dependencies: ["Models", "Network", "Persistence", "DesignSystem"],
       path: "AdminFeatures/Sources/AdminFeatures"
     ),
     .testTarget(name: "ModelsTests", dependencies: ["Models"], path: "Models/Tests/ModelsTests"),

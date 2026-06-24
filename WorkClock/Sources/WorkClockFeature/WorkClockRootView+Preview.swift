@@ -26,7 +26,7 @@ struct WorkClockRootView_Previews: PreviewProvider {
   }
 
   private static var previewSyncController: SyncController {
-    SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil))
+    SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil, deviceId: "preview-device"))
   }
 }
 #endif

@@ -81,10 +81,50 @@ public struct WorkClockSummary: Equatable, Sendable {
   public let requiresTwoHoursRest: Bool
 }
 
+public struct WorksiteInfo: Equatable, Sendable {
+  public let name: String
+  public let latitude: Double
+  public let longitude: Double
+  public let radiusMeters: Double
+
+  public init(name: String, latitude: Double, longitude: Double, radiusMeters: Double) {
+    self.name = name
+    self.latitude = latitude
+    self.longitude = longitude
+    self.radiusMeters = radiusMeters
+  }
+
+  public var point: GeoPoint {
+    GeoPoint(latitude: latitude, longitude: longitude)
+  }
+}
+
 public enum WorksiteLocation {
-  public static let name = "Beco da Praia"
-  public static let allowedRadiusMeters = 5.0
-  public static let point = GeoPoint(latitude: -23.85491, longitude: -46.13872)
+  private static let lock = NSLock()
+  private static var _cached: WorksiteInfo?
+
+  public static let defaultInfo = WorksiteInfo(
+    name: "Beco da Praia",
+    latitude: -23.85491,
+    longitude: -46.13872,
+    radiusMeters: 5.0
+  )
+
+  public static var current: WorksiteInfo {
+    lock.lock()
+    defer { lock.unlock() }
+    return _cached ?? defaultInfo
+  }
+
+  public static func applyCached(_ info: WorksiteInfo) {
+    lock.lock()
+    _cached = info
+    lock.unlock()
+  }
+
+  public static var name: String { current.name }
+  public static var allowedRadiusMeters: Double { current.radiusMeters }
+  public static var point: GeoPoint { current.point }
 }
 
 public enum WorkClockCalculator {
