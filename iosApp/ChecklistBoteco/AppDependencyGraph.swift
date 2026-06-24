@@ -20,7 +20,10 @@ private struct AppDependencyGraphModifier: ViewModifier {
     content
       .environmentObject(session)
       .environmentObject(NetworkFeedback.shared)
-      .task { await syncController.syncOnce() }
+      .task(id: session.authToken) {
+        guard session.authToken != nil else { return }
+        await syncController.syncOnce()
+      }
       .onAppear {
         #if os(iOS)
         BackgroundSyncScheduler.register(syncController: syncController)

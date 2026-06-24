@@ -19,6 +19,8 @@ public final class AppSession: ObservableObject {
     self.repository = repository
     self.authClient = authClient
     self.deviceId = deviceId
+    // Cold start não restaura sessão em memória; remove token órfão que disparava sync/401 na tela de login.
+    try? repository.clearSyncSession()
   }
 
   public func loginOffline(name: String, password: String) throws -> User {

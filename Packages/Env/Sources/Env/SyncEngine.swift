@@ -18,6 +18,7 @@ public actor SyncEngine {
 
   public func syncOnce() async {
     guard let syncClient, let session = try? repository.getSyncSession(), !isSyncing else { return }
+    guard !session.authToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
     isSyncing = true
     defer { isSyncing = false }
     await pushPending(syncClient: syncClient, session: session)
@@ -48,6 +49,10 @@ public actor SyncEngine {
         }
         try? repository.setSyncCursor(response.cursor)
       } catch {
+        if isAuthError(error) {
+          try? repository.clearSyncSession()
+          return
+        }
         let now = Date.nowMillis
         for op in pending {
           try? repository.markSyncOperationFailed(
@@ -72,10 +77,21 @@ public actor SyncEngine {
       try repository.applyRemoteSync(response)
       try repository.setSyncCursor(response.nextCursor)
     } catch {
+      if isAuthError(error) {
+        try? repository.clearSyncSession()
+        return
+      }
       await MainActor.run {
         NetworkFeedback.shared.showError(AppErrorMapper.toUserMessage(error))
       }
     }
+  }
+
+  private func isAuthError(_ error: Error) -> Bool {
+    if case let APIError.http(status, _) = error {
+      return status == 401 || status == 403
+    }
+    return false
   }
 
   public func retryWorkClockEntries(
