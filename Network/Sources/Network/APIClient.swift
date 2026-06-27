@@ -67,7 +67,11 @@ public final class APIClient: @unchecked Sendable {
       guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
       if http.statusCode >= 400 {
         let bodyText = String(data: data, encoding: .utf8) ?? ""
-        throw APIError.http(status: http.statusCode, message: AppErrorMapper.fromHTTP(status: http.statusCode, body: bodyText))
+        let message = AppErrorMapper.fromHTTP(status: http.statusCode, body: bodyText)
+        if http.statusCode == 401 {
+          SessionExpiredCenter.shared.notify(reason: message)
+        }
+        throw APIError.http(status: http.statusCode, message: message)
       }
       do {
         return try decoder.decode(T.self, from: data)

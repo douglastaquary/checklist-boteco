@@ -41,7 +41,7 @@ public struct ActivitiesManagementView: View {
         initialArea: .atendimento,
         onSave: { name, area in
           try? repository.insertActivity(
-            Activity(id: 0, name: name, area: area, frequency: .daily)
+            Activity(id: 0, name: name, area: area, frequency: .diario)
           )
           reload()
           createSheet = nil

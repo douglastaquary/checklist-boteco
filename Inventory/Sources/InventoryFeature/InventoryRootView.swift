@@ -30,14 +30,20 @@ public struct InventoryRootView: View {
   private let canCreate: Bool
   private let canViewInsights: Bool
   private let canManageAdministrativeStock: Bool
-  private let onSelectAuditItem: ((InventoryAuditItemSnapshot) -> Void)?
 
   @State private var drafts: [InventoryCountDraft] = []
   @State private var administrativeMode = false
   @State private var banner: InventoryBanner?
   @State private var draftSheet: InventoryDraftSheet?
-  @State private var audit: InventoryDailyAudit?
-  @State private var loadingAudit = false
+  @State private var showSubmitConfirm = false
+  @State private var sending = false
+
+  @State private var auditSheetStep: AuditSheetStep?
+  @State private var showAuditSheet = false
+  @State private var showAuditResult = false
+  @State private var auditImportBatch: SalesImportBatch?
+  @State private var auditImportFileName: String?
+  @State private var auditResult: ApplyDailyAuditResponse?
 
   public init(
     repository: ChecklistRepository,
@@ -54,8 +60,8 @@ public struct InventoryRootView: View {
     self.canCreate = canCreate
     self.canViewInsights = canViewInsights
     self.canManageAdministrativeStock = canManageAdministrativeStock
-    self.onSelectAuditItem = onSelectAuditItem
     _banner = State(initialValue: nil)
+    _ = onSelectAuditItem
   }
 
   #if DEBUG
@@ -75,63 +81,113 @@ public struct InventoryRootView: View {
     self.canCreate = canCreate
     self.canViewInsights = canViewInsights
     self.canManageAdministrativeStock = canManageAdministrativeStock
-    self.onSelectAuditItem = onSelectAuditItem
     _banner = State(initialValue: initialBanner)
+    _ = onSelectAuditItem
   }
   #endif
 
+  private var canCreateInMode: Bool {
+    administrativeMode ? canManageAdministrativeStock : canCreate
+  }
+
+  private var canOpenAudit: Bool {
+    canViewInsights || canManageAdministrativeStock
+  }
+
+  private var canApplyAudit: Bool {
+    canManageAdministrativeStock || canViewInsights
+  }
+
+  private var navigationTitle: String {
+    administrativeMode ? "Estoque admin" : "Contagem"
+  }
+
+  private var navigationSubtitle: String {
+    if administrativeMode { return "Contagem administrativa" }
+    if canCreateInMode { return "Abertura" }
+    return "Somente insights"
+  }
+
   public var body: some View {
     List {
-      if canManageAdministrativeStock {
+      if canManageAdministrativeStock && canCreate {
         Section {
-          Toggle("Contagem administrativa", isOn: $administrativeMode)
-            .onChange(of: administrativeMode) { _ in reload() }
-        }
-      }
-      if canCreate {
-        Section {
-          Button("Adicionar produto") {
-            draftSheet = .create
+          Picker("Modo", selection: $administrativeMode) {
+            Text("Abertura").tag(false)
+            Text("Estoque admin").tag(true)
           }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+          .onChange(of: administrativeMode) { _ in reload() }
           .themedListRowBackground()
-        } header: {
-          themedSectionHeader("Contagem")
         }
       }
-      InventoryDraftSection(
-        drafts: drafts,
-        onEdit: { draftSheet = .edit($0) },
-        onDelete: deleteDrafts
-      )
-      if canCreate {
-        Section {
-          Button("Enviar contagem") {
-            Task { await submit() }
-          }
-          .buttonStyle(PrimaryButtonStyle())
-          .disabled(drafts.isEmpty)
-        }
+
+      Section {
+        Text(navigationSubtitle)
+          .font(.subheadline.weight(.semibold))
+          .themedListRowBackground()
+        Text(helperText)
+          .font(.footnote)
+          .foregroundColor(.secondary)
+          .themedListRowBackground()
       }
-      if canViewInsights || canManageAdministrativeStock {
-        InventoryAuditSection(
-          audit: audit,
-          loading: loadingAudit,
-          canApply: canManageAdministrativeStock,
-          onLoad: { Task { await loadAudit() } },
-          onApply: { Task { await applyAudit() } },
-          onSelectItem: onSelectAuditItem
+
+      if canCreateInMode {
+        InventoryDraftSection(
+          drafts: drafts,
+          onEdit: { draftSheet = .edit($0) },
+          onDelete: deleteDrafts
         )
       }
+
       if let banner {
         Section {
           Text(banner.message)
             .foregroundColor(banner.textColor)
+            .themedListRowBackground()
         }
       }
     }
-    .navigationTitle("Contagem")
     .themedListStyle()
+    .navigationTitle(navigationTitle)
+    .toolbar {
+      if canOpenAudit {
+        ToolbarItem(placement: .primaryAction) {
+          Menu {
+            Button("Gerar auditoria") {
+              openAuditSheet()
+            }
+          } label: {
+            Image(systemName: "ellipsis.circle")
+          }
+        }
+      }
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if canCreateInMode {
+        bottomBar
+      }
+    }
+    .overlay(alignment: .bottomTrailing) {
+      if canCreateInMode {
+        Button {
+          draftSheet = .create
+        } label: {
+          Label("Adicionar", systemImage: "plus")
+        }
+        .buttonStyle(.borderedProminent)
+        .padding(.trailing, 16)
+        .padding(.bottom, canCreateInMode ? 88 : 16)
+      }
+    }
     .task { reload() }
+    .onAppear {
+      if canManageAdministrativeStock && !canCreate {
+        administrativeMode = true
+        reload()
+      }
+    }
     .sheet(item: $draftSheet) { sheet in
       InventoryDraftFormSheet(
         mode: sheet.formMode,
@@ -140,6 +196,69 @@ public struct InventoryRootView: View {
         onCancel: { draftSheet = nil }
       )
       .environmentObject(AppTheme.shared)
+    }
+    .sheet(isPresented: $showAuditSheet) {
+      if let auditSheetStep {
+        InventoryAuditSheet(
+          step: auditSheetStep,
+          importBatch: auditImportBatch,
+          importFileName: auditImportFileName,
+          canApplyAudit: canApplyAudit,
+          onDismiss: closeAuditSheet,
+          onConfirmAudit: { Task { await confirmAudit() } },
+          onUploadCsv: { fileName, content in
+            Task { await uploadSalesCsv(fileName: fileName, content: content) }
+          }
+        )
+        .environmentObject(AppTheme.shared)
+        .interactiveDismissDisabled(auditSheetStep == .processing)
+      }
+    }
+    .sheet(isPresented: $showAuditResult) {
+      if let auditResult {
+        InventoryAuditResultSheet(result: auditResult, onDismiss: closeAuditResult)
+          .environmentObject(AppTheme.shared)
+      }
+    }
+    .confirmationDialog(
+      administrativeMode ? "Confirmar estoque" : "Confirmar contagem",
+      isPresented: $showSubmitConfirm,
+      titleVisibility: .visible
+    ) {
+      Button("Sim, enviar") {
+        Task { await submit() }
+      }
+      Button("Revisar", role: .cancel) {}
+    } message: {
+      Text(
+        administrativeMode
+          ? "Confirma o envio da contagem administrativa? O saldo acumulado será atualizado."
+          : "Os valores estão corretos? Após o envio, a contagem não poderá ser editada."
+      )
+    }
+  }
+
+  private var helperText: String {
+    if canCreateInMode && administrativeMode {
+      return "Soma ao saldo acumulado de estoque. Após a auditoria diária, as vendas são abatidas."
+    }
+    if canCreateInMode {
+      return "Itens ficam no aparelho até o envio em lote."
+    }
+    return "Acesso somente aos insights e à auditoria."
+  }
+
+  private var bottomBar: some View {
+    VStack(spacing: 0) {
+      Divider()
+      Button(sending ? "Enviando…" : "Revisar e enviar") {
+        showSubmitConfirm = true
+      }
+      .buttonStyle(PrimaryButtonStyle())
+      .disabled(drafts.isEmpty || sending)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .background(.bar)
     }
   }
 
@@ -169,11 +288,28 @@ public struct InventoryRootView: View {
     reload()
   }
 
+  @MainActor
+  private func requireInventoryRemoteAccess() throws -> (InventoryClient, String) {
+    guard let inventoryClient else {
+      throw RemoteSessionRequiredError(message: "Faça login novamente")
+    }
+    let validToken = try AuthSessionGuard.requireRemoteToken(apiConfigured: true, token: token)
+    return (inventoryClient, validToken)
+  }
+
   private func submit() async {
-    guard let inventoryClient, let token else {
+    let inventoryClient: InventoryClient
+    let token: String
+    do {
+      (inventoryClient, token) = try requireInventoryRemoteAccess()
+    } catch is RemoteSessionRequiredError {
+      return
+    } catch {
       banner = .info("Faça login novamente")
       return
     }
+    sending = true
+    defer { sending = false }
     let date = InventoryDate.today
     do {
       try await inventoryClient.submitCount(
@@ -196,34 +332,145 @@ public struct InventoryRootView: View {
     }
   }
 
-  private func loadAudit() async {
-    guard let inventoryClient, let token else { return }
-    loadingAudit = true
-    defer { loadingAudit = false }
+  private func openAuditSheet() {
+    auditSheetStep = .checkingSales
+    auditImportBatch = nil
+    auditImportFileName = nil
+    showAuditResult = false
+    showAuditSheet = true
+    Task { await checkSalesForAudit() }
+  }
+
+  private func closeAuditSheet() {
+    showAuditSheet = false
+    auditSheetStep = nil
+    auditImportBatch = nil
+    auditImportFileName = nil
+  }
+
+  private func closeAuditResult() {
+    showAuditResult = false
+    auditResult = nil
+    auditSheetStep = nil
+  }
+
+  private func checkSalesForAudit() async {
+    let inventoryClient: InventoryClient
+    let token: String
     do {
-      audit = try await inventoryClient.dailyAudit(token: token, date: InventoryDate.today)
-      banner = nil
+      (inventoryClient, token) = try requireInventoryRemoteAccess()
+    } catch is RemoteSessionRequiredError {
+      return
     } catch {
       await MainActor.run {
+        auditSheetStep = .error("Faça login novamente")
+      }
+      return
+    }
+    do {
+      let audit = try await inventoryClient.dailyAudit(token: token, date: InventoryDate.today)
+      await MainActor.run {
+        auditSheetStep = InventoryAuditLogic.shouldSkipCsvUpload(audit)
+          ? .readyToConfirm(audit)
+          : .uploadCsv
+        banner = nil
+      }
+    } catch {
+      await MainActor.run {
+        auditSheetStep = .error(AppErrorMapper.toUserMessage(error))
         banner = .networkError(AppErrorMapper.toUserMessage(error))
       }
     }
   }
 
-  private func applyAudit() async {
-    guard let inventoryClient, let token else { return }
-    loadingAudit = true
-    defer { loadingAudit = false }
+  private func uploadSalesCsv(fileName: String, content: String) async {
+    let inventoryClient: InventoryClient
+    let token: String
     do {
-      let response = try await inventoryClient.applyDailyAudit(token: token, date: InventoryDate.today)
-      audit = response.audit
-      banner = .success(
-        response.alreadyApplied
-          ? "Auditoria já havia sido aplicada ao estoque administrativo."
-          : "Vendas abatidas do estoque administrativo conforme planilha."
-      )
+      (inventoryClient, token) = try requireInventoryRemoteAccess()
+    } catch is RemoteSessionRequiredError {
+      return
     } catch {
       await MainActor.run {
+        auditSheetStep = .error("Faça login novamente")
+      }
+      return
+    }
+    await MainActor.run {
+      auditSheetStep = .checkingSales
+      auditImportFileName = fileName
+      auditImportBatch = nil
+    }
+    do {
+      let preview = try await inventoryClient.salesImportPreview(
+        token: token,
+        fileName: fileName,
+        csv: content
+      )
+      if let firstError = preview.errors.first {
+        throw NSError(
+          domain: "InventoryAudit",
+          code: 1,
+          userInfo: [NSLocalizedDescriptionKey: firstError.message]
+        )
+      }
+      let mapping = preview.suggestedMapping.isEmpty ? preview.mapping : preview.suggestedMapping
+      let committed = try await inventoryClient.salesImportCommit(
+        token: token,
+        batchId: preview.id,
+        mapping: mapping
+      )
+      if let firstError = committed.errors.first {
+        throw NSError(
+          domain: "InventoryAudit",
+          code: 2,
+          userInfo: [NSLocalizedDescriptionKey: firstError.message]
+        )
+      }
+      let audit = try await inventoryClient.dailyAudit(token: token, date: InventoryDate.today)
+      await MainActor.run {
+        auditImportBatch = committed
+        auditSheetStep = .readyToConfirm(audit)
+      }
+    } catch {
+      await MainActor.run {
+        auditSheetStep = .uploadCsv
+        banner = .networkError(AppErrorMapper.toUserMessage(error))
+      }
+    }
+  }
+
+  private func confirmAudit() async {
+    let inventoryClient: InventoryClient
+    let token: String
+    do {
+      (inventoryClient, token) = try requireInventoryRemoteAccess()
+    } catch is RemoteSessionRequiredError {
+      return
+    } catch {
+      await MainActor.run {
+        auditSheetStep = .error("Faça login novamente")
+      }
+      return
+    }
+    await MainActor.run {
+      auditSheetStep = .processing
+    }
+    do {
+      let response = try await inventoryClient.applyDailyAudit(token: token, date: InventoryDate.today)
+      await MainActor.run {
+        auditResult = response
+        showAuditSheet = false
+        showAuditResult = true
+        banner = .success(
+          response.alreadyApplied
+            ? "Auditoria já havia sido aplicada ao estoque administrativo."
+            : "Vendas abatidas do estoque administrativo conforme planilha."
+        )
+      }
+    } catch {
+      await MainActor.run {
+        auditSheetStep = .error(AppErrorMapper.toUserMessage(error))
         banner = .networkError(AppErrorMapper.toUserMessage(error))
       }
     }
@@ -268,7 +515,7 @@ private struct InventoryDraftSection: View {
   var body: some View {
     Section {
       if drafts.isEmpty {
-        Text("Nenhum item no rascunho.")
+        Text("Nenhum produto adicionado. Toque em Adicionar para começar.")
           .font(.footnote)
           .foregroundColor(.secondary)
           .themedListRowBackground()
@@ -293,60 +540,6 @@ private struct InventoryDraftSection: View {
       }
     } header: {
       themedSectionHeader("Rascunho")
-    }
-  }
-}
-
-private struct InventoryAuditSection: View {
-  let audit: InventoryDailyAudit?
-  let loading: Bool
-  let canApply: Bool
-  let onLoad: () -> Void
-  let onApply: () -> Void
-  let onSelectItem: ((InventoryAuditItemSnapshot) -> Void)?
-
-  var body: some View {
-    Section {
-      Button(loading ? "Carregando..." : "Consultar auditoria", action: onLoad)
-        .disabled(loading)
-      if let audit {
-        ForEach(audit.items) { item in
-          if let onSelectItem {
-            Button {
-              onSelectItem(InventoryAuditItemSnapshot(item: item, audit: audit))
-            } label: {
-              InventoryAuditRow(item: item)
-            }
-            .buttonStyle(.plain)
-          } else {
-            InventoryAuditRow(item: item)
-          }
-        }
-      }
-      if canApply {
-        Button("Aplicar vendas ao estoque", action: onApply)
-          .buttonStyle(PrimaryButtonStyle())
-          .disabled(loading)
-      }
-    } header: {
-      themedSectionHeader("Auditoria diária")
-    }
-  }
-}
-
-private struct InventoryAuditRow: View {
-  let item: InventoryDailyAuditItem
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(item.product).font(.headline)
-      Text("Abertura: \(item.openingQuantity, format: .number) · Vendido: \(item.soldQuantity, format: .number)")
-        .font(.caption)
-      Text("Saldo teórico: \(item.theoreticalRemaining, format: .number)")
-        .font(.caption)
-      if !item.notes.isEmpty {
-        Text(item.notes).font(.caption2).foregroundColor(.secondary)
-      }
     }
   }
 }

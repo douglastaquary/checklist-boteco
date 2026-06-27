@@ -1,20 +1,37 @@
 import Foundation
 
-public enum Frequency: String, CaseIterable, Codable, Sendable {
-  case daily = "DAILY"
-  case weekly = "WEEKLY"
-  case monthly = "MONTHLY"
+public enum Frequency: String, CaseIterable, Sendable {
+  case diario = "DIARIO"
+  case quinzenal = "QUINZENAL"
+  case mensal = "MENSAL"
 
   public var displayName: String {
     switch self {
-    case .daily: return "Diária"
-    case .weekly: return "Semanal"
-    case .monthly: return "Mensal"
+    case .diario: return "Diária"
+    case .quinzenal: return "Quinzenal"
+    case .mensal: return "Mensal"
     }
   }
 
   public static func from(_ value: String) -> Frequency {
-    Frequency(rawValue: value.uppercased()) ?? .daily
+    switch value.uppercased() {
+    case "DIARIO", "DAILY": return .diario
+    case "QUINZENAL", "WEEKLY": return .quinzenal
+    case "MENSAL", "MONTHLY": return .mensal
+    default: return .diario
+    }
+  }
+}
+
+extension Frequency: Codable {
+  public init(from decoder: Decoder) throws {
+    let raw = try decoder.singleValueContainer().decode(String.self)
+    self = Frequency.from(raw)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
   }
 }
 

@@ -24,6 +24,7 @@ public actor SyncEngine {
     guard !session.authToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
     isSyncing = true
     defer { isSyncing = false }
+    try? repository.repairPendingSyncQueue()
     await pushPending(syncClient: syncClient, session: session)
     await pullRemote(syncClient: syncClient, session: session)
   }
@@ -40,12 +41,24 @@ public actor SyncEngine {
           request: SyncPushRequestDTO(deviceId: deviceId, operations: envelopes)
         )
         for ack in response.acknowledgements {
+          if let conflict = ack.conflict {
+            let cursor = (try? repository.getSyncCursor()) ?? "0"
+            try? repository.applyRemoteSync(
+              SyncPullResponse(
+                nextCursor: cursor,
+                hasMore: false,
+                activities: [conflict]
+              )
+            )
+          }
           try? repository.acknowledgeSyncOperation(ack)
         }
-        try? repository.setSyncCursor(response.cursor)
       } catch {
-        if isAuthError(error) {
+        if isUnauthorized(error) {
           try? repository.clearSyncSession()
+          await MainActor.run {
+            SessionExpiredCenter.shared.notify(reason: AppErrorMapper.toUserMessage(error))
+          }
           return
         }
         let now = Date.nowMillis
@@ -74,8 +87,11 @@ public actor SyncEngine {
         try repository.setSyncCursor(response.nextCursor)
         if !response.hasMore { return }
       } catch {
-        if isAuthError(error) {
+        if isUnauthorized(error) {
           try? repository.clearSyncSession()
+          await MainActor.run {
+            SessionExpiredCenter.shared.notify(reason: AppErrorMapper.toUserMessage(error))
+          }
           return
         }
         await MainActor.run {
@@ -86,11 +102,15 @@ public actor SyncEngine {
     }
   }
 
-  private func isAuthError(_ error: Error) -> Bool {
+  private func isUnauthorized(_ error: Error) -> Bool {
     if case let APIError.http(status, _) = error {
-      return status == 401 || status == 403
+      return status == 401
     }
     return false
+  }
+
+  private func isAuthError(_ error: Error) -> Bool {
+    isUnauthorized(error)
   }
 
   public func retryWorkClockEntries(

@@ -35,6 +35,7 @@ public final class NetworkFeedback: ObservableObject {
 
   public func showError(_ message: String) {
     guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    if SessionExpiredCenter.shared.isHandling { return }
     activeAlert = FeedbackAlert(message: message)
   }
 

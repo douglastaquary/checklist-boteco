@@ -61,7 +61,7 @@ public final class AppSession: ObservableObject {
       await refreshWorksite(token: session.authToken)
       await onRemoteLoginCompleted?()
     } catch {
-      if isAuthError(error) {
+      if isUnauthorized(error) {
         try? repository.clearSyncSession()
       }
     }
@@ -199,11 +199,16 @@ public final class AppSession: ObservableObject {
   }
 
   public func logout() throws {
+    try invalidateSession(reason: "")
+  }
+
+  public func invalidateSession(reason: String) throws {
     try repository.clearSyncSession()
     currentUser = nil
     authToken = nil
     remoteUserId = nil
     pendingDeviceVerification = nil
+    _ = reason
   }
 
   private func refreshWorksite(token: String) async {
@@ -216,11 +221,15 @@ public final class AppSession: ObservableObject {
     }
   }
 
-  private func isAuthError(_ error: Error) -> Bool {
+  private func isUnauthorized(_ error: Error) -> Bool {
     if case let APIError.http(status, _) = error {
-      return status == 401 || status == 403
+      return status == 401
     }
     return false
+  }
+
+  private func isAuthError(_ error: Error) -> Bool {
+    isUnauthorized(error)
   }
 
   private struct PendingDeviceVerification: Sendable {

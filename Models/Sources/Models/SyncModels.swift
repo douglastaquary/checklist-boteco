@@ -66,7 +66,7 @@ public struct PendingSyncOperation: Codable, Equatable, Sendable, Identifiable {
   }
 }
 
-public struct RemoteActivityRecord: Codable, Equatable, Sendable {
+public struct RemoteActivityRecord: Decodable, Equatable, Sendable {
   public let syncId: String
   public let name: String
   public let area: String
@@ -74,9 +74,43 @@ public struct RemoteActivityRecord: Codable, Equatable, Sendable {
   public let effort: Int
   public let serverRevision: Int64
   public let updatedAt: Int64
+
+  private enum CodingKeys: String, CodingKey {
+    case syncId, id, name, area, frequency, effort, serverRevision, updatedAt
+  }
+
+  public init(
+    syncId: String,
+    name: String,
+    area: String,
+    frequency: String,
+    effort: Int,
+    serverRevision: Int64,
+    updatedAt: Int64
+  ) {
+    self.syncId = syncId
+    self.name = name
+    self.area = area
+    self.frequency = frequency
+    self.effort = effort
+    self.serverRevision = serverRevision
+    self.updatedAt = updatedAt
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    syncId = try container.decodeIfPresent(String.self, forKey: .syncId)
+      ?? container.decode(String.self, forKey: .id)
+    name = try container.decode(String.self, forKey: .name)
+    area = try container.decode(String.self, forKey: .area)
+    frequency = try container.decode(String.self, forKey: .frequency)
+    effort = try container.decode(Int.self, forKey: .effort)
+    serverRevision = try container.decodeIfPresent(Int64.self, forKey: .serverRevision) ?? 0
+    updatedAt = try container.decodeIfPresent(Int64.self, forKey: .updatedAt) ?? 0
+  }
 }
 
-public struct RemoteCompletionRecord: Codable, Equatable, Sendable {
+public struct RemoteCompletionRecord: Decodable, Equatable, Sendable {
   public let syncId: String
   public let activitySyncId: String
   public let userId: String
@@ -85,6 +119,44 @@ public struct RemoteCompletionRecord: Codable, Equatable, Sendable {
   public let isLate: Bool
   public let serverRevision: Int64
   public let updatedAt: Int64
+
+  private enum CodingKeys: String, CodingKey {
+    case syncId, id, activitySyncId, activityId, userId, completedAt, imagePath, isLate, serverRevision, updatedAt
+  }
+
+  public init(
+    syncId: String,
+    activitySyncId: String,
+    userId: String,
+    completedAt: Int64,
+    imagePath: String? = nil,
+    isLate: Bool = false,
+    serverRevision: Int64,
+    updatedAt: Int64
+  ) {
+    self.syncId = syncId
+    self.activitySyncId = activitySyncId
+    self.userId = userId
+    self.completedAt = completedAt
+    self.imagePath = imagePath
+    self.isLate = isLate
+    self.serverRevision = serverRevision
+    self.updatedAt = updatedAt
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    syncId = try container.decodeIfPresent(String.self, forKey: .syncId)
+      ?? container.decode(String.self, forKey: .id)
+    activitySyncId = try container.decodeIfPresent(String.self, forKey: .activitySyncId)
+      ?? container.decode(String.self, forKey: .activityId)
+    userId = try container.decode(String.self, forKey: .userId)
+    completedAt = try container.decode(Int64.self, forKey: .completedAt)
+    imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
+    isLate = try container.decodeIfPresent(Bool.self, forKey: .isLate) ?? false
+    serverRevision = try container.decodeIfPresent(Int64.self, forKey: .serverRevision) ?? 0
+    updatedAt = try container.decodeIfPresent(Int64.self, forKey: .updatedAt) ?? 0
+  }
 }
 
 public struct RemoteTombstone: Codable, Equatable, Sendable {
@@ -94,7 +166,7 @@ public struct RemoteTombstone: Codable, Equatable, Sendable {
   public let deletedAt: Int64
 }
 
-public struct SyncAcknowledgement: Codable, Equatable, Sendable {
+public struct SyncAcknowledgement: Decodable, Equatable, Sendable {
   public let operationId: String
   public let status: SyncAckStatus
   public let serverRevision: Int64
@@ -114,15 +186,28 @@ public struct SyncAcknowledgement: Codable, Equatable, Sendable {
     self.conflict = conflict
     self.message = message
   }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    operationId = try container.decode(String.self, forKey: .operationId)
+    status = try container.decode(SyncAckStatus.self, forKey: .status)
+    serverRevision = try container.decodeIfPresent(Int64.self, forKey: .serverRevision) ?? 0
+    conflict = try container.decodeIfPresent(RemoteActivityRecord.self, forKey: .conflict)
+    message = try container.decodeIfPresent(String.self, forKey: .message)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case operationId, status, serverRevision, conflict, message
+  }
 }
 
-public struct SyncPushResponse: Codable, Sendable {
+public struct SyncPushResponse: Decodable, Sendable {
   public let serverTime: Int64
   public let cursor: String
   public let acknowledgements: [SyncAcknowledgement]
 }
 
-public struct SyncPullResponse: Codable, Sendable {
+public struct SyncPullResponse: Decodable, Sendable {
   public let nextCursor: String
   public let hasMore: Bool
   public let activities: [RemoteActivityRecord]

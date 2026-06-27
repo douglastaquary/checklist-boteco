@@ -36,6 +36,7 @@ public struct LoginView: View {
     credentialStore: CredentialStoreProtocol = KeychainCredentialStore(),
     onLoginSuccess: @escaping () -> Void,
     onRegisterTap: @escaping () -> Void,
+    sessionExpiredMessage: String? = nil,
     debugPhase: LoginPhase? = nil,
     debugTwoFactorHint: String? = nil,
     debugUsername: String = "",
@@ -49,7 +50,7 @@ public struct LoginView: View {
     _phase = State(initialValue: debugPhase ?? .credentials)
     _twoFactorHint = State(initialValue: debugTwoFactorHint)
     _username = State(initialValue: debugUsername)
-    _localError = State(initialValue: debugLocalError)
+    _localError = State(initialValue: sessionExpiredMessage ?? debugLocalError)
   }
 
   public var body: some View {

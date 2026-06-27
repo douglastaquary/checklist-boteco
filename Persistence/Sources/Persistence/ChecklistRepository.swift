@@ -49,10 +49,10 @@ public final class ChecklistRepository: Sendable {
         ]
       )
       let activities: [(String, Area, Frequency)] = [
-        ("Abrir caixa", .atendimento, .daily),
-        ("Conferir estoque geladeira", .estoque, .daily),
-        ("Limpar balcão", .limpeza, .daily),
-        ("Preparar mise en place", .cozinha, .daily),
+        ("Abrir caixa", .atendimento, .diario),
+        ("Conferir estoque geladeira", .estoque, .diario),
+        ("Limpar balcão", .limpeza, .diario),
+        ("Preparar mise en place", .cozinha, .diario),
       ]
       for (name, area, frequency) in activities {
         try db.execute(
@@ -376,9 +376,97 @@ public final class ChecklistRepository: Sendable {
     }
   }
 
+  public func repairPendingSyncQueue() throws {
+    try dbQueue.write { db in
+      let pendingActivities = try Row.fetchAll(
+        db,
+        sql: """
+        SELECT * FROM Activity
+        WHERE deletedAt IS NULL AND syncState = 'PENDING'
+          AND syncId IS NOT NULL AND syncId != ''
+        """
+      )
+      for row in pendingActivities {
+        let syncId: String = row["syncId"]
+        let pendingOutbox = try Int.fetchOne(
+          db,
+          sql: "SELECT COUNT(*) FROM SyncOutbox WHERE entitySyncId = ? AND status = 'PENDING'",
+          arguments: [syncId]
+        ) ?? 0
+        guard pendingOutbox == 0 else { continue }
+        let name: String = row["name"]
+        let area: String = row["area"]
+        let frequency: String = row["frequency"]
+        let effort = row["effort"] as Int64? ?? 1
+        let serverRevision = row["serverRevision"] as Int64? ?? 0
+        let deletedAt = row["deletedAt"] as Int64?
+        if deletedAt != nil {
+          let payload = """
+          {"syncId":"\(syncId)","name":"\(name)","area":"\(area)","frequency":"\(frequency)","effort":\(effort),"baseRevision":\(serverRevision),"deletedAt":\(deletedAt!)}
+          """
+          try enqueueOutbox(
+            db,
+            entityType: .activity,
+            entitySyncId: syncId,
+            operationType: .activityDelete,
+            payload: payload
+          )
+        } else {
+          let payload = """
+          {"syncId":"\(syncId)","name":"\(name)","area":"\(area)","frequency":"\(frequency)","effort":\(effort),"baseRevision":\(serverRevision)}
+          """
+          try enqueueOutbox(
+            db,
+            entityType: .activity,
+            entitySyncId: syncId,
+            operationType: .activityUpsert,
+            payload: payload
+          )
+        }
+      }
+    }
+  }
+
   public func acknowledgeSyncOperation(_ ack: SyncAcknowledgement) throws {
     try dbQueue.write { db in
-      try db.execute(sql: "DELETE FROM SyncOutbox WHERE operationId = ?", arguments: [ack.operationId])
+      let row = try Row.fetchOne(
+        db,
+        sql: "SELECT entityType, entitySyncId, operationType FROM SyncOutbox WHERE operationId = ?",
+        arguments: [ack.operationId]
+      )
+      switch ack.status {
+      case .applied, .alreadyApplied:
+        if let row {
+          let entitySyncId: String = row["entitySyncId"]
+          let opType = row["operationType"] as String
+          if opType == SyncOperationType.activityUpsert.rawValue {
+            try db.execute(
+              sql: "UPDATE Activity SET serverRevision = ?, syncState = 'SYNCED' WHERE syncId = ?",
+              arguments: [ack.serverRevision, entitySyncId]
+            )
+          } else if opType == SyncOperationType.activityDelete.rawValue {
+            try db.execute(
+              sql: "UPDATE Activity SET serverRevision = ?, syncState = 'SYNCED' WHERE syncId = ?",
+              arguments: [ack.serverRevision, entitySyncId]
+            )
+          } else if opType == SyncOperationType.completionCreate.rawValue {
+            try db.execute(
+              sql: "UPDATE ActivityCompletion SET serverRevision = ?, syncState = 'SYNCED' WHERE syncId = ?",
+              arguments: [ack.serverRevision, entitySyncId]
+            )
+          }
+        }
+        try db.execute(sql: "DELETE FROM SyncOutbox WHERE operationId = ?", arguments: [ack.operationId])
+      case .conflict, .rejected:
+        let now = Date.nowMillis
+        try db.execute(
+          sql: """
+          UPDATE SyncOutbox SET attemptCount = attemptCount + 1, nextAttemptAt = ?, lastError = ?, status = 'PENDING'
+          WHERE operationId = ?
+          """,
+          arguments: [now + 15 * 60 * 1000, ack.message ?? ack.status.rawValue, ack.operationId]
+        )
+      }
     }
   }
 
