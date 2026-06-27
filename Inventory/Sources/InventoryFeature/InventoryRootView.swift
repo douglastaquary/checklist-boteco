@@ -301,7 +301,7 @@ public struct InventoryRootView: View {
     let inventoryClient: InventoryClient
     let token: String
     do {
-      (inventoryClient, token) = try requireInventoryRemoteAccess()
+      (inventoryClient, token) = try await requireInventoryRemoteAccess()
     } catch is RemoteSessionRequiredError {
       return
     } catch {
@@ -358,7 +358,7 @@ public struct InventoryRootView: View {
     let inventoryClient: InventoryClient
     let token: String
     do {
-      (inventoryClient, token) = try requireInventoryRemoteAccess()
+      (inventoryClient, token) = try await requireInventoryRemoteAccess()
     } catch is RemoteSessionRequiredError {
       return
     } catch {
@@ -387,7 +387,7 @@ public struct InventoryRootView: View {
     let inventoryClient: InventoryClient
     let token: String
     do {
-      (inventoryClient, token) = try requireInventoryRemoteAccess()
+      (inventoryClient, token) = try await requireInventoryRemoteAccess()
     } catch is RemoteSessionRequiredError {
       return
     } catch {
@@ -444,7 +444,7 @@ public struct InventoryRootView: View {
     let inventoryClient: InventoryClient
     let token: String
     do {
-      (inventoryClient, token) = try requireInventoryRemoteAccess()
+      (inventoryClient, token) = try await requireInventoryRemoteAccess()
     } catch is RemoteSessionRequiredError {
       return
     } catch {
