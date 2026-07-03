@@ -1,6 +1,7 @@
 import SwiftUI
 import Models
 import Persistence
+import DesignSystem
 
 public struct WorkClockDayEntriesView: View {
   private let userId: Int64
@@ -28,6 +29,7 @@ public struct WorkClockDayEntriesView: View {
       }
     }
     .navigationTitle("Marcações do dia")
+    .becoBackButton()
     .task { await reload() }
   }
 

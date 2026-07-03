@@ -13,7 +13,7 @@ public final class AppTheme: ObservableObject {
   public let secondaryLabel: Color
 
   private init() {
-    tint = Color(red: 0.45, green: 0.25, blue: 0.10)
+    tint = Color(red: 23 / 255, green: 23 / 255, blue: 23 / 255)
     primaryBackground = Color(.systemBackground)
     secondaryBackground = Color(.secondarySystemBackground)
     rowBackground = Color(.systemBackground)

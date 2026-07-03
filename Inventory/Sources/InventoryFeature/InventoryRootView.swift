@@ -120,18 +120,6 @@ public struct InventoryRootView: View {
 
   public var body: some View {
     List {
-      Section {
-        BecoUserHeader(
-          name: user.name,
-          role: user.workSector.displayName,
-          date: Date.now.formatted(date: .abbreviated, time: .omitted),
-          onLogout: onLogout
-        )
-        .listRowInsets(EdgeInsets())
-        .listRowSeparator(.hidden)
-        .themedListRowBackground()
-      }
-
       if canManageAdministrativeStock && canCreate {
         Section {
           BecoSegmentedFilter(
@@ -172,6 +160,15 @@ public struct InventoryRootView: View {
     .themedListStyle()
     .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      BecoUserHeader(
+        name: user.name,
+        role: user.workSector.displayName,
+        date: Date.now.formatted(date: .abbreviated, time: .omitted),
+        onLogout: onLogout
+      )
+      .background(BecoTokens.ColorToken.background)
+    }
     .toolbar {
       if canOpenAudit {
         ToolbarItem(placement: .primaryAction) {

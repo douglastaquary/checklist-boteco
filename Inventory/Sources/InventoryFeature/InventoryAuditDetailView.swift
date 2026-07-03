@@ -64,6 +64,7 @@ public struct InventoryAuditDetailView: View {
     .themedListStyle()
     .navigationTitle("Detalhe")
     .navigationBarTitleDisplayMode(.inline)
+    .becoBackButton()
   }
 
   private func formatNumber(_ value: Double) -> String {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 public enum BecoTokens {
   public enum ColorToken {
@@ -8,7 +9,7 @@ public enum BecoTokens {
     public static let surface = Color.white
     public static let subtle = Color(red: 241 / 255, green: 241 / 255, blue: 243 / 255)
     public static let outline = Color(red: 226 / 255, green: 226 / 255, blue: 226 / 255)
-    public static let brand = Color(red: 94 / 255, green: 53 / 255, blue: 177 / 255)
+    public static let brand = ink
   }
 
   public enum Spacing {
@@ -93,6 +94,152 @@ public struct BecoPageHeader<Actions: View>: View {
     .padding(.horizontal, BecoTokens.Spacing.md)
     .padding(.vertical, BecoTokens.Spacing.sm)
     .background(BecoTokens.ColorToken.background)
+  }
+}
+
+public struct BecoBackButton: View {
+  private let action: () -> Void
+
+  public init(action: @escaping () -> Void) {
+    self.action = action
+  }
+
+  public var body: some View {
+    Button(action: action) {
+      Image(systemName: "chevron.left")
+        .font(.system(size: 17, weight: .semibold))
+        .foregroundStyle(BecoTokens.ColorToken.ink)
+        .frame(width: 48, height: 48)
+        .background(.ultraThinMaterial, in: Circle())
+        .overlay(Circle().stroke(BecoTokens.ColorToken.outline.opacity(0.7), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.08), radius: 6, y: 2)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Voltar")
+  }
+}
+
+private struct BecoBackButtonModifier: ViewModifier {
+  @Environment(\.dismiss) private var dismiss
+
+  func body(content: Content) -> some View {
+    content
+      .navigationBarBackButtonHidden(true)
+      .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          BecoBackButton { dismiss() }
+        }
+      }
+      .background(BecoInteractivePopGestureEnabler())
+  }
+}
+
+private struct BecoInteractivePopGestureEnabler: UIViewControllerRepresentable {
+  func makeUIViewController(context: Context) -> Controller { Controller() }
+  func updateUIViewController(_ uiViewController: Controller, context: Context) {}
+
+  final class Controller: UIViewController {
+    override func viewDidAppear(_ animated: Bool) {
+      super.viewDidAppear(animated)
+      navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+      navigationController?.interactivePopGestureRecognizer?.delegate = nil
+    }
+  }
+}
+
+public extension View {
+  func becoBackButton() -> some View {
+    modifier(BecoBackButtonModifier())
+  }
+}
+
+public struct BecoTabBarItem<ID: Hashable>: Identifiable {
+  public let id: ID
+  public let title: String
+  public let systemImage: String
+
+  public init(id: ID, title: String, systemImage: String) {
+    self.id = id
+    self.title = title
+    self.systemImage = systemImage
+  }
+}
+
+public struct BecoTabBar<ID: Hashable>: View {
+  private let items: [BecoTabBarItem<ID>]
+  private let selected: ID
+  private let hasOverflow: Bool
+  private let overflowSelected: Bool
+  private let onSelect: (ID) -> Void
+  private let onMore: () -> Void
+
+  public init(
+    items: [BecoTabBarItem<ID>],
+    selected: ID,
+    hasOverflow: Bool,
+    overflowSelected: Bool,
+    onSelect: @escaping (ID) -> Void,
+    onMore: @escaping () -> Void
+  ) {
+    self.items = items
+    self.selected = selected
+    self.hasOverflow = hasOverflow
+    self.overflowSelected = overflowSelected
+    self.onSelect = onSelect
+    self.onMore = onMore
+  }
+
+  public var body: some View {
+    HStack(spacing: BecoTokens.Spacing.xs) {
+      ForEach(items) { item in
+        tabButton(
+          title: item.title,
+          systemImage: item.systemImage,
+          selected: selected == item.id,
+          action: { onSelect(item.id) }
+        )
+      }
+      if hasOverflow {
+        tabButton(
+          title: "Mais",
+          systemImage: "ellipsis",
+          selected: overflowSelected,
+          action: onMore
+        )
+      }
+    }
+    .padding(BecoTokens.Spacing.xs)
+    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 32, style: .continuous)
+        .stroke(BecoTokens.ColorToken.outline.opacity(0.75), lineWidth: 1)
+    )
+    .shadow(color: Color.black.opacity(0.12), radius: 12, y: 5)
+    .padding(.horizontal, BecoTokens.Spacing.md)
+    .padding(.vertical, BecoTokens.Spacing.xs)
+  }
+
+  private func tabButton(
+    title: String,
+    systemImage: String,
+    selected: Bool,
+    action: @escaping () -> Void
+  ) -> some View {
+    Button(action: action) {
+      VStack(spacing: BecoTokens.Spacing.xxs) {
+        Image(systemName: systemImage).font(.system(size: 20, weight: .semibold))
+        Text(title).font(.caption.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.75)
+      }
+      .foregroundStyle(selected ? Color.white : BecoTokens.ColorToken.muted)
+      .frame(maxWidth: .infinity, minHeight: 58)
+      .background(
+        selected ? BecoTokens.ColorToken.ink : Color.clear,
+        in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+      )
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(title)
+    .accessibilityAddTraits(selected ? .isSelected : [])
   }
 }
 

@@ -49,6 +49,7 @@ public struct ChecklistActivityDetailView: View {
       }
     }
     .navigationTitle("Detalhe")
+    .becoBackButton()
     .task { await load() }
   }
 

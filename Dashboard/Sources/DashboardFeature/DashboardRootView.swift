@@ -27,6 +27,7 @@ public struct DashboardAreaDetailView: View {
     }
     .themedListStyle()
     .navigationTitle(area.displayName)
+    .becoBackButton()
     .task { activities = (try? repository.allActivities().filter { $0.area == area }) ?? [] }
   }
 }

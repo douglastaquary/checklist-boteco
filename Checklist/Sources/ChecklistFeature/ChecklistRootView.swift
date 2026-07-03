@@ -41,12 +41,6 @@ public struct ChecklistRootView: View {
   public var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
-        BecoUserHeader(
-          name: user.name,
-          role: user.workSector.displayName,
-          date: Date.now.formatted(date: .abbreviated, time: .omitted),
-          onLogout: onLogout
-        )
         BecoSegmentedFilter(
           options: ChecklistViewFilter.allCases.map { filter in
             (filter, filter.label, count(for: filter))
@@ -86,6 +80,15 @@ public struct ChecklistRootView: View {
     }
     .background(BecoTokens.ColorToken.background.ignoresSafeArea())
     .toolbar(.hidden, for: .navigationBar)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      BecoUserHeader(
+        name: user.name,
+        role: user.workSector.displayName,
+        date: Date.now.formatted(date: .abbreviated, time: .omitted),
+        onLogout: onLogout
+      )
+      .background(BecoTokens.ColorToken.background)
+    }
     .task(id: selectedArea) { await reload() }
     .sheet(item: $cameraCapture, onDismiss: { Task { await reload() } }) { request in
       CameraCaptureView { path in

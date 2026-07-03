@@ -93,12 +93,6 @@ public struct WorkClockRootView: View {
 
     ScrollView {
       LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.lg) {
-        BecoUserHeader(
-          name: user.name,
-          role: user.workSector.displayName,
-          date: Date.now.formatted(date: .abbreviated, time: .omitted),
-          onLogout: onLogout
-        )
         VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
           Text("Ponto").font(.largeTitle.bold())
           Text("Próxima marcação: \(nextType.displayName)")
@@ -123,6 +117,15 @@ public struct WorkClockRootView: View {
     }
     .background(BecoTokens.ColorToken.background)
     .toolbar(.hidden, for: .navigationBar)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      BecoUserHeader(
+        name: user.name,
+        role: user.workSector.displayName,
+        date: Date.now.formatted(date: .abbreviated, time: .omitted),
+        onLogout: onLogout
+      )
+      .background(BecoTokens.ColorToken.background)
+    }
     .safeAreaInset(edge: .bottom) {
       VStack(spacing: 12) {
         Button {
