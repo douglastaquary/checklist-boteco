@@ -17,6 +17,7 @@ public struct ChecklistRootView: View {
 
   @State private var selectedArea: Area
   @State private var items: [ActivityWithCompletion] = []
+  @State private var selectedFilter: ChecklistViewFilter = .all
   @State private var cameraCapture: CameraCaptureRequest?
   @State private var alert: ChecklistAlert?
 
@@ -38,42 +39,53 @@ public struct ChecklistRootView: View {
   }
 
   public var body: some View {
-    List {
-      Section(sectionTitle) {
-        if items.isEmpty {
-          Text("Nenhuma atividade para esta área.")
-            .foregroundColor(.secondary)
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
+        BecoUserHeader(
+          name: user.name,
+          role: user.workSector.displayName,
+          date: Date.now.formatted(date: .abbreviated, time: .omitted),
+          onLogout: onLogout
+        )
+        BecoSegmentedFilter(
+          options: ChecklistViewFilter.allCases.map { filter in
+            (filter, filter.label, count(for: filter))
+          },
+          selected: $selectedFilter
+        )
+        if accessibleAreas.count > 1 {
+          BecoSegmentedFilter(
+            options: accessibleAreas.map { ($0, $0.displayName, nil) },
+            selected: $selectedArea
+          )
+        }
+        Divider().padding(.vertical, BecoTokens.Spacing.xs)
+        Text(sectionTitle).font(.headline)
+        if visibleItems.isEmpty {
+          VStack(spacing: BecoTokens.Spacing.xs) {
+            Text("Nenhuma atividade").font(.headline)
+            Text(emptyMessage).font(.subheadline).foregroundStyle(BecoTokens.ColorToken.muted)
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, BecoTokens.Spacing.xxl)
         } else {
-          ForEach(items) { item in
-            ActivityChecklistRow(
-              item: item,
+          ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+            BecoTaskRow(
+              title: item.activity.name,
+              metadata: "\(item.activity.frequency.displayName) · esforço \(item.activity.effort)",
+              completed: item.completion != nil,
               onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
-              onMarkComplete: {
-                cameraCapture = CameraCaptureRequest(activityId: item.activity.id)
-              }
+              onComplete: { cameraCapture = CameraCaptureRequest(activityId: item.activity.id) }
             )
-            .themedListRowBackground()
+            if index < visibleItems.count - 1 { Divider() }
           }
         }
       }
+      .padding(.horizontal, BecoTokens.Spacing.md)
+      .padding(.bottom, BecoTokens.Spacing.xl)
     }
-    .themedListStyle()
-    .navigationTitle("Checklist")
-    .toolbar {
-      if accessibleAreas.count > 1 {
-        ToolbarItem(placement: .navigationBarLeading) {
-          Picker("Área", selection: $selectedArea) {
-            ForEach(accessibleAreas, id: \.self) { area in
-              Text(area.displayName).tag(area)
-            }
-          }
-          .pickerStyle(.menu)
-        }
-      }
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Button("Sair", action: onLogout)
-      }
-    }
+    .background(BecoTokens.ColorToken.background.ignoresSafeArea())
+    .toolbar(.hidden, for: .navigationBar)
     .task(id: selectedArea) { await reload() }
     .sheet(item: $cameraCapture, onDismiss: { Task { await reload() } }) { request in
       CameraCaptureView { path in
@@ -92,6 +104,30 @@ public struct ChecklistRootView: View {
 
   private var sectionTitle: String {
     accessibleAreas.count == 1 ? accessibleAreas[0].displayName : "Atividades"
+  }
+
+  private var visibleItems: [ActivityWithCompletion] {
+    switch selectedFilter {
+    case .all: return items
+    case .pending: return items.filter { $0.completion == nil }
+    case .completed: return items.filter { $0.completion != nil }
+    }
+  }
+
+  private func count(for filter: ChecklistViewFilter) -> Int {
+    switch filter {
+    case .all: return items.count
+    case .pending: return items.filter { $0.completion == nil }.count
+    case .completed: return items.filter { $0.completion != nil }.count
+    }
+  }
+
+  private var emptyMessage: String {
+    switch selectedFilter {
+    case .all: return "Não há atividades para \(selectedArea.displayName)."
+    case .pending: return "Todas as atividades visíveis foram concluídas."
+    case .completed: return "Nenhuma atividade foi concluída ainda."
+    }
   }
 
   @MainActor
@@ -118,6 +154,17 @@ public struct ChecklistRootView: View {
       }
     } catch {
       alert = ChecklistAlert(title: "Erro", message: error.localizedDescription)
+    }
+  }
+}
+
+private enum ChecklistViewFilter: String, CaseIterable, Hashable {
+  case all, pending, completed
+  var label: String {
+    switch self {
+    case .all: return "Todas"
+    case .pending: return "Pendentes"
+    case .completed: return "Concluídas"
     }
   }
 }

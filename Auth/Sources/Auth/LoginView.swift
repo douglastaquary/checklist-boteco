@@ -56,6 +56,22 @@ public struct LoginView: View {
   public var body: some View {
     NavigationStack {
       Form {
+        Section {
+          VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
+            Text("Beco da Praia")
+              .font(.subheadline.weight(.semibold))
+              .foregroundStyle(BecoTokens.ColorToken.brand)
+            Text("Bem-vindo")
+              .font(.largeTitle.bold())
+              .foregroundStyle(BecoTokens.ColorToken.ink)
+            Text("Acesse sua rotina operacional")
+              .foregroundStyle(BecoTokens.ColorToken.muted)
+          }
+          .padding(.vertical, BecoTokens.Spacing.sm)
+          .themedListRowBackground()
+        }
+        .listRowSeparator(.hidden)
+
         if phase == .biometricUnlock {
           Section {
             Text("Login salvo neste aparelho. Confirme sua biometria para preencher usuário e senha.")
@@ -120,7 +136,8 @@ public struct LoginView: View {
         }
       }
       .themedFormStyle()
-      .navigationTitle("Checklist Boteco")
+      .navigationTitle("")
+      .navigationBarHidden(true)
       .task {
         guard !skipsRestore else { return }
         await restoreSavedLogin(autoUnlock: true)

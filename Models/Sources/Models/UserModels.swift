@@ -25,6 +25,21 @@ public enum WorkSector: String, CaseIterable, Codable, Sendable {
     WorkSector(rawValue: value.uppercased()) ?? .atendimento
   }
 
+  public var displayName: String {
+    switch self {
+    case .atendimento: return "Atendimento"
+    case .cozinha: return "Cozinha"
+    case .servicosGerais: return "Serviços Gerais"
+    case .garcom: return "Garçom"
+    case .cumim: return "Cumim"
+    case .chefeCozinha: return "Chefe de Cozinha"
+    case .gerente: return "Gerente"
+    case .ajudanteCozinha: return "Ajudante de Cozinha"
+    case .atendente: return "Atendente"
+    case .barman: return "Barman"
+    }
+  }
+
   /// Área principal de atividades associada ao setor (paridade backend/KMP).
   public var activityArea: Area {
     switch self {

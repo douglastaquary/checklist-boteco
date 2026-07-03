@@ -18,6 +18,12 @@ public struct ActivitiesManagementView: View {
   public var body: some View {
     List {
       Section {
+        BecoPageHeader(title: "Atividades", subtitle: "Rotinas operacionais cadastradas")
+          .listRowInsets(EdgeInsets())
+          .listRowSeparator(.hidden)
+          .themedListRowBackground()
+      }
+      Section {
         Button("Nova atividade") {
           createSheet = ActivityCreateSheet()
         }
@@ -32,7 +38,8 @@ public struct ActivitiesManagementView: View {
       )
     }
     .themedListStyle()
-    .navigationTitle("Atividades")
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
     .task { reload() }
     .sheet(item: $createSheet) { _ in
       ActivityFormSheet(
@@ -173,6 +180,12 @@ public struct PermissionManagementView: View {
 
   public var body: some View {
     List {
+      Section {
+        BecoPageHeader(title: "Equipe", subtitle: "Usuários e permissões de acesso")
+          .listRowInsets(EdgeInsets())
+          .listRowSeparator(.hidden)
+          .themedListRowBackground()
+      }
       if let loadError {
         Section {
           Text(loadError)
@@ -201,7 +214,8 @@ public struct PermissionManagementView: View {
       }
     }
     .themedListStyle()
-    .navigationTitle("Permissões")
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
     .task { await reloadUsers() }
     .sheet(item: $editSheet) { sheet in
       PermissionEditorSheet(

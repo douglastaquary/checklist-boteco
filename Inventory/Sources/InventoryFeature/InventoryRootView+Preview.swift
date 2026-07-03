@@ -9,6 +9,7 @@ struct InventoryRootView_Previews: PreviewProvider {
     Group {
       NavigationStack {
         InventoryRootView(
+          user: previewUser,
           repository: previewRepository,
           inventoryClient: nil,
           token: nil,
@@ -21,6 +22,7 @@ struct InventoryRootView_Previews: PreviewProvider {
 
       NavigationStack {
         InventoryRootView(
+          user: previewUser,
           repository: previewRepository,
           inventoryClient: nil,
           token: "preview-token",
@@ -60,6 +62,20 @@ struct InventoryRootView_Previews: PreviewProvider {
 
   private static var previewRepository: ChecklistRepository {
     ChecklistRepository(dbQueue: try! AppDatabase.inMemory())
+  }
+
+  private static var previewUser: User {
+    User(
+      id: 1,
+      name: "Daniel Acevedo",
+      email: "daniel@beco.local",
+      password: "x",
+      area: .atendimento,
+      workSector: .gerente,
+      permissionLevel: .admin,
+      allowedAreas: Area.allCases,
+      featurePermissions: .admin
+    )
   }
 }
 #endif

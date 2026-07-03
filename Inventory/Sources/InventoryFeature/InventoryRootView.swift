@@ -24,6 +24,8 @@ private enum InventoryDraftSheet: Identifiable {
 }
 
 public struct InventoryRootView: View {
+  private let user: User
+  private let onLogout: () -> Void
   private let repository: ChecklistRepository
   private let inventoryClient: InventoryClient?
   private let token: String?
@@ -46,6 +48,8 @@ public struct InventoryRootView: View {
   @State private var auditResult: ApplyDailyAuditResponse?
 
   public init(
+    user: User,
+    onLogout: @escaping () -> Void = {},
     repository: ChecklistRepository,
     inventoryClient: InventoryClient?,
     token: String?,
@@ -54,6 +58,8 @@ public struct InventoryRootView: View {
     canManageAdministrativeStock: Bool = false,
     onSelectAuditItem: ((InventoryAuditItemSnapshot) -> Void)? = nil
   ) {
+    self.user = user
+    self.onLogout = onLogout
     self.repository = repository
     self.inventoryClient = inventoryClient
     self.token = token
@@ -66,6 +72,8 @@ public struct InventoryRootView: View {
 
   #if DEBUG
   init(
+    user: User,
+    onLogout: @escaping () -> Void = {},
     repository: ChecklistRepository,
     inventoryClient: InventoryClient?,
     token: String?,
@@ -75,6 +83,8 @@ public struct InventoryRootView: View {
     onSelectAuditItem: ((InventoryAuditItemSnapshot) -> Void)?,
     initialBanner: InventoryBanner
   ) {
+    self.user = user
+    self.onLogout = onLogout
     self.repository = repository
     self.inventoryClient = inventoryClient
     self.token = token
@@ -110,14 +120,24 @@ public struct InventoryRootView: View {
 
   public var body: some View {
     List {
+      Section {
+        BecoUserHeader(
+          name: user.name,
+          role: user.workSector.displayName,
+          date: Date.now.formatted(date: .abbreviated, time: .omitted),
+          onLogout: onLogout
+        )
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .themedListRowBackground()
+      }
+
       if canManageAdministrativeStock && canCreate {
         Section {
-          Picker("Modo", selection: $administrativeMode) {
-            Text("Abertura").tag(false)
-            Text("Estoque admin").tag(true)
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
+          BecoSegmentedFilter(
+            options: [(false, "Abertura", nil), (true, "Estoque admin", nil)],
+            selected: $administrativeMode
+          )
           .onChange(of: administrativeMode) { _ in reload() }
           .themedListRowBackground()
         }
@@ -150,7 +170,8 @@ public struct InventoryRootView: View {
       }
     }
     .themedListStyle()
-    .navigationTitle(navigationTitle)
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       if canOpenAudit {
         ToolbarItem(placement: .primaryAction) {

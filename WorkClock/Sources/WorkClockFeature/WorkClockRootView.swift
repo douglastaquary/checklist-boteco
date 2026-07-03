@@ -47,6 +47,7 @@ public final class LocationTracker: NSObject, ObservableObject, CLLocationManage
 }
 
 public struct WorkClockRootView: View {
+  private let user: User
   private let userId: Int64
   private let authToken: String?
   private let remoteUserId: String?
@@ -54,6 +55,7 @@ public struct WorkClockRootView: View {
   private let syncController: SyncController
   private let deviceId: String
   private let onShowDayEntries: (() -> Void)?
+  private let onLogout: () -> Void
 
   @EnvironmentObject private var theme: AppTheme
   @StateObject private var tracker = LocationTracker()
@@ -62,14 +64,17 @@ public struct WorkClockRootView: View {
   @State private var isRegistering = false
 
   public init(
+    user: User,
     userId: Int64,
     authToken: String?,
     remoteUserId: String?,
     repository: ChecklistRepository,
     syncController: SyncController,
     deviceId: String,
-    onShowDayEntries: (() -> Void)? = nil
+    onShowDayEntries: (() -> Void)? = nil,
+    onLogout: @escaping () -> Void = {}
   ) {
+    self.user = user
     self.userId = userId
     self.authToken = authToken
     self.remoteUserId = remoteUserId
@@ -77,6 +82,7 @@ public struct WorkClockRootView: View {
     self.syncController = syncController
     self.deviceId = deviceId
     self.onShowDayEntries = onShowDayEntries
+    self.onLogout = onLogout
   }
 
   public var body: some View {
@@ -85,24 +91,38 @@ public struct WorkClockRootView: View {
     let distance = currentDistance
     let canRegister = canUseClock(distance: distance)
 
-    Form {
-      WorkClockStatusSection(
-        nextType: nextType,
-        distance: distance,
-        accuracy: effectiveAccuracy,
-        locationStatus: locationStatus,
-        isWithinRadius: canRegister,
-        authorizationDenied: tracker.authorizationDenied
-      )
-      WorkClockSummarySection(summary: summary)
-      if let onShowDayEntries, !entries.isEmpty {
-        Section {
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.lg) {
+        BecoUserHeader(
+          name: user.name,
+          role: user.workSector.displayName,
+          date: Date.now.formatted(date: .abbreviated, time: .omitted),
+          onLogout: onLogout
+        )
+        VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
+          Text("Ponto").font(.largeTitle.bold())
+          Text("Próxima marcação: \(nextType.displayName)")
+            .foregroundStyle(BecoTokens.ColorToken.muted)
+        }
+        WorkClockStatusSection(
+          nextType: nextType,
+          distance: distance,
+          accuracy: effectiveAccuracy,
+          locationStatus: locationStatus,
+          isWithinRadius: canRegister,
+          authorizationDenied: tracker.authorizationDenied
+        )
+        WorkClockSummarySection(summary: summary)
+        if let onShowDayEntries, !entries.isEmpty {
           Button("Ver marcações do dia", action: onShowDayEntries)
+            .buttonStyle(.bordered)
         }
       }
+      .padding(.horizontal, BecoTokens.Spacing.md)
+      .padding(.bottom, BecoTokens.Spacing.xxl)
     }
-    .themedFormStyle()
-    .navigationTitle("Ponto")
+    .background(BecoTokens.ColorToken.background)
+    .toolbar(.hidden, for: .navigationBar)
     .safeAreaInset(edge: .bottom) {
       VStack(spacing: 12) {
         Button {
@@ -277,8 +297,8 @@ private struct WorkClockStatusSection: View {
   let authorizationDenied: Bool
 
   var body: some View {
-    Section("Próxima marcação") {
-      Text(nextType.displayName).font(.title2.bold())
+    VStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
+      Text("Localização").font(.headline)
       statusRow
       if let distance {
         Text(String(format: "Distância do local: %.1f m", distance))
@@ -293,6 +313,8 @@ private struct WorkClockStatusSection: View {
         }
       }
     }
+    .padding(BecoTokens.Spacing.md)
+    .background(BecoTokens.ColorToken.surface, in: RoundedRectangle(cornerRadius: 16))
   }
 
   @ViewBuilder
@@ -311,9 +333,26 @@ private struct WorkClockSummarySection: View {
   let summary: WorkClockSummary
 
   var body: some View {
-    Section("Resumo do dia") {
-      LabeledContent("Trabalhadas", value: WorkClockCalculator.formatDuration(summary.workedMillis))
-      LabeledContent("Extras semana", value: WorkClockCalculator.formatDuration(summary.overtimeMillis))
+    VStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
+      Text("Resumo do dia").font(.headline)
+      BecoValueRow(label: "Trabalhadas", value: WorkClockCalculator.formatDuration(summary.workedMillis))
+      Divider()
+      BecoValueRow(label: "Extras na semana", value: WorkClockCalculator.formatDuration(summary.overtimeMillis))
+    }
+    .padding(BecoTokens.Spacing.md)
+    .background(BecoTokens.ColorToken.surface, in: RoundedRectangle(cornerRadius: 16))
+  }
+}
+
+private struct BecoValueRow: View {
+  let label: String
+  let value: String
+
+  var body: some View {
+    HStack {
+      Text(label).foregroundStyle(BecoTokens.ColorToken.muted)
+      Spacer()
+      Text(value).fontWeight(.semibold)
     }
   }
 }

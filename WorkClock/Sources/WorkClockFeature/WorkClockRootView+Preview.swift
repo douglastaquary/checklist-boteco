@@ -9,6 +9,7 @@ struct WorkClockRootView_Previews: PreviewProvider {
   static var previews: some View {
     NavigationStack {
       WorkClockRootView(
+        user: previewUser,
         userId: 1,
         authToken: nil,
         remoteUserId: nil,
@@ -27,6 +28,19 @@ struct WorkClockRootView_Previews: PreviewProvider {
 
   private static var previewSyncController: SyncController {
     SyncController(engine: SyncEngine(repository: previewRepository, syncClient: nil, deviceId: "preview-device"))
+  }
+
+  private static var previewUser: User {
+    User(
+      id: 1,
+      name: "Daniel Acevedo",
+      email: "daniel@beco.local",
+      password: "x",
+      area: .atendimento,
+      workSector: .garcom,
+      permissionLevel: .user,
+      allowedAreas: [.atendimento]
+    )
   }
 }
 #endif

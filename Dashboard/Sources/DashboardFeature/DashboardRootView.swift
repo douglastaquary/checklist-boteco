@@ -54,6 +54,12 @@ public struct DashboardRootView: View {
 
   public var body: some View {
     List {
+      Section {
+        BecoPageHeader(title: "Visão Geral", subtitle: "Indicadores operacionais")
+          .listRowInsets(EdgeInsets())
+          .listRowSeparator(.hidden)
+          .themedListRowBackground()
+      }
       if let remoteStats {
         Section("Servidor") {
           Text("Usuários: \(remoteStats.totalUsers)")
@@ -88,7 +94,8 @@ public struct DashboardRootView: View {
       }
     }
     .themedListStyle()
-    .navigationTitle("Dashboard")
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
     .task { await reload() }
   }
 
