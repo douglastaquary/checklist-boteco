@@ -1,0 +1,4 @@
+[submodule "Packages"]
+	path = Packages
+	url = https://github.com/douglastaquary/checklist-boteco.git
+	branch = ios-packages

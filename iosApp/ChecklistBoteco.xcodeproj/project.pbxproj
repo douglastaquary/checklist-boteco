@@ -15,6 +15,7 @@
 		E4375CF08EC7414292F5A9E0 /* file */ = {isa = PBXBuildFile; fileRef = 879890E257C24AC39B2D9A33; };
 		520A09A6CB55437DAD494D4D /* file */ = {isa = PBXBuildFile; fileRef = B879F62D9AAF4B36B0E97115; };
 		8278DC8E1A9C4ACA9A30DC3A /* file */ = {isa = PBXBuildFile; fileRef = B376BB8A40ED455E996B4DD0; };
+		F1E2D3C4B5A6478990FEDCBA0 /* file */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6478990ABCDEF0; };
 		205C5F2E67724682945B9C83 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 78CAB7E4F1DA4E7BB80B17F7 /* Models */; };
 		AC8C0132A78B4BB2886353EA /* Network in Frameworks */ = {isa = PBXBuildFile; productRef = C2D069520C594AE48F5CD988 /* Network */; };
 		B5403B57C04348BDB1470971 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 4997E8B3655A45569814149B /* Persistence */; };
@@ -38,6 +39,7 @@
 		879890E257C24AC39B2D9A33 /* AppTabRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTabRoute.swift; sourceTree = "<group>"; };
 		B879F62D9AAF4B36B0E97115 /* AppDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDeepLink.swift; sourceTree = "<group>"; };
 		B376BB8A40ED455E996B4DD0 /* TabRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabRouter.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6478990ABCDEF0 /* SyncRefreshingContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRefreshingContainer.swift; sourceTree = "<group>"; };
 		FA4D5991F23D43C3943E9641 /* ChecklistBoteco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChecklistBoteco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D6F00FEAFD945EB976A1227 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D7C0D3B055654EFAB93D29F7 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
@@ -52,7 +54,7 @@
 		29AE45ECD4384F35B4D59393 = {isa = PBXGroup; children = (B156D1C09B0548F3A81745E7, 7348BDC5C23D41318EA4AEB0, B538BD97A3744BCCB479B389); sourceTree = "<group>"; };
 		B538BD97A3744BCCB479B389 /* Products */ = {isa = PBXGroup; children = (FA4D5991F23D43C3943E9641); name = Products; sourceTree = "<group>"; };
 		7348BDC5C23D41318EA4AEB0 /* Config */ = {isa = PBXGroup; children = (D7C0D3B055654EFAB93D29F7, 90C056D5CF024BA3BC7B28DC); path = Config; sourceTree = "<group>"; };
-		B156D1C09B0548F3A81745E7 /* ChecklistBoteco */ = {isa = PBXGroup; children = (30BCFABEB60342ACBC79D90C, 453B63DA2D9745B2A1F23BFF, 7DC4691E8BD5454FB57165DA, DA5C662E7F2D4C688FB7DFF9, 469C4CB7F500416CB8041E8A, 48846245505E4DE98CD350BF, 879890E257C24AC39B2D9A33, B879F62D9AAF4B36B0E97115, B376BB8A40ED455E996B4DD0, 1D6F00FEAFD945EB976A1227); path = ChecklistBoteco; sourceTree = "<group>"; };
+		B156D1C09B0548F3A81745E7 /* ChecklistBoteco */ = {isa = PBXGroup; children = (30BCFABEB60342ACBC79D90C, 453B63DA2D9745B2A1F23BFF, 7DC4691E8BD5454FB57165DA, DA5C662E7F2D4C688FB7DFF9, 469C4CB7F500416CB8041E8A, 48846245505E4DE98CD350BF, 879890E257C24AC39B2D9A33, B879F62D9AAF4B36B0E97115, B376BB8A40ED455E996B4DD0, A1B2C3D4E5F6478990ABCDEF0, 1D6F00FEAFD945EB976A1227); path = ChecklistBoteco; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -68,7 +70,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		7757FCB25F9B480AAF9B5EC3 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (87E490A192934A179A33E918, 6AACA51D7C2345F7BBBD9FAD, CF17216FD53E43AFAAEC70DC, BCA0C1331C384C0099D61B84, A374B6023D1B4745BEBB2CA7, FD8C8732D9B1414998D9C82B, E4375CF08EC7414292F5A9E0, 520A09A6CB55437DAD494D4D, 8278DC8E1A9C4ACA9A30DC3A); runOnlyForDeploymentPostprocessing = 0; };
+		7757FCB25F9B480AAF9B5EC3 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (87E490A192934A179A33E918, 6AACA51D7C2345F7BBBD9FAD, CF17216FD53E43AFAAEC70DC, BCA0C1331C384C0099D61B84, A374B6023D1B4745BEBB2CA7, FD8C8732D9B1414998D9C82B, E4375CF08EC7414292F5A9E0, 520A09A6CB55437DAD494D4D, 8278DC8E1A9C4ACA9A30DC3A, F1E2D3C4B5A6478990FEDCBA0); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
@@ -79,7 +81,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "../Packages"; requirement = {kind = branch; branch = main;}; };
+		65514588539B439E81E7E91E /* XCRemoteSwiftPackageReference Packages */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "../Packages"; requirement = {kind = branch; branch = ios-packages;}; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */

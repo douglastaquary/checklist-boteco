@@ -1,6 +1,0 @@
-.build/
-**/.build/
-.swiftpm/
-DerivedData/
-Package.resolved
-iosApp/.build/

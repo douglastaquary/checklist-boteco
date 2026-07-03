@@ -14,8 +14,8 @@
       "kind": "localSourceControl",
       "location": "/Users/douglastaquary/ChecklistBoteco/Packages",
       "state": {
-        "branch": "main",
-        "revision": "186e4440b8b784cddffc3f19fd9b9acf2467294e"
+        "branch": "ios-packages",
+        "revision": "8add0abf06352c284b42c6e591457c38440399d8"
       }
     }
   ],
