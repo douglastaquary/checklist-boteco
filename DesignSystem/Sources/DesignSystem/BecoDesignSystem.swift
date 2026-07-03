@@ -43,10 +43,13 @@ public struct BecoUserHeader: View {
         .font(.headline)
         .frame(width: 52, height: 52)
         .background(BecoTokens.ColorToken.subtle, in: Circle())
+        .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
         Text("Olá, \(name)").font(.headline).lineLimit(1)
         Text("\(role) · \(date)").font(.subheadline).foregroundStyle(BecoTokens.ColorToken.muted).lineLimit(1)
       }
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("\(name), \(role), \(date)")
       Spacer()
       Menu {
         Button(action: onLogout) { Label("Sair", systemImage: "rectangle.portrait.and.arrow.right") }
@@ -79,6 +82,7 @@ public struct BecoPageHeader<Actions: View>: View {
     HStack(alignment: .center, spacing: BecoTokens.Spacing.sm) {
       VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
         Text(title).font(.title2.bold()).foregroundStyle(BecoTokens.ColorToken.ink)
+          .accessibilityAddTraits(.isHeader)
         if let subtitle {
           Text(subtitle).font(.subheadline).foregroundStyle(BecoTokens.ColorToken.muted)
         }
@@ -123,6 +127,9 @@ public struct BecoSegmentedFilter<Option: Hashable>: View {
             .background(selected == option ? BecoTokens.ColorToken.ink : BecoTokens.ColorToken.subtle, in: Capsule())
           }
           .buttonStyle(.plain)
+          .accessibilityLabel(count.map { "\(label), \($0) itens" } ?? label)
+          .accessibilityValue(selected == option ? "Selecionado" : "Não selecionado")
+          .accessibilityAddTraits(selected == option ? .isSelected : [])
         }
       }
     }
@@ -152,6 +159,7 @@ public struct BecoTaskRow: View {
           .foregroundStyle(completed ? BecoTokens.ColorToken.brand : BecoTokens.ColorToken.ink)
           .frame(width: 44, height: 44)
       }
+      .accessibilityLabel(completed ? "\(title), concluída" : "Concluir \(title)")
       .disabled(completed)
       Button(action: { onSelect?() }) {
         VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
@@ -161,6 +169,7 @@ public struct BecoTaskRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       .buttonStyle(.plain)
+      .accessibilityLabel("\(title), \(metadata)")
       .disabled(onSelect == nil)
     }
     .padding(.vertical, BecoTokens.Spacing.xs)
