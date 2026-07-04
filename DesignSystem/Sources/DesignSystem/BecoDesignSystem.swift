@@ -107,12 +107,13 @@ public struct BecoBackButton: View {
   public var body: some View {
     Button(action: action) {
       Image(systemName: "chevron.left")
-        .font(.system(size: 17, weight: .semibold))
+        .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(BecoTokens.ColorToken.ink)
-        .frame(width: 48, height: 48)
+        .frame(width: 40, height: 40)
         .background(.ultraThinMaterial, in: Circle())
         .overlay(Circle().stroke(BecoTokens.ColorToken.outline.opacity(0.7), lineWidth: 1))
-        .shadow(color: Color.black.opacity(0.08), radius: 6, y: 2)
+        .shadow(color: Color.black.opacity(0.08), radius: 4, y: 1)
+        .frame(width: 48, height: 48)
     }
     .buttonStyle(.plain)
     .accessibilityLabel("Voltar")
