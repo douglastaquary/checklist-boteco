@@ -58,6 +58,26 @@ public enum ChecklistTimingStatus: String, Codable, Sendable {
   case green = "GREEN", yellow = "YELLOW", red = "RED", completed = "COMPLETED"
 }
 
+public struct OperatingDaySchedule: Codable, Equatable, Sendable {
+  public let dayOfWeek: String
+  public let active: Bool
+  public let entryTime: String?
+  public let lunchTime: String?
+  public let openingTime: String?
+  public let closingTime: String?
+  public let eventLabel: String?
+}
+
+public struct ChecklistSchedule: Codable, Equatable, Sendable {
+  public let timezone: String
+  public let days: [String: OperatingDaySchedule]
+
+  public init(timezone: String = "America/Fortaleza", days: [String: OperatingDaySchedule] = [:]) {
+    self.timezone = timezone
+    self.days = days
+  }
+}
+
 public struct Activity: Identifiable, Equatable, Sendable {
   public let id: Int64
   public var syncId: String?
@@ -160,21 +180,23 @@ public struct ActivityTiming: Equatable, Sendable {
   public let deadline: Date
   public let recommendedStart: Date
 
-  public static func today(activity: Activity, completion: ActivityCompletion?, now: Date = Date()) -> ActivityTiming {
+  public static func today(activity: Activity, completion: ActivityCompletion?, now: Date = Date(), schedule: ChecklistSchedule = ChecklistSchedule()) -> ActivityTiming {
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "America/Fortaleza") ?? .current
+    calendar.timeZone = TimeZone(identifier: schedule.timezone) ?? .current
     let weekday = calendar.component(.weekday, from: now)
-    let weekend = weekday == 1 || weekday == 7
-    let hour: Int
+    let names = [1:"SUNDAY",2:"MONDAY",3:"TUESDAY",4:"WEDNESDAY",5:"THURSDAY",6:"FRIDAY",7:"SATURDAY"]
+    let day = names[weekday].flatMap { schedule.days[$0] }
+    let time: String
     switch activity.executionPhase {
-    case .beforeLunch: hour = weekend ? 11 : 17
-    case .beforeOpening: hour = weekend ? 12 : 18
-    case .duringOperation: hour = 0
+    case .beforeLunch: time = day?.lunchTime ?? (weekday == 1 || weekday == 7 ? "11:00" : "17:00")
+    case .beforeOpening: time = day?.openingTime ?? (weekday == 1 || weekday == 7 ? "12:00" : "18:00")
+    case .duringOperation: time = day?.closingTime ?? "00:00"
     }
+    let pieces = time.split(separator: ":").compactMap { Int($0) }
     let base = activity.executionPhase == .duringOperation
       ? calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
       : calendar.startOfDay(for: now)
-    let deadline = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: base) ?? now
+    let deadline = calendar.date(bySettingHour: pieces.first ?? 0, minute: pieces.dropFirst().first ?? 0, second: 0, of: base) ?? now
     let status: ChecklistTimingStatus
     if completion != nil { status = .completed }
     else if now > deadline { status = .red }

@@ -522,6 +522,21 @@ public final class ChecklistRepository: Sendable {
           arguments: [tombstone.deletedAt, tombstone.entityId]
         )
       }
+      if let schedule = response.checklistSchedule,
+         let data = try? JSONEncoder().encode(schedule),
+         let value = String(data: data, encoding: .utf8) {
+        try upsertMetadata(db, key: MetadataKey.checklistSchedule, value: value)
+      }
+    }
+  }
+
+  public func checklistSchedule() throws -> ChecklistSchedule {
+    try dbQueue.read { db in
+      guard let value = try selectMetadata(db, key: MetadataKey.checklistSchedule),
+            let data = value.data(using: .utf8),
+            let schedule = try? JSONDecoder().decode(ChecklistSchedule.self, from: data)
+      else { return ChecklistSchedule() }
+      return schedule
     }
   }
 
@@ -877,6 +892,7 @@ private final class SyncCallbackBox: @unchecked Sendable {
     static let worksiteLatitude = "worksite_latitude"
     static let worksiteLongitude = "worksite_longitude"
     static let worksiteRadius = "worksite_radius"
+    static let checklistSchedule = "checklist_schedule"
   }
 
 extension Date {

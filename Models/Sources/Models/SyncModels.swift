@@ -231,19 +231,22 @@ public struct SyncPullResponse: Decodable, Sendable {
   public let activities: [RemoteActivityRecord]
   public let completions: [RemoteCompletionRecord]
   public let tombstones: [RemoteTombstone]
+  public let checklistSchedule: ChecklistSchedule?
 
   public init(
     nextCursor: String,
     hasMore: Bool,
     activities: [RemoteActivityRecord] = [],
     completions: [RemoteCompletionRecord] = [],
-    tombstones: [RemoteTombstone] = []
+    tombstones: [RemoteTombstone] = [],
+    checklistSchedule: ChecklistSchedule? = nil
   ) {
     self.nextCursor = nextCursor
     self.hasMore = hasMore
     self.activities = activities
     self.completions = completions
     self.tombstones = tombstones
+    self.checklistSchedule = checklistSchedule
   }
 }
 

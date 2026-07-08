@@ -22,6 +22,7 @@ public struct ChecklistRootView: View {
   @State private var cameraCapture: CameraCaptureRequest?
   @State private var alert: ChecklistAlert?
   @State private var now = Date()
+  @State private var schedule = ChecklistSchedule()
 
   public init(
     user: User,
@@ -76,7 +77,7 @@ public struct ChecklistRootView: View {
           .padding(.vertical, BecoTokens.Spacing.xxl)
         } else {
           ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
-            let timing = ActivityTiming.today(activity: item.activity, completion: item.completion, now: now)
+            let timing = ActivityTiming.today(activity: item.activity, completion: item.completion, now: now, schedule: schedule)
             BecoTaskRow(
               title: item.activity.name,
               metadata: "\(item.activity.executionPhase.displayName) · \(item.activity.estimatedDurationMinutes) min · \(timing.label)",
@@ -138,7 +139,7 @@ public struct ChecklistRootView: View {
   }
 
   private var pendingItems: [ActivityWithCompletion] { visibleItems.filter { $0.completion == nil } }
-  private var lateCount: Int { pendingItems.filter { ActivityTiming.today(activity: $0.activity, completion: nil, now: now).status == .red }.count }
+  private var lateCount: Int { pendingItems.filter { ActivityTiming.today(activity: $0.activity, completion: nil, now: now, schedule: schedule).status == .red }.count }
   private var remainingMinutes: Int { pendingItems.reduce(0) { $0 + $1.activity.estimatedDurationMinutes } }
 
   private func count(for filter: ChecklistViewFilter) -> Int {
@@ -165,6 +166,7 @@ public struct ChecklistRootView: View {
     }
     do {
       items = try repository.activitiesByArea(selectedArea)
+      schedule = try repository.checklistSchedule()
       await scheduleLocalNotifications()
     } catch {
       alert = ChecklistAlert(title: "Erro", message: error.localizedDescription)
@@ -181,7 +183,7 @@ public struct ChecklistRootView: View {
       center.removePendingNotificationRequests(withIdentifiers: [identifier])
       let assigned = item.activity.assigneeIds.isEmpty || remoteUserId == nil || item.activity.assigneeIds.contains(remoteUserId!)
       guard item.completion == nil, assigned else { continue }
-      let timing = ActivityTiming.today(activity: item.activity, completion: nil)
+      let timing = ActivityTiming.today(activity: item.activity, completion: nil, schedule: schedule)
       guard timing.recommendedStart > Date() else { continue }
       let content = UNMutableNotificationContent()
       content.title = "Hora de iniciar uma atividade"
