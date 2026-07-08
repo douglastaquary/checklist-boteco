@@ -120,6 +120,7 @@ public enum JSONValue: Encodable {
   case int64(Int64)
   case double(Double)
   case bool(Bool)
+  case strings([String])
   case null
 
   public func encode(to encoder: Encoder) throws {
@@ -130,6 +131,7 @@ public enum JSONValue: Encodable {
     case let .int64(value): try container.encode(value)
     case let .double(value): try container.encode(value)
     case let .bool(value): try container.encode(value)
+    case let .strings(value): try container.encode(value)
     case .null: try container.encodeNil()
     }
   }

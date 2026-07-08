@@ -64,6 +64,11 @@ struct ActivityRecord: FetchableRecord, Decodable {
   let area: String
   let frequency: String
   let effort: Int
+  let assigneeIds: String
+  let estimatedDurationMinutes: Int
+  let executionPhase: String
+  let activeWeekdays: String
+  let recurrenceAnchorDate: String?
   let serverRevision: Int64
   let syncState: String
   let deletedAt: Int64?
@@ -75,6 +80,11 @@ struct ActivityRecord: FetchableRecord, Decodable {
     area = row[Column("\(prefix)area")]
     frequency = row[Column("\(prefix)frequency")]
     effort = row[Column("\(prefix)effort")]
+    assigneeIds = row[Column("\(prefix)assigneeIds")]
+    estimatedDurationMinutes = row[Column("\(prefix)estimatedDurationMinutes")]
+    executionPhase = row[Column("\(prefix)executionPhase")]
+    activeWeekdays = row[Column("\(prefix)activeWeekdays")]
+    recurrenceAnchorDate = row[Column("\(prefix)recurrenceAnchorDate")]
     serverRevision = row[Column("\(prefix)serverRevision")]
     syncState = row[Column("\(prefix)syncState")]
     deletedAt = row[Column("\(prefix)deletedAt")]
@@ -88,6 +98,11 @@ struct ActivityRecord: FetchableRecord, Decodable {
       area: Area.from(area),
       frequency: Frequency.from(frequency),
       effort: effort,
+      assigneeIds: assigneeIds.split(separator: ",").map(String.init),
+      estimatedDurationMinutes: estimatedDurationMinutes,
+      executionPhase: ExecutionPhase(rawValue: executionPhase) ?? .beforeLunch,
+      activeWeekdays: activeWeekdays.split(separator: ",").map(String.init),
+      recurrenceAnchorDate: recurrenceAnchorDate,
       serverRevision: serverRevision,
       syncState: SyncState(rawValue: syncState) ?? .synced,
       deletedAt: deletedAt

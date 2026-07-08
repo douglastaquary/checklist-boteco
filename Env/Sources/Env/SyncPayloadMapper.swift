@@ -20,6 +20,11 @@ enum SyncPayloadMapper {
           "area": .string(payload.area),
           "frequency": .string(payload.frequency),
           "effort": .int(payload.effort),
+          "assigneeIds": .strings(payload.assigneeIds ?? []),
+          "estimatedDurationMinutes": .int(payload.estimatedDurationMinutes ?? 15),
+          "executionPhase": .string(payload.executionPhase ?? "BEFORE_LUNCH"),
+          "activeWeekdays": .strings(payload.activeWeekdays ?? ["TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
+          "recurrenceAnchorDate": payload.recurrenceAnchorDate.map(JSONValue.string) ?? .null,
         ]
       )
     case .activityDelete:
@@ -40,6 +45,7 @@ enum SyncPayloadMapper {
         "activitySyncId": .string(payload.activitySyncId),
         "completedAt": .int64(payload.completedAt),
         "isLate": .bool(payload.isLate),
+        "serviceDate": .string(payload.serviceDate ?? ""),
       ]
       if let imagePath = payload.imagePath {
         envelopePayload["imagePath"] = .string(imagePath)
@@ -64,6 +70,11 @@ private struct ActivityPayload: Decodable {
   let area: String
   let frequency: String
   let effort: Int
+  let assigneeIds: [String]?
+  let estimatedDurationMinutes: Int?
+  let executionPhase: String?
+  let activeWeekdays: [String]?
+  let recurrenceAnchorDate: String?
   let baseRevision: Int64
   let deletedAt: Int64?
 }
@@ -75,4 +86,5 @@ private struct CompletionPayload: Decodable {
   let completedAt: Int64
   let imagePath: String?
   let isLate: Bool
+  let serviceDate: String?
 }

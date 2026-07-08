@@ -72,11 +72,16 @@ public struct RemoteActivityRecord: Decodable, Equatable, Sendable {
   public let area: String
   public let frequency: String
   public let effort: Int
+  public let assigneeIds: [String]
+  public let estimatedDurationMinutes: Int
+  public let executionPhase: String
+  public let activeWeekdays: [String]
+  public let recurrenceAnchorDate: String?
   public let serverRevision: Int64
   public let updatedAt: Int64
 
   private enum CodingKeys: String, CodingKey {
-    case syncId, id, name, area, frequency, effort, serverRevision, updatedAt
+    case syncId, id, name, area, frequency, effort, assigneeIds, estimatedDurationMinutes, executionPhase, activeWeekdays, recurrenceAnchorDate, serverRevision, updatedAt
   }
 
   public init(
@@ -85,6 +90,8 @@ public struct RemoteActivityRecord: Decodable, Equatable, Sendable {
     area: String,
     frequency: String,
     effort: Int,
+    assigneeIds: [String] = [], estimatedDurationMinutes: Int = 15, executionPhase: String = "BEFORE_LUNCH",
+    activeWeekdays: [String] = ["TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"], recurrenceAnchorDate: String? = nil,
     serverRevision: Int64,
     updatedAt: Int64
   ) {
@@ -93,6 +100,8 @@ public struct RemoteActivityRecord: Decodable, Equatable, Sendable {
     self.area = area
     self.frequency = frequency
     self.effort = effort
+    self.assigneeIds = assigneeIds; self.estimatedDurationMinutes = estimatedDurationMinutes; self.executionPhase = executionPhase
+    self.activeWeekdays = activeWeekdays; self.recurrenceAnchorDate = recurrenceAnchorDate
     self.serverRevision = serverRevision
     self.updatedAt = updatedAt
   }
@@ -105,6 +114,11 @@ public struct RemoteActivityRecord: Decodable, Equatable, Sendable {
     area = try container.decode(String.self, forKey: .area)
     frequency = try container.decode(String.self, forKey: .frequency)
     effort = try container.decode(Int.self, forKey: .effort)
+    assigneeIds = try container.decodeIfPresent([String].self, forKey: .assigneeIds) ?? []
+    estimatedDurationMinutes = try container.decodeIfPresent(Int.self, forKey: .estimatedDurationMinutes) ?? 15
+    executionPhase = try container.decodeIfPresent(String.self, forKey: .executionPhase) ?? "BEFORE_LUNCH"
+    activeWeekdays = try container.decodeIfPresent([String].self, forKey: .activeWeekdays) ?? ["TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    recurrenceAnchorDate = try container.decodeIfPresent(String.self, forKey: .recurrenceAnchorDate)
     serverRevision = try container.decodeIfPresent(Int64.self, forKey: .serverRevision) ?? 0
     updatedAt = try container.decodeIfPresent(Int64.self, forKey: .updatedAt) ?? 0
   }
@@ -117,11 +131,12 @@ public struct RemoteCompletionRecord: Decodable, Equatable, Sendable {
   public let completedAt: Int64
   public let imagePath: String?
   public let isLate: Bool
+  public let serviceDate: String
   public let serverRevision: Int64
   public let updatedAt: Int64
 
   private enum CodingKeys: String, CodingKey {
-    case syncId, id, activitySyncId, activityId, userId, completedAt, imagePath, isLate, serverRevision, updatedAt
+    case syncId, id, activitySyncId, activityId, userId, completedAt, imagePath, isLate, serviceDate, serverRevision, updatedAt
   }
 
   public init(
@@ -131,6 +146,7 @@ public struct RemoteCompletionRecord: Decodable, Equatable, Sendable {
     completedAt: Int64,
     imagePath: String? = nil,
     isLate: Bool = false,
+    serviceDate: String = "",
     serverRevision: Int64,
     updatedAt: Int64
   ) {
@@ -140,6 +156,7 @@ public struct RemoteCompletionRecord: Decodable, Equatable, Sendable {
     self.completedAt = completedAt
     self.imagePath = imagePath
     self.isLate = isLate
+    self.serviceDate = serviceDate
     self.serverRevision = serverRevision
     self.updatedAt = updatedAt
   }
@@ -154,6 +171,7 @@ public struct RemoteCompletionRecord: Decodable, Equatable, Sendable {
     completedAt = try container.decode(Int64.self, forKey: .completedAt)
     imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
     isLate = try container.decodeIfPresent(Bool.self, forKey: .isLate) ?? false
+    serviceDate = try container.decodeIfPresent(String.self, forKey: .serviceDate) ?? ""
     serverRevision = try container.decodeIfPresent(Int64.self, forKey: .serverRevision) ?? 0
     updatedAt = try container.decodeIfPresent(Int64.self, forKey: .updatedAt) ?? 0
   }

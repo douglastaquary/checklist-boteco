@@ -28,6 +28,11 @@ enum DatabaseSchema {
     area TEXT NOT NULL,
     frequency TEXT NOT NULL,
     effort INTEGER NOT NULL DEFAULT 1,
+    assigneeIds TEXT NOT NULL DEFAULT '',
+    estimatedDurationMinutes INTEGER NOT NULL DEFAULT 15,
+    executionPhase TEXT NOT NULL DEFAULT 'BEFORE_LUNCH',
+    activeWeekdays TEXT NOT NULL DEFAULT 'TUESDAY,FRIDAY,SATURDAY,SUNDAY',
+    recurrenceAnchorDate TEXT,
     serverRevision INTEGER NOT NULL DEFAULT 0,
     syncState TEXT NOT NULL DEFAULT 'SYNCED',
     deletedAt INTEGER
@@ -40,6 +45,7 @@ enum DatabaseSchema {
     completedAt INTEGER NOT NULL,
     imagePath TEXT,
     isLate INTEGER NOT NULL DEFAULT 0,
+    serviceDate TEXT NOT NULL DEFAULT '',
     serverRevision INTEGER NOT NULL DEFAULT 0,
     syncState TEXT NOT NULL DEFAULT 'SYNCED'
   );
@@ -116,6 +122,16 @@ public enum AppDatabase {
     var migrator = DatabaseMigrator()
     migrator.registerMigration("v1") { db in
       try db.execute(sql: DatabaseSchema.createSQL)
+    }
+    migrator.registerMigration("v2-checklist-timing") { db in
+      let activityColumns = try db.columns(in: "Activity").map(\.name)
+      if !activityColumns.contains("assigneeIds") { try db.execute(sql: "ALTER TABLE Activity ADD COLUMN assigneeIds TEXT NOT NULL DEFAULT ''") }
+      if !activityColumns.contains("estimatedDurationMinutes") { try db.execute(sql: "ALTER TABLE Activity ADD COLUMN estimatedDurationMinutes INTEGER NOT NULL DEFAULT 15") }
+      if !activityColumns.contains("executionPhase") { try db.execute(sql: "ALTER TABLE Activity ADD COLUMN executionPhase TEXT NOT NULL DEFAULT 'BEFORE_LUNCH'") }
+      if !activityColumns.contains("activeWeekdays") { try db.execute(sql: "ALTER TABLE Activity ADD COLUMN activeWeekdays TEXT NOT NULL DEFAULT 'TUESDAY,FRIDAY,SATURDAY,SUNDAY'") }
+      if !activityColumns.contains("recurrenceAnchorDate") { try db.execute(sql: "ALTER TABLE Activity ADD COLUMN recurrenceAnchorDate TEXT") }
+      let completionColumns = try db.columns(in: "ActivityCompletion").map(\.name)
+      if !completionColumns.contains("serviceDate") { try db.execute(sql: "ALTER TABLE ActivityCompletion ADD COLUMN serviceDate TEXT NOT NULL DEFAULT ''") }
     }
     return migrator
   }

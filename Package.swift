@@ -35,7 +35,7 @@ let package = Package(
       dependencies: ["Models", "Network", "Persistence"],
       path: "Env/Sources/Env"
     ),
-    .target(name: "DesignSystem", dependencies: ["Network"], path: "DesignSystem/Sources/DesignSystem"),
+    .target(name: "DesignSystem", dependencies: ["Models", "Network"], path: "DesignSystem/Sources/DesignSystem"),
     .target(
       name: "Auth",
       dependencies: ["Models", "Env", "Network", "DesignSystem", "Persistence"],

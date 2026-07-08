@@ -1,4 +1,5 @@
 import SwiftUI
+import Models
 import UIKit
 
 public enum BecoTokens {
@@ -290,13 +291,15 @@ public struct BecoTaskRow: View {
   private let completed: Bool
   private let onSelect: (() -> Void)?
   private let onComplete: () -> Void
+  private let timingStatus: ChecklistTimingStatus?
 
-  public init(title: String, metadata: String, completed: Bool, onSelect: (() -> Void)? = nil, onComplete: @escaping () -> Void) {
+  public init(title: String, metadata: String, completed: Bool, timingStatus: ChecklistTimingStatus? = nil, onSelect: (() -> Void)? = nil, onComplete: @escaping () -> Void) {
     self.title = title
     self.metadata = metadata
     self.completed = completed
     self.onSelect = onSelect
     self.onComplete = onComplete
+    self.timingStatus = timingStatus
   }
 
   public var body: some View {
@@ -321,6 +324,17 @@ public struct BecoTaskRow: View {
       .disabled(onSelect == nil)
     }
     .padding(.vertical, BecoTokens.Spacing.xs)
+    .padding(.horizontal, BecoTokens.Spacing.sm)
+    .overlay(RoundedRectangle(cornerRadius: 12).stroke(timingColor, lineWidth: timingStatus == nil || timingStatus == .completed ? 0 : 2))
+    .accessibilityValue(timingAccessibilityLabel)
     .contentShape(Rectangle())
+  }
+
+  private var timingColor: Color {
+    switch timingStatus { case .green: return Color(red: 0.18, green: 0.49, blue: 0.20); case .yellow: return Color(red: 0.75, green: 0.52, blue: 0); case .red: return Color(red: 0.78, green: 0.16, blue: 0.16); default: return .clear }
+  }
+
+  private var timingAccessibilityLabel: String {
+    switch timingStatus { case .green: return "Dentro do prazo"; case .yellow: return "Próxima do limite"; case .red: return "Atrasada"; case .completed: return "Concluída"; case nil: return completed ? "Concluída" : "Pendente" }
   }
 }

@@ -3,6 +3,7 @@ import Models
 import Persistence
 import Env
 import DesignSystem
+import UserNotifications
 
 public struct ChecklistRootView: View {
   private let user: User
@@ -20,6 +21,7 @@ public struct ChecklistRootView: View {
   @State private var selectedFilter: ChecklistViewFilter = .all
   @State private var cameraCapture: CameraCaptureRequest?
   @State private var alert: ChecklistAlert?
+  @State private var now = Date()
 
   public init(
     user: User,
@@ -41,6 +43,16 @@ public struct ChecklistRootView: View {
   public var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
+        HStack {
+          Label("\(pendingItems.count) pendentes", systemImage: "checklist")
+          Spacer()
+          Text("\(lateCount) atrasadas")
+          Spacer()
+          Text("\(remainingMinutes) min")
+        }
+        .font(.caption.bold())
+        .padding(BecoTokens.Spacing.sm)
+        .background(BecoTokens.ColorToken.subtle, in: RoundedRectangle(cornerRadius: 14))
         BecoSegmentedFilter(
           options: ChecklistViewFilter.allCases.map { filter in
             (filter, filter.label, count(for: filter))
@@ -64,10 +76,12 @@ public struct ChecklistRootView: View {
           .padding(.vertical, BecoTokens.Spacing.xxl)
         } else {
           ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+            let timing = ActivityTiming.today(activity: item.activity, completion: item.completion, now: now)
             BecoTaskRow(
               title: item.activity.name,
-              metadata: "\(item.activity.frequency.displayName) · esforço \(item.activity.effort)",
+              metadata: "\(item.activity.executionPhase.displayName) · \(item.activity.estimatedDurationMinutes) min · \(timing.label)",
               completed: item.completion != nil,
+              timingStatus: timing.status,
               onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
               onComplete: { cameraCapture = CameraCaptureRequest(activityId: item.activity.id) }
             )
@@ -90,6 +104,12 @@ public struct ChecklistRootView: View {
       .background(BecoTokens.ColorToken.background)
     }
     .task(id: selectedArea) { await reload() }
+    .task {
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: 60_000_000_000)
+        now = Date()
+      }
+    }
     .sheet(item: $cameraCapture, onDismiss: { Task { await reload() } }) { request in
       CameraCaptureView { path in
         guard let path else { return }
@@ -117,6 +137,10 @@ public struct ChecklistRootView: View {
     }
   }
 
+  private var pendingItems: [ActivityWithCompletion] { visibleItems.filter { $0.completion == nil } }
+  private var lateCount: Int { pendingItems.filter { ActivityTiming.today(activity: $0.activity, completion: nil, now: now).status == .red }.count }
+  private var remainingMinutes: Int { pendingItems.reduce(0) { $0 + $1.activity.estimatedDurationMinutes } }
+
   private func count(for filter: ChecklistViewFilter) -> Int {
     switch filter {
     case .all: return items.count
@@ -141,8 +165,30 @@ public struct ChecklistRootView: View {
     }
     do {
       items = try repository.activitiesByArea(selectedArea)
+      await scheduleLocalNotifications()
     } catch {
       alert = ChecklistAlert(title: "Erro", message: error.localizedDescription)
+    }
+  }
+
+  @MainActor
+  private func scheduleLocalNotifications() async {
+    let center = UNUserNotificationCenter.current()
+    _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    let remoteUserId = user.remoteId
+    for item in items {
+      let identifier = "checklist-reminder-\(item.activity.syncId ?? String(item.id))"
+      center.removePendingNotificationRequests(withIdentifiers: [identifier])
+      let assigned = item.activity.assigneeIds.isEmpty || remoteUserId == nil || item.activity.assigneeIds.contains(remoteUserId!)
+      guard item.completion == nil, assigned else { continue }
+      let timing = ActivityTiming.today(activity: item.activity, completion: nil)
+      guard timing.recommendedStart > Date() else { continue }
+      let content = UNMutableNotificationContent()
+      content.title = "Hora de iniciar uma atividade"
+      content.body = item.activity.name
+      content.sound = .default
+      let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: timing.recommendedStart)
+      try? await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)))
     }
   }
 

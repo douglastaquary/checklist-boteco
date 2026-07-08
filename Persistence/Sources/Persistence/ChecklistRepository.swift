@@ -324,6 +324,7 @@ public final class ChecklistRepository: Sendable {
             completedAt: row["completedAt"],
             imagePath: row["imagePath"],
             isLate: (row["isLate"] as Int64) != 0,
+            serviceDate: row["serviceDate"] ?? "",
             serverRevision: row["completionRevision"] ?? 0,
             syncState: SyncState(rawValue: row["completionSyncState"] ?? "SYNCED") ?? .synced
           )
@@ -344,13 +345,13 @@ public final class ChecklistRepository: Sendable {
     try dbQueue.write { db in
       try db.execute(
         sql: """
-        INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serviceDate)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        arguments: [syncId, activityId, userId, now, imagePath, isLate ? 1 : 0]
+        arguments: [syncId, activityId, userId, now, imagePath, isLate ? 1 : 0, Date.serviceDate]
       )
       let payload = """
-      {"activitySyncId":"\(try activitySyncId(db, activityId: activityId))","completedAt":\(now),"imagePath":\(imagePath.map { "\"\($0)\"" } ?? "null"),"isLate":\(isLate)}
+      {"activitySyncId":"\(try activitySyncId(db, activityId: activityId))","completedAt":\(now),"imagePath":\(imagePath.map { "\"\($0)\"" } ?? "null"),"isLate":\(isLate),"serviceDate":"\(Date.serviceDate)"}
       """
       try enqueueOutbox(
         db,
@@ -497,18 +498,18 @@ public final class ChecklistRepository: Sendable {
         ) != nil {
           try db.execute(
             sql: """
-            UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?, serverRevision = ?, syncState = 'SYNCED'
+            UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?, assigneeIds = ?, estimatedDurationMinutes = ?, executionPhase = ?, activeWeekdays = ?, recurrenceAnchorDate = ?, serverRevision = ?, syncState = 'SYNCED'
             WHERE syncId = ?
             """,
-            arguments: [activity.name, activity.area, activity.frequency, activity.effort, activity.serverRevision, activity.syncId]
+            arguments: [activity.name, activity.area, activity.frequency, activity.effort, activity.assigneeIds.joined(separator: ","), activity.estimatedDurationMinutes, activity.executionPhase, activity.activeWeekdays.joined(separator: ","), activity.recurrenceAnchorDate, activity.serverRevision, activity.syncId]
           )
         } else {
           try db.execute(
             sql: """
-            INSERT INTO Activity(syncId, name, area, frequency, effort, serverRevision, syncState)
-            VALUES (?, ?, ?, ?, ?, ?, 'SYNCED')
+            INSERT INTO Activity(syncId, name, area, frequency, effort, assigneeIds, estimatedDurationMinutes, executionPhase, activeWeekdays, recurrenceAnchorDate, serverRevision, syncState)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SYNCED')
             """,
-            arguments: [activity.syncId, activity.name, activity.area, activity.frequency, activity.effort, activity.serverRevision]
+            arguments: [activity.syncId, activity.name, activity.area, activity.frequency, activity.effort, activity.assigneeIds.joined(separator: ","), activity.estimatedDurationMinutes, activity.executionPhase, activity.activeWeekdays.joined(separator: ","), activity.recurrenceAnchorDate, activity.serverRevision]
           )
         }
       }
@@ -546,12 +547,12 @@ public final class ChecklistRepository: Sendable {
     }
     try db.execute(
       sql: """
-      INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serverRevision, syncState)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'SYNCED')
+      INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serviceDate, serverRevision, syncState)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SYNCED')
       """,
       arguments: [
         completion.syncId, activityId, localUserId, completion.completedAt,
-        completion.imagePath, completion.isLate ? 1 : 0, completion.serverRevision,
+        completion.imagePath, completion.isLate ? 1 : 0, completion.serviceDate, completion.serverRevision,
       ]
     )
   }
@@ -693,12 +694,12 @@ public final class ChecklistRepository: Sendable {
   public func insertActivity(_ activity: Activity) throws {
     let syncId = activity.syncId ?? newSyncId(prefix: "activity")
     let payload = """
-    {"syncId":"\(syncId)","name":"\(activity.name)","area":"\(activity.area.rawValue)","frequency":"\(activity.frequency.rawValue)","effort":\(activity.effort),"baseRevision":0}
+    {"syncId":"\(syncId)","name":"\(activity.name)","area":"\(activity.area.rawValue)","frequency":"\(activity.frequency.rawValue)","effort":\(activity.effort),"assigneeIds":[\(activity.assigneeIds.map { "\"\($0)\"" }.joined(separator: ","))],"estimatedDurationMinutes":\(activity.estimatedDurationMinutes),"executionPhase":"\(activity.executionPhase.rawValue)","activeWeekdays":[\(activity.activeWeekdays.map { "\"\($0)\"" }.joined(separator: ","))],"recurrenceAnchorDate":\(activity.recurrenceAnchorDate.map { "\"\($0)\"" } ?? "null"),"baseRevision":0}
     """
     try dbQueue.write { db in
       try db.execute(
-        sql: "INSERT INTO Activity(syncId, name, area, frequency, effort, syncState) VALUES (?, ?, ?, ?, ?, 'PENDING')",
-        arguments: [syncId, activity.name, activity.area.rawValue, activity.frequency.rawValue, activity.effort]
+        sql: "INSERT INTO Activity(syncId, name, area, frequency, effort, assigneeIds, estimatedDurationMinutes, executionPhase, activeWeekdays, recurrenceAnchorDate, syncState) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')",
+        arguments: [syncId, activity.name, activity.area.rawValue, activity.frequency.rawValue, activity.effort, activity.assigneeIds.joined(separator: ","), activity.estimatedDurationMinutes, activity.executionPhase.rawValue, activity.activeWeekdays.joined(separator: ","), activity.recurrenceAnchorDate]
       )
       try enqueueOutbox(
         db,
@@ -884,5 +885,13 @@ extension Date {
     let calendar = Calendar.current
     let start = calendar.startOfDay(for: Date())
     return Int64(start.timeIntervalSince1970 * 1000)
+  }
+  public static var serviceDate: String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: "America/Fortaleza")
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
   }
 }
