@@ -6,9 +6,20 @@ import Network
 
 @main
 struct ChecklistBotecoApp: App {
+  @StateObject private var launch: AppLaunchState
+
+  init() {
+    let launch = AppLaunchState()
+    _launch = StateObject(wrappedValue: launch)
+
+    if case .ready(let holder) = launch.status {
+      BackgroundSyncScheduler.register(syncController: holder.syncController)
+    }
+  }
+
   var body: some Scene {
     WindowGroup {
-      AppLaunchGate()
+      AppLaunchGate(launch: launch)
     }
   }
 }
@@ -33,7 +44,7 @@ final class AppLaunchState: ObservableObject {
 }
 
 struct AppLaunchGate: View {
-  @StateObject private var launch = AppLaunchState()
+  @ObservedObject var launch: AppLaunchState
 
   var body: some View {
     switch launch.status {

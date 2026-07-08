@@ -26,7 +26,6 @@ private struct AppDependencyGraphModifier: ViewModifier {
       }
       .onAppear {
         #if os(iOS)
-        BackgroundSyncScheduler.register(syncController: syncController)
         BackgroundSyncScheduler.schedule()
         #endif
       }
