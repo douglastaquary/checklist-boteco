@@ -21,8 +21,8 @@ public class SalesResource {
     @Inject SalesQueryService queries;
     @Inject SalesAuditService audits;
 
-    @POST @Path("/imports/preview") public ImportBatch preview(@HeaderParam("Authorization") String auth,PreviewRequest request){ return imports.preview(guard.requireAdmin(auth),request); }
-    @POST @Path("/imports/{id}/commit") public ImportBatch commit(@HeaderParam("Authorization") String auth,@PathParam("id") String id,CommitRequest request){ return imports.commit(guard.requireAdmin(auth),id,request); }
+    @POST @Path("/imports/preview") public ImportBatch preview(@HeaderParam("Authorization") String auth,PreviewRequest request){ return imports.preview(guard.requireApplyDailyAuditAccess(auth),request); }
+    @POST @Path("/imports/{id}/commit") public ImportBatch commit(@HeaderParam("Authorization") String auth,@PathParam("id") String id,CommitRequest request){ return imports.commit(guard.requireApplyDailyAuditAccess(auth),id,request); }
     @GET @Path("/imports/{id}") public ImportBatch importStatus(@HeaderParam("Authorization") String auth,@PathParam("id") String id){ guard.requireAdmin(auth); return imports.get(id); }
     @GET @Path("/imports") public List<ImportBatch> importList(@HeaderParam("Authorization") String auth){ guard.requireAdmin(auth); return imports.list(); }
     @GET @Path("/schema") public ImportSchema schema(@HeaderParam("Authorization") String auth,@QueryParam("datasetId") String dataset){ guard.requireAdmin(auth); return queries.schema(dataset); }

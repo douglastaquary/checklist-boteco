@@ -2,6 +2,8 @@
 
 Documentação do módulo de contagem e auditoria diária: [docs/inventory-counting-module.md](docs/inventory-counting-module.md).
 
+Plano de uniformização visual Android/iOS: [docs/mobile-design-system-migration-plan.md](docs/mobile-design-system-migration-plan.md).
+
 Sincronização mobile (offline-first + API): [docs/mobile-api-sync.md](docs/mobile-api-sync.md).
 
 Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform**, backend **Quarkus serverless** e administração web em **Qute + JavaScript vanilla**.
