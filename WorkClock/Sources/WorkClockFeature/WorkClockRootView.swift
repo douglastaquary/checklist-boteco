@@ -60,6 +60,7 @@ public struct WorkClockRootView: View {
   @EnvironmentObject private var theme: AppTheme
   @StateObject private var tracker = LocationTracker()
   @State private var entries: [WorkClockEntry] = []
+  @State private var weeklyWorkedMillis: Int64 = 0
   @State private var feedbackAlert: WorkClockFeedbackAlert?
   @State private var isRegistering = false
 
@@ -87,7 +88,10 @@ public struct WorkClockRootView: View {
 
   public var body: some View {
     let nextType = WorkClockCalculator.nextType(entries: entries)
-    let summary = WorkClockCalculator.summarizeDay(entries: entries)
+    let summary = WorkClockCalculator.summarizeDay(
+      entries: entries,
+      weeklyWorkedMillis: weeklyWorkedMillis
+    )
     let distance = currentDistance
     let canRegister = canUseClock(distance: distance)
 
@@ -143,7 +147,7 @@ public struct WorkClockRootView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(theme.tint)
-        .disabled(isRegistering)
+        .disabled(isRegistering || !canRegister)
       }
       .padding(.horizontal)
       .padding(.vertical, 12)
@@ -222,6 +226,21 @@ public struct WorkClockRootView: View {
     let start = Date.startOfDayMillis
     let end = start + 24 * 60 * 60 * 1000
     entries = (try? repository.workClockEntries(userId: userId, dayStart: start, dayEnd: end)) ?? []
+    let week = Date.currentWeekMillis
+    let weeklyEntries = (try? repository.workClockEntries(
+      userId: userId,
+      dayStart: week.start,
+      dayEnd: week.end
+    )) ?? []
+    weeklyWorkedMillis = Dictionary(grouping: weeklyEntries) { entry in
+      Calendar.current.startOfDay(
+        for: Date(timeIntervalSince1970: TimeInterval(entry.registeredAt) / 1000)
+      )
+    }
+    .values
+    .reduce(0) { total, dayEntries in
+      total + WorkClockCalculator.summarizeDay(entries: dayEntries).workedMillis
+    }
   }
 
   @MainActor
@@ -337,10 +356,19 @@ private struct WorkClockSummarySection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
-      Text("Resumo do dia").font(.headline)
-      BecoValueRow(label: "Trabalhadas", value: WorkClockCalculator.formatDuration(summary.workedMillis))
+      Text("Resumo").font(.headline)
+      BecoValueRow(label: "Trabalhadas hoje", value: WorkClockCalculator.formatDuration(summary.workedMillis))
+      Divider()
+      BecoValueRow(
+        label: "Horas restantes na semana",
+        value: WorkClockCalculator.formatDuration(summary.missingWeeklyMillis)
+      )
       Divider()
       BecoValueRow(label: "Extras na semana", value: WorkClockCalculator.formatDuration(summary.overtimeMillis))
+      Divider()
+      BecoValueRow(label: "Descanso devido", value: WorkClockCalculator.formatDuration(summary.missingBreakMillis))
+      Divider()
+      BecoValueRow(label: "Horas devidas hoje", value: WorkClockCalculator.formatDuration(summary.missingDailyMillis))
     }
     .padding(BecoTokens.Spacing.md)
     .background(BecoTokens.ColorToken.surface, in: RoundedRectangle(cornerRadius: 16))
@@ -364,6 +392,18 @@ private extension Date {
   static var nowMillis: Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
   static var startOfDayMillis: Int64 {
     Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000)
+  }
+
+  static var currentWeekMillis: (start: Int64, end: Int64) {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: Date())
+    let daysSinceMonday = (calendar.component(.weekday, from: today) + 5) % 7
+    let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: today) ?? today
+    let nextMonday = calendar.date(byAdding: .day, value: 7, to: monday) ?? today
+    return (
+      Int64(monday.timeIntervalSince1970 * 1000),
+      Int64(nextMonday.timeIntervalSince1970 * 1000)
+    )
   }
 }
 
