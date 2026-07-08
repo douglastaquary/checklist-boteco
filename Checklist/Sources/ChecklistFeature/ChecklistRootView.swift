@@ -143,7 +143,7 @@ public struct ChecklistRootView: View {
     calendar.timeZone = TimeZone(identifier: schedule.timezone) ?? .current
     let names = [1:"SUNDAY",2:"MONDAY",3:"TUESDAY",4:"WEDNESDAY",5:"THURSDAY",6:"FRIDAY",7:"SATURDAY"]
     guard let weekday = names[calendar.component(.weekday, from: now)], schedule.days[weekday]?.active == true else { return [] }
-    return visibleItems.filter { $0.activity.activeWeekdays.contains(weekday) }
+    return visibleItems.filter { ActivityTiming.isDueToday(activity: $0.activity, now: now, schedule: schedule) }
   }
 
   private var pendingItems: [ActivityWithCompletion] { scheduledItems.filter { $0.completion == nil } }

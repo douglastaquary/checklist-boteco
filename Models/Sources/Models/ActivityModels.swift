@@ -217,4 +217,18 @@ public struct ActivityTiming: Equatable, Sendable {
   public var label: String {
     switch status { case .green: return "Dentro do prazo"; case .yellow: return "Próxima do limite"; case .red: return "Atrasada"; case .completed: return "Concluída" }
   }
+
+  public static func isDueToday(activity: Activity, now: Date = Date(), schedule: ChecklistSchedule = ChecklistSchedule()) -> Bool {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: schedule.timezone) ?? .current
+    let names = [1:"SUNDAY",2:"MONDAY",3:"TUESDAY",4:"WEDNESDAY",5:"THURSDAY",6:"FRIDAY",7:"SATURDAY"]
+    guard let weekday = names[calendar.component(.weekday, from: now)], activity.activeWeekdays.contains(weekday) else { return false }
+    guard activity.frequency != .diario else { return true }
+    let formatter = DateFormatter(); formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.dateFormat = "yyyy-MM-dd"
+    guard let raw = activity.recurrenceAnchorDate, let anchor = formatter.date(from: raw), now >= anchor else { return true }
+    if activity.frequency == .quinzenal { return (calendar.dateComponents([.day], from: calendar.startOfDay(for: anchor), to: calendar.startOfDay(for: now)).day ?? 0) % 14 == 0 }
+    let anchorDay = calendar.component(.day, from: anchor)
+    let daysInMonth = calendar.range(of: .day, in: .month, for: now)?.count ?? anchorDay
+    return calendar.component(.day, from: now) == min(anchorDay, daysInMonth)
+  }
 }
