@@ -2,6 +2,7 @@ package com.checklistboteco.backend;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.path.json.JsonPath;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -52,8 +53,8 @@ class InventoryResourceTest {
         String userId=JsonPath.from(created).getString("id");
         String token=login(email,"senha123");
         String product="Produto Admin "+suffix;
-        int day=(Integer.parseInt(suffix.substring(0,2),16)%27)+1;
-        String auditDate=String.format("2026-06-%02d",day);
+        long dateOffset=Long.parseUnsignedLong(suffix,16)%1_000_000L;
+        String auditDate=LocalDate.of(2100,1,1).plusDays(dateOffset).toString();
 
         given().header("Authorization","Bearer "+token).contentType("application/json").body(("""
             {"countDate":"%s","countedAt":"%sT10:00:00Z","location":"Beco da Praia","items":[
@@ -70,8 +71,8 @@ class InventoryResourceTest {
             ]}
             """).formatted(auditDate,auditDate,product)).post("/api/inventory/counts").then().statusCode(201);
 
-        String csv="Data;Produto;Categoria;Local;Quantidade;Valor\n"+auditDate.substring(8,10)+"/06/2026;"+product+";Bebidas;Beco da Praia;15;270,00\n";
-        String preview=given().header("Authorization","Bearer "+admin).contentType("application/json").body(Map.of("fileName","vendas.csv","csv",csv))
+        String csv="Data;Produto;Categoria;Local;Quantidade;Valor\n"+auditDate+";"+product+";Bebidas;Beco da Praia;15;270,00\n";
+        String preview=given().header("Authorization","Bearer "+token).contentType("application/json").body(Map.of("fileName","vendas.csv","csv",csv))
             .post("/api/sales/imports/preview").then().statusCode(200).extract().asString();
         String importId=JsonPath.from(preview).getString("id");
         Map<String,String> mapping=new LinkedHashMap<>();
@@ -81,7 +82,7 @@ class InventoryResourceTest {
         mapping.put("location","Local");
         mapping.put("quantity","Quantidade");
         mapping.put("totalInCents","Valor");
-        given().header("Authorization","Bearer "+admin).contentType("application/json").body(Map.of("datasetId","sales","mapping",mapping))
+        given().header("Authorization","Bearer "+token).contentType("application/json").body(Map.of("datasetId","sales","mapping",mapping))
             .post("/api/sales/imports/"+importId+"/commit").then().statusCode(200).body("importedRows",is(1));
 
         given().header("Authorization","Bearer "+token).contentType("application/json").body(Map.of("date",auditDate,"location","Beco da Praia","text",suffix))

@@ -88,7 +88,7 @@ public class LocalStore implements AppStore {
         user.allowedAreas=user.permissionLevel==PermissionLevel.ADMIN?List.of(Area.values()):List.of(user.area);
         user.createdAt=now;
         user.updatedAt=now;
-        user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():new FeaturePermissions();
+        user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():nonNull(request.permissions);
         users.put(user.id,user);
         return PublicUser.from(user);
     }
