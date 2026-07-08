@@ -91,6 +91,7 @@ O commit do repositório principal registra o novo gitlink. Não edite a revisã
 | `InventoryFeature` | Contagem, envio e auditoria diária |
 | `DashboardFeature` | Resumo local |
 | `AdminFeatures` | Atividades e permissões delegadas |
+| `AIChatFeature` | Chat administrativo sobre vendas, compras, estoque e ponto |
 
 Ver [`Packages/README.md`](../Packages/README.md).
 
@@ -150,6 +151,7 @@ Verifique se o package local `Packages` está vinculado ao target **ChecklistBot
 - Tabs condicionais por permissão
 - Loader global e dialog de erro
 - Sync em background (`BGTaskScheduler`)
+- Chat IA somente para administradores, com orçamento e fontes consultadas
 
 ## Permissões Info.plist
 

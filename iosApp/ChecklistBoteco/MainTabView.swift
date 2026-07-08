@@ -118,6 +118,7 @@ extension MainTabView {
         inventoryClient: dependencies.inventoryClient,
         userClient: dependencies.userClient,
         dashboardClient: dependencies.dashboardClient,
+        aiChatClient: dependencies.aiChatClient,
         authToken: dependencies.authToken,
         remoteUserId: dependencies.remoteUserId,
         deviceId: dependencies.deviceId,

@@ -8,6 +8,7 @@ Contrato arquitetural do backend e admin web. O agente Cursor deve seguir a skil
 App Android (KMP) ──┐
 Admin Qute + JS ────┼──► API Gateway HttpApi ──► Lambda (Quarkus) ──► DynamoDB
 MCP client ─────────┘         (JWT Cognito*)              │
+Chat IA iOS ─────────┘                 │                   ├──► OpenAI Responses API
                                                     Qute + assets
                                                     no function.zip
 ```
@@ -22,6 +23,8 @@ MCP client ─────────┘         (JWT Cognito*)              �
 | `./mvnw quarkus:dev` local | Docker / docker-compose para dev |
 | SAM + Lambda + DynamoDB prod | Kubernetes, ECS, RDS, segundo deploy container |
 | JSON local em `backend/.data/` (dev) | Banco relacional |
+
+O Chat IA usa `/api/ai/*`, exige usuário `ADMIN` e reutiliza internamente o catálogo MCP. Consulte [`ai-chat.md`](ai-chat.md).
 
 Referências conceituais:
 - [Quarkus + Qute full-stack](https://dev.to/vsenger/building-a-full-stack-java-app-with-quarkus-no-react-no-angular-no-problem-j1m)

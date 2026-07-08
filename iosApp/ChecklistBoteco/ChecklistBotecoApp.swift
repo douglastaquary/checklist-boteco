@@ -78,6 +78,7 @@ final class AppDependenciesHolder {
   let userClient: UserClient?
   let dashboardClient: DashboardClient?
   let inventoryClient: InventoryClient?
+  let aiChatClient: AIChatClient?
   let deviceId: String
 
   init(deps: AppDependencies) {
@@ -88,6 +89,7 @@ final class AppDependenciesHolder {
     userClient = deps.userClient
     dashboardClient = deps.dashboardClient
     inventoryClient = deps.inventoryClient
+    aiChatClient = deps.aiChatClient
     deviceId = deps.deviceId
   }
 }
