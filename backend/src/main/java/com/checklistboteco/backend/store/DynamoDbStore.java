@@ -34,7 +34,6 @@ public class DynamoDbStore extends LocalStore {
     @PostConstruct void connect() {
         dynamo=DynamoDbClient.builder().region(Region.of(region)).credentialsProvider(DefaultCredentialsProvider.create())
             .httpClientBuilder(UrlConnectionHttpClient.builder()).build();
-        seed();
     }
     @PreDestroy void close(){ if(dynamo!=null)dynamo.close(); }
 
@@ -43,8 +42,8 @@ public class DynamoDbStore extends LocalStore {
         users.clear(); activities.clear(); completions.clear(); workClock.clear(); userSchedules.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear();
         dynamo.scan(ScanRequest.builder().tableName(table).build()).items().forEach(this::hydrate);
         deletedUsers.forEach(users::remove);
-        if (users.isEmpty()) seed();
         hydrated=true;
+        if (users.isEmpty()) seed();
     }
 
     @Override public User authenticate(String email,String password){ ensureHydrated(); return super.authenticate(email,password); }
