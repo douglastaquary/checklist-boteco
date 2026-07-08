@@ -201,6 +201,7 @@ public enum AppTab: String, CaseIterable, Identifiable, Sendable {
   case dashboard
   case activities
   case permissions
+  case aiChat
 
   public var id: String { rawValue }
 
@@ -212,6 +213,7 @@ public enum AppTab: String, CaseIterable, Identifiable, Sendable {
     case .dashboard: return "Dashboard"
     case .activities: return "Atividades"
     case .permissions: return "Permissões"
+    case .aiChat: return "Chat IA"
     }
   }
 
@@ -222,6 +224,7 @@ public enum AppTab: String, CaseIterable, Identifiable, Sendable {
     if user.canUseDashboardModule() { tabs.append(.dashboard) }
     if user.canUseActivitiesModule() { tabs.append(.activities) }
     if user.canManagePermissions() { tabs.append(.permissions) }
+    if user.permissionLevel == .admin { tabs.append(.aiChat) }
     return tabs
   }
 }

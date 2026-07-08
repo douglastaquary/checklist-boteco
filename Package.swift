@@ -18,6 +18,7 @@ let package = Package(
     .library(name: "InventoryFeature", targets: ["InventoryFeature"]),
     .library(name: "DashboardFeature", targets: ["DashboardFeature"]),
     .library(name: "AdminFeatures", targets: ["AdminFeatures"]),
+    .library(name: "AIChatFeature", targets: ["AIChatFeature"]),
   ],
   dependencies: [
     .package(url: "https://github.com/groue/GRDB.swift.git", exact: "6.29.3"),
@@ -65,6 +66,11 @@ let package = Package(
       name: "AdminFeatures",
       dependencies: ["Models", "Network", "Persistence", "DesignSystem"],
       path: "AdminFeatures/Sources/AdminFeatures"
+    ),
+    .target(
+      name: "AIChatFeature",
+      dependencies: ["Network", "DesignSystem"],
+      path: "AIChat/Sources/AIChatFeature"
     ),
     .testTarget(name: "ModelsTests", dependencies: ["Models"], path: "Models/Tests/ModelsTests"),
     .testTarget(name: "NetworkTests", dependencies: ["Network"], path: "Network/Tests/NetworkTests"),
