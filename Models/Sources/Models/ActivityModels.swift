@@ -79,7 +79,7 @@ public struct ChecklistSchedule: Codable, Equatable, Sendable {
     self.timezone = timezone
     self.days = days
   }
-  private static let defaultDays = [
+  public static let defaultDays = [
     "TUESDAY": OperatingDaySchedule(dayOfWeek: "TUESDAY", active: true, entryTime: "15:00", lunchTime: "17:00", openingTime: "18:00", closingTime: "00:00", eventLabel: "Forró"),
     "FRIDAY": OperatingDaySchedule(dayOfWeek: "FRIDAY", active: true, entryTime: "15:00", lunchTime: "17:00", openingTime: "18:00", closingTime: "00:00"),
     "SATURDAY": OperatingDaySchedule(dayOfWeek: "SATURDAY", active: true, entryTime: "10:00", lunchTime: "11:00", openingTime: "12:00", closingTime: "00:00"),
