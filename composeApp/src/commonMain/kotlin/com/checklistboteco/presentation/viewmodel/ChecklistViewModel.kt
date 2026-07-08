@@ -5,6 +5,7 @@ import com.checklistboteco.data.sync.SyncCoordinator
 import com.checklistboteco.domain.model.ActivityWithCompletion
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.User
+import com.checklistboteco.domain.model.ChecklistSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,8 @@ data class ChecklistUiState(
     val isLoading: Boolean = false,
     val currentUser: User? = null,
     val showCameraForActivity: Long? = null,
-    val pendingConfirmationActivity: Long? = null
+    val pendingConfirmationActivity: Long? = null,
+    val schedule: ChecklistSchedule = ChecklistSchedule()
 )
 
 class ChecklistViewModel(
@@ -43,6 +45,7 @@ class ChecklistViewModel(
     private fun loadActivities() {
         scope.launch {
             syncCoordinator?.syncOnce()
+            _uiState.update { it.copy(schedule = repository.getChecklistSchedule()) }
             repository.getActivitiesWithCompletion(_uiState.value.selectedArea).collect { activities ->
                 _uiState.update { it.copy(activities = activities) }
             }

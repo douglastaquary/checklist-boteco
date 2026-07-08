@@ -2,13 +2,17 @@ package com.checklistboteco.backend.store;
 
 import com.checklistboteco.backend.model.Models.*;
 import com.checklistboteco.backend.security.PasswordHasher;
+import com.checklistboteco.backend.checklist.ChecklistTimingService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.checklistboteco.backend.workclock.domain.WorkClockModels.UserWorkSchedule;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,6 +23,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 @ApplicationScoped
 @UnlessBuildProfile("prod")
@@ -26,6 +32,7 @@ public class LocalStore implements AppStore {
     protected final Map<String,User> users=new ConcurrentHashMap<>();
     protected final Map<String,Activity> activities=new ConcurrentHashMap<>();
     protected final Map<String,Completion> completions=new ConcurrentHashMap<>();
+    protected ChecklistSchedule checklistSchedule=ChecklistSchedule.defaults();
     protected final Map<String,WorkClockEntry> workClock=new ConcurrentHashMap<>();
     protected final Map<String,UserWorkSchedule> userSchedules=new ConcurrentHashMap<>();
     protected final Map<String,Tombstone> tombstones=new ConcurrentHashMap<>();
@@ -35,10 +42,13 @@ public class LocalStore implements AppStore {
     protected final java.util.Set<String> trustedDevices=ConcurrentHashMap.newKeySet();
     private final PasswordHasher passwords=new PasswordHasher();
     private final SecureRandom random=new SecureRandom();
+    @Inject ChecklistTimingService checklistTiming;
+    @Inject ObjectMapper objectMapper;
     private long cursorSequence=0L;
     @ConfigProperty(name="checklist.initial-admin-password", defaultValue="admin123") String initialAdminPassword;
+    @ConfigProperty(name="checklist.schedule.local-file", defaultValue=".data/checklist-schedule.json") String checklistScheduleFile;
 
-    @PostConstruct void initializeLocal(){ if(!(this instanceof DynamoDbStore)) seed(); }
+    @PostConstruct void initializeLocal(){ if(!(this instanceof DynamoDbStore)){ loadChecklistSchedule(); seed(); } }
 
     protected void seed() {
         if(!users.isEmpty()) return;
@@ -168,6 +178,11 @@ public class LocalStore implements AppStore {
         activity.area=request.area;
         activity.frequency=request.frequency;
         activity.effort=Math.max(1,Math.min(5,request.effort));
+        activity.assigneeIds=request.assigneeIds==null?new ArrayList<>():request.assigneeIds.stream().filter(users::containsKey).distinct().toList();
+        activity.estimatedDurationMinutes=Math.max(1,Math.min(480,request.estimatedDurationMinutes));
+        activity.executionPhase=request.executionPhase==null?ExecutionPhase.BEFORE_LUNCH:request.executionPhase;
+        activity.activeWeekdays=request.activeWeekdays==null||request.activeWeekdays.isEmpty()?new ArrayList<>(List.of(DayOfWeek.TUESDAY,DayOfWeek.FRIDAY,DayOfWeek.SATURDAY,DayOfWeek.SUNDAY)):new ArrayList<>(request.activeWeekdays);
+        activity.recurrenceAnchorDate=request.frequency==Frequency.DIARIO?request.recurrenceAnchorDate:validAnchor(request.recurrenceAnchorDate);
         activity.createdAt=now;
         activity.updatedAt=now;
         activity.serverRevision=1L;
@@ -176,10 +191,38 @@ public class LocalStore implements AppStore {
         return activity;
     }
 
+    public synchronized Activity updateActivity(String id,CreateActivityRequest request){
+        Activity activity=activities.get(id); require(activity!=null&&activity.syncStatus!=SyncStatus.DELETED,"Atividade não encontrada");
+        require(request!=null&&request.name!=null&&!request.name.isBlank(),"Nome da atividade é obrigatório");
+        require(request.area!=null&&request.frequency!=null,"Área e frequência são obrigatórias");
+        activity.name=request.name.trim(); activity.area=request.area; activity.frequency=request.frequency;
+        activity.effort=Math.max(1,Math.min(5,request.effort));
+        activity.assigneeIds=request.assigneeIds==null?new ArrayList<>():request.assigneeIds.stream().filter(users::containsKey).distinct().toList();
+        activity.estimatedDurationMinutes=Math.max(1,Math.min(480,request.estimatedDurationMinutes));
+        activity.executionPhase=request.executionPhase==null?ExecutionPhase.BEFORE_LUNCH:request.executionPhase;
+        activity.activeWeekdays=request.activeWeekdays==null||request.activeWeekdays.isEmpty()?new ArrayList<>(List.of(DayOfWeek.TUESDAY,DayOfWeek.FRIDAY,DayOfWeek.SATURDAY,DayOfWeek.SUNDAY)):new ArrayList<>(request.activeWeekdays);
+        activity.recurrenceAnchorDate=request.frequency==Frequency.DIARIO?request.recurrenceAnchorDate:validAnchor(request.recurrenceAnchorDate); activity.updatedAt=System.currentTimeMillis(); activity.serverRevision++;
+        recordChange(EntityType.ACTIVITY,activity.id); return activity;
+    }
+
     public List<Completion> completions() {
         return completions.values().stream()
             .sorted(Comparator.comparingLong((Completion c)->c.completedAt).reversed())
             .toList();
+    }
+
+    public ChecklistSchedule checklistSchedule(){ return checklistSchedule; }
+
+    public synchronized ChecklistSchedule saveChecklistSchedule(ChecklistSchedule value){
+        require(value!=null&&value.days!=null,"Calendário do checklist é obrigatório");
+        value.timezone=value.timezone==null||value.timezone.isBlank()?"America/Fortaleza":value.timezone;
+        for(DayOfWeek dow:DayOfWeek.values()) value.days.putIfAbsent(dow,ChecklistSchedule.defaults().days.get(dow));
+        value.days.values().stream().filter(day->day.active).forEach(day->{
+            require(day.entryTime!=null&&day.lunchTime!=null&&day.openingTime!=null&&day.closingTime!=null,"Horários são obrigatórios nos dias ativos");
+            try{ java.time.LocalTime.parse(day.entryTime); java.time.LocalTime.parse(day.lunchTime); java.time.LocalTime.parse(day.openingTime); java.time.LocalTime.parse(day.closingTime); }
+            catch(Exception error){ throw new IllegalArgumentException("Horário inválido em "+day.dayOfWeek); }
+        });
+        checklistSchedule=value; persistChecklistSchedule(); return checklistSchedule;
     }
 
     public void upsertWorkClockEntries(List<WorkClockEntry> values) {
@@ -316,6 +359,12 @@ public class LocalStore implements AppStore {
         activity.area=area;
         activity.frequency=frequency;
         activity.effort=Math.max(1,Math.min(5,effort));
+        activity.assigneeIds=stringList(operation.payload,"assigneeIds").stream().filter(users::containsKey).distinct().toList();
+        activity.estimatedDurationMinutes=Math.max(1,Math.min(480,intValue(operation.payload,"estimatedDurationMinutes",15)));
+        activity.executionPhase=Optional.ofNullable(enumValue(ExecutionPhase.class,stringValue(operation.payload,"executionPhase"))).orElse(ExecutionPhase.BEFORE_LUNCH);
+        List<DayOfWeek> weekdays=enumList(DayOfWeek.class,operation.payload,"activeWeekdays");
+        activity.activeWeekdays=weekdays.isEmpty()?new ArrayList<>(List.of(DayOfWeek.TUESDAY,DayOfWeek.FRIDAY,DayOfWeek.SATURDAY,DayOfWeek.SUNDAY)):weekdays;
+        String anchor=stringValue(operation.payload,"recurrenceAnchorDate"); activity.recurrenceAnchorDate=frequency==Frequency.DIARIO?anchor:validAnchor(anchor);
         activity.updatedAt=now;
         activity.deletedAt=0L;
         activity.syncStatus=SyncStatus.SYNCED;
@@ -367,7 +416,13 @@ public class LocalStore implements AppStore {
         completion.userId=userId;
         completion.completedAt=completedAt;
         completion.imagePath=stringValue(operation.payload,"imagePath");
-        completion.isLate=booleanValue(operation.payload,"isLate");
+        completion.serviceDate=stringValue(operation.payload,"serviceDate");
+        LocalDate serviceDate;
+        try{ serviceDate=completion.serviceDate==null?java.time.Instant.ofEpochMilli(completedAt).atZone(ZoneId.of(checklistSchedule.timezone)).toLocalDate():LocalDate.parse(completion.serviceDate); }
+        catch(Exception ignored){ serviceDate=java.time.Instant.ofEpochMilli(completedAt).atZone(ZoneId.of(checklistSchedule.timezone)).toLocalDate(); }
+        completion.serviceDate=serviceDate.toString();
+        OperatingDaySchedule day=checklistSchedule.days.get(serviceDate.getDayOfWeek());
+        completion.isLate=day!=null&&day.active&&completedAt>checklistTiming.deadline(serviceDate,day,activity.executionPhase,checklistSchedule.timezone);
         completion.createdAt=now;
         completion.updatedAt=now;
         completion.serverRevision=1L;
@@ -448,9 +503,33 @@ public class LocalStore implements AppStore {
         return false;
     }
 
+    private static List<String> stringList(Map<String,Object> payload,String key){
+        if(payload==null||!(payload.get(key) instanceof List<?> values)) return List.of();
+        return values.stream().filter(Objects::nonNull).map(Object::toString).toList();
+    }
+
+    private static <E extends Enum<E>> List<E> enumList(Class<E> type,Map<String,Object> payload,String key){
+        var result=new ArrayList<E>();
+        for(String value:stringList(payload,key)) try{ result.add(Enum.valueOf(type,value)); }catch(Exception ignored){}
+        return result;
+    }
+
     private static <E extends Enum<E>> E enumValue(Class<E> type,String name){
         if(name==null||name.isBlank()) return null;
         return Enum.valueOf(type,name);
+    }
+    private static String validAnchor(String value){
+        try{return value==null||value.isBlank()?LocalDate.now(ZoneId.of("America/Fortaleza")).toString():LocalDate.parse(value).toString();}
+        catch(Exception error){throw new IllegalArgumentException("Data-base de recorrência inválida");}
+    }
+    private void loadChecklistSchedule(){
+        try{ Path path=Path.of(checklistScheduleFile); if(Files.exists(path)) checklistSchedule=objectMapper.readValue(path.toFile(),ChecklistSchedule.class); }
+        catch(Exception error){ throw new IllegalStateException("Falha ao carregar calendário local do checklist",error); }
+    }
+    private void persistChecklistSchedule(){
+        if(this instanceof DynamoDbStore) return;
+        try{ Path path=Path.of(checklistScheduleFile); if(path.getParent()!=null) Files.createDirectories(path.getParent()); objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(),checklistSchedule); }
+        catch(Exception error){ throw new IllegalStateException("Falha ao persistir calendário local do checklist",error); }
     }
 
     private static Activity copy(Activity source){
@@ -460,6 +539,11 @@ public class LocalStore implements AppStore {
         target.area=source.area;
         target.frequency=source.frequency;
         target.effort=source.effort;
+        target.assigneeIds=source.assigneeIds==null?new ArrayList<>():new ArrayList<>(source.assigneeIds);
+        target.estimatedDurationMinutes=source.estimatedDurationMinutes;
+        target.executionPhase=source.executionPhase;
+        target.activeWeekdays=source.activeWeekdays==null?new ArrayList<>():new ArrayList<>(source.activeWeekdays);
+        target.recurrenceAnchorDate=source.recurrenceAnchorDate;
         target.createdAt=source.createdAt;
         target.updatedAt=source.updatedAt;
         target.serverRevision=source.serverRevision;
@@ -479,6 +563,7 @@ public class LocalStore implements AppStore {
         target.updatedAt=source.updatedAt;
         target.serverRevision=source.serverRevision;
         target.isLate=source.isLate;
+        target.serviceDate=source.serviceDate;
         target.syncStatus=source.syncStatus;
         return target;
     }

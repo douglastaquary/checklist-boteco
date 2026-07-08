@@ -4,10 +4,12 @@ import com.checklistboteco.backend.model.Models.*;
 import com.checklistboteco.backend.security.TokenService;
 import com.checklistboteco.backend.security.AdminGuard;
 import com.checklistboteco.backend.store.AppStore;
+import com.checklistboteco.backend.checklist.ChecklistTimingService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import java.util.List;
+import java.time.*;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @Path("/api")
@@ -17,6 +19,7 @@ public class ApiResource {
     @Inject AppStore store;
     @Inject TokenService tokens;
     @Inject AdminGuard guard;
+    @Inject ChecklistTimingService checklistTiming;
     @ConfigProperty(name="checklist.auth.expose-device-code") boolean exposeDeviceCode;
     @ConfigProperty(name="worksite.radiusMeters", defaultValue="5") double worksiteRadiusMeters;
 
@@ -66,7 +69,19 @@ public class ApiResource {
     @POST @Path("/activities") public Response createActivity(@HeaderParam("Authorization") String auth,CreateActivityRequest request){
         guard.requireActivityManagementAccess(auth); return Response.status(Response.Status.CREATED).entity(store.createActivity(request)).build();
     }
+    @PUT @Path("/activities/{id}") public Activity updateActivity(@HeaderParam("Authorization") String auth,@PathParam("id") String id,CreateActivityRequest request){
+        guard.requireActivityManagementAccess(auth); return store.updateActivity(id,request);
+    }
     @GET @Path("/completions") public List<Completion> completions(@HeaderParam("Authorization") String auth){ requireToken(auth); return store.completions(); }
+    @GET @Path("/checklist/schedule") public ChecklistSchedule checklistSchedule(@HeaderParam("Authorization") String auth){ requireToken(auth); return store.checklistSchedule(); }
+    @PUT @Path("/checklist/schedule") public ChecklistSchedule updateChecklistSchedule(@HeaderParam("Authorization") String auth,ChecklistSchedule schedule){ requireAdmin(auth); return store.saveChecklistSchedule(schedule); }
+    @GET @Path("/checklist/today") public ChecklistOverview checklistToday(@HeaderParam("Authorization") String auth,@QueryParam("date") String rawDate){
+        TokenService.Payload payload=requireToken(auth); User user=store.getUser(payload.userId); if(user==null) fail(Response.Status.UNAUTHORIZED,"Usuário não encontrado");
+        ChecklistOverview result=checklistOverview(rawDate); if(payload.isAdmin) return result;
+        result.occurrences=result.occurrences.stream().filter(value->value.assigneeIds.isEmpty()?user.allowedAreas.contains(value.area):value.assigneeIds.contains(user.id)).toList();
+        recount(result); return result;
+    }
+    @GET @Path("/admin/checklist/overview") public ChecklistOverview adminChecklistOverview(@HeaderParam("Authorization") String auth,@QueryParam("date") String rawDate){ requireAdmin(auth); return checklistOverview(rawDate); }
     @GET @Path("/admin/dashboard") public DashboardStats dashboard(@HeaderParam("Authorization") String auth){ requireAdmin(auth); return store.dashboard(); }
     @GET @Path("/sync/pull") public SyncPullResponse pull(@HeaderParam("Authorization") String auth,@QueryParam("cursor") @DefaultValue("0") String cursor,@QueryParam("limit") @DefaultValue("500") int limit){
         TokenService.Payload payload=requireToken(auth); return response(store.pullChanges(payload.userId,parseCursor(cursor),Math.max(1,Math.min(500,limit))));
@@ -77,7 +92,7 @@ public class ApiResource {
         return store.pushSync(payload.userId,payload.isAdmin,request);
     }
     private LoginResponse authenticated(User user){ var result=new LoginResponse(); result.token=tokens.issue(user.id,user.permissionLevel==PermissionLevel.ADMIN); result.user=PublicUser.from(user); return result; }
-    private SyncPullResponse response(PullData data){ var result=new SyncPullResponse(); result.serverTime=System.currentTimeMillis(); result.nextCursor=data.nextCursor; result.hasMore=data.hasMore; result.activities=data.activities; result.completions=data.completions; result.tombstones=data.tombstones; return result; }
+    private SyncPullResponse response(PullData data){ var result=new SyncPullResponse(); result.serverTime=System.currentTimeMillis(); result.nextCursor=data.nextCursor; result.hasMore=data.hasMore; result.activities=data.activities; result.completions=data.completions; result.tombstones=data.tombstones; result.checklistSchedule=store.checklistSchedule(); return result; }
     private TokenService.Payload requireToken(String authorization){ return guard.requireToken(authorization); }
     private void requireAdmin(String auth){ guard.requireAdmin(auth); }
     private void validateWorkClockEntries(TokenService.Payload payload,List<WorkClockEntry> entries){
@@ -85,6 +100,20 @@ public class ApiResource {
             if(entry==null) fail(Response.Status.BAD_REQUEST,"Marcação de ponto inválida");
             if(!payload.userId.equals(entry.userId)) fail(Response.Status.FORBIDDEN,"Não é permitido enviar ponto de outro usuário");
             if(entry.distanceFromWorkMeters>worksiteRadiusMeters) fail(Response.Status.BAD_REQUEST,"Marcação de ponto fora do raio permitido");
+        }
+    }
+    private ChecklistOverview checklistOverview(String rawDate){
+        ChecklistSchedule schedule=store.checklistSchedule(); ZoneId zone=ZoneId.of(schedule.timezone);
+        LocalDate date=rawDate==null||rawDate.isBlank()?LocalDate.now(zone):LocalDate.parse(rawDate);
+        return checklistTiming.overview(date,System.currentTimeMillis(),store.activities(),store.completions(),store.users(),schedule);
+    }
+    private static void recount(ChecklistOverview value){
+        value.green=value.yellow=value.red=value.completed=value.totalRemainingMinutes=0;
+        for(ChecklistOccurrence item:value.occurrences) switch(item.status){
+            case GREEN->{value.green++;value.totalRemainingMinutes+=item.estimatedDurationMinutes;}
+            case YELLOW->{value.yellow++;value.totalRemainingMinutes+=item.estimatedDurationMinutes;}
+            case RED->{value.red++;value.totalRemainingMinutes+=item.estimatedDurationMinutes;}
+            case COMPLETED->value.completed++;
         }
     }
     private static long parseCursor(String cursor){ try{return cursor==null||cursor.isBlank()?0L:Long.parseLong(cursor);}catch(NumberFormatException error){ return 0L; } }

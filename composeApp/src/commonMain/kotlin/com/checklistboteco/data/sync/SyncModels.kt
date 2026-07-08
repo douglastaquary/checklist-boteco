@@ -3,6 +3,7 @@ package com.checklistboteco.data.sync
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonObject
+import com.checklistboteco.domain.model.ChecklistSchedule
 
 @Serializable
 data class SyncSession(
@@ -30,6 +31,11 @@ data class ActivityPayload(
     val area: String,
     val frequency: String,
     val effort: Int,
+    val assigneeIds: List<String> = emptyList(),
+    val estimatedDurationMinutes: Int = 15,
+    val executionPhase: String = "BEFORE_LUNCH",
+    val activeWeekdays: List<String> = listOf("TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"),
+    val recurrenceAnchorDate: String? = null,
     val baseRevision: Long = 0,
     val deletedAt: Long? = null
 )
@@ -41,7 +47,8 @@ data class CompletionPayload(
     val baseRevision: Long = 0,
     val completedAt: Long,
     val imagePath: String? = null,
-    val isLate: Boolean = false
+    val isLate: Boolean = false,
+    val serviceDate: String = ""
 )
 
 @Serializable
@@ -79,7 +86,12 @@ data class ActivityUpsertPayload(
     val name: String,
     val area: String,
     val frequency: String,
-    val effort: Int
+    val effort: Int,
+    val assigneeIds: List<String> = emptyList(),
+    val estimatedDurationMinutes: Int = 15,
+    val executionPhase: String = "BEFORE_LUNCH",
+    val activeWeekdays: List<String> = listOf("TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"),
+    val recurrenceAnchorDate: String? = null
 )
 
 @Serializable
@@ -92,7 +104,8 @@ data class CompletionCreatePayload(
     val activitySyncId: String,
     val completedAt: Long,
     val imagePath: String? = null,
-    val isLate: Boolean = false
+    val isLate: Boolean = false,
+    val serviceDate: String = ""
 )
 
 @Serializable
@@ -125,7 +138,8 @@ data class SyncPullResponse(
     val hasMore: Boolean,
     val activities: List<RemoteActivityRecord> = emptyList(),
     val completions: List<RemoteCompletionRecord> = emptyList(),
-    val tombstones: List<RemoteTombstone> = emptyList()
+    val tombstones: List<RemoteTombstone> = emptyList(),
+    val checklistSchedule: ChecklistSchedule? = null
 )
 
 @Serializable
@@ -136,6 +150,11 @@ data class RemoteActivityRecord(
     val area: String,
     val frequency: String,
     val effort: Int,
+    val assigneeIds: List<String> = emptyList(),
+    val estimatedDurationMinutes: Int = 15,
+    val executionPhase: String = "BEFORE_LUNCH",
+    val activeWeekdays: List<String> = listOf("TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"),
+    val recurrenceAnchorDate: String? = null,
     val serverRevision: Long,
     val updatedAt: Long
 )
@@ -144,11 +163,13 @@ data class RemoteActivityRecord(
 data class RemoteCompletionRecord(
     @JsonNames("id")
     val syncId: String,
+    @JsonNames("activityId", "activitySyncId")
     val activitySyncId: String,
     val userId: String,
     val completedAt: Long,
     val imagePath: String? = null,
     val isLate: Boolean = false,
+    val serviceDate: String = "",
     val serverRevision: Long,
     val updatedAt: Long
 )

@@ -24,6 +24,11 @@ CREATE TABLE Activity (
     area TEXT NOT NULL,
     frequency TEXT NOT NULL,
     effort INTEGER NOT NULL DEFAULT 1,
+    assigneeIds TEXT NOT NULL DEFAULT '',
+    estimatedDurationMinutes INTEGER NOT NULL DEFAULT 15,
+    executionPhase TEXT NOT NULL DEFAULT 'BEFORE_LUNCH',
+    activeWeekdays TEXT NOT NULL DEFAULT 'TUESDAY,FRIDAY,SATURDAY,SUNDAY',
+    recurrenceAnchorDate TEXT,
     serverRevision INTEGER NOT NULL DEFAULT 0,
     syncState TEXT NOT NULL DEFAULT 'SYNCED',
     deletedAt INTEGER
@@ -37,6 +42,7 @@ CREATE TABLE ActivityCompletion (
     completedAt INTEGER NOT NULL,
     imagePath TEXT,
     isLate INTEGER NOT NULL DEFAULT 0,
+    serviceDate TEXT NOT NULL DEFAULT '',
     serverRevision INTEGER NOT NULL DEFAULT 0,
     syncState TEXT NOT NULL DEFAULT 'SYNCED',
     FOREIGN KEY (activityId) REFERENCES Activity(id),
@@ -94,12 +100,12 @@ INSERT INTO User(name, email, password, area, workSector, permissionLevel, allow
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertActivity:
-INSERT INTO Activity(syncId, name, area, frequency, effort, serverRevision, syncState, deletedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO Activity(syncId, name, area, frequency, effort, assigneeIds, estimatedDurationMinutes, executionPhase, activeWeekdays, recurrenceAnchorDate, serverRevision, syncState, deletedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertCompletion:
-INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serverRevision, syncState)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO ActivityCompletion(syncId, activityId, userId, completedAt, imagePath, isLate, serviceDate, serverRevision, syncState)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertWorkClockEntry:
 INSERT INTO WorkClockEntry(userId, type, registeredAt, latitude, longitude, distanceFromWorkMeters, isLate, syncStatus)
@@ -202,7 +208,7 @@ LEFT JOIN ActivityCompletion ac ON a.id = ac.activityId AND ac.completedAt >= ?
 GROUP BY a.area;
 
 updateActivity:
-UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?, serverRevision = ?, syncState = ?, deletedAt = ?
+UPDATE Activity SET name = ?, area = ?, frequency = ?, effort = ?, assigneeIds = ?, estimatedDurationMinutes = ?, executionPhase = ?, activeWeekdays = ?, recurrenceAnchorDate = ?, serverRevision = ?, syncState = ?, deletedAt = ?
 WHERE id = ?;
 
 deleteActivity:

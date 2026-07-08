@@ -23,6 +23,8 @@ import com.checklistboteco.domain.model.ActivityWithCompletion
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.FeaturePermissions
 import com.checklistboteco.domain.model.Frequency
+import com.checklistboteco.domain.model.ExecutionPhase
+import com.checklistboteco.domain.model.ChecklistSchedule
 import com.checklistboteco.domain.model.InventoryCategory
 import com.checklistboteco.domain.model.InventoryCountDraft
 import com.checklistboteco.domain.model.StorageCondition
@@ -216,9 +218,13 @@ class ChecklistRepository(
             response.activities.forEach(::upsertRemoteActivity)
             response.completions.forEach(::upsertRemoteCompletion)
             response.tombstones.forEach(::applyRemoteTombstone)
+            response.checklistSchedule?.let { queries.upsertSyncMetadata(METADATA_CHECKLIST_SCHEDULE, json.encodeToString(it)) }
             queries.upsertSyncMetadata(METADATA_SYNC_CURSOR, response.nextCursor)
         }
     }
+
+    fun getChecklistSchedule(): ChecklistSchedule = queries.selectSyncMetadata(METADATA_CHECKLIST_SCHEDULE).executeAsOneOrNull()
+        ?.let { runCatching { json.decodeFromString<ChecklistSchedule>(it) }.getOrNull() } ?: ChecklistSchedule()
 
     fun insertUser(
         name: String,
@@ -320,7 +326,13 @@ class ChecklistRepository(
     fun deleteInventoryCountDraft(id: Long) = queries.deleteInventoryCountDraft(id)
     fun clearInventoryCountDraft(administrative: Boolean = false) = queries.clearInventoryCountDraft(administrative.toLongFlag())
 
-    fun insertActivity(name: String, area: Area, frequency: Frequency, effort: Int) {
+    fun insertActivity(
+        name: String, area: Area, frequency: Frequency, effort: Int,
+        assigneeIds: List<String> = emptyList(), estimatedDurationMinutes: Int = 15,
+        executionPhase: ExecutionPhase = ExecutionPhase.BEFORE_LUNCH,
+        activeWeekdays: List<String> = listOf("TUESDAY", "FRIDAY", "SATURDAY", "SUNDAY"),
+        recurrenceAnchorDate: String? = null
+    ) {
         val now = Clock.System.now().toEpochMilliseconds()
         val syncId = newSyncId("activity")
         val payload = ActivityPayload(
@@ -329,6 +341,11 @@ class ChecklistRepository(
             area = area.name,
             frequency = frequency.name,
             effort = effort,
+            assigneeIds = assigneeIds,
+            estimatedDurationMinutes = estimatedDurationMinutes,
+            executionPhase = executionPhase.name,
+            activeWeekdays = activeWeekdays,
+            recurrenceAnchorDate = recurrenceAnchorDate,
             baseRevision = 0L
         )
 
@@ -339,6 +356,11 @@ class ChecklistRepository(
                 area.name,
                 frequency.name,
                 effort.toLong(),
+                assigneeIds.joinToString(","),
+                estimatedDurationMinutes.toLong(),
+                executionPhase.name,
+                activeWeekdays.joinToString(","),
+                recurrenceAnchorDate,
                 0L,
                 SyncState.PENDING.name,
                 null
@@ -387,6 +409,11 @@ class ChecklistRepository(
                     area = activity.area,
                     frequency = activity.frequency,
                     effort = activity.effort.toInt(),
+                    assigneeIds = activity.assigneeIds.split(",").filter { it.isNotBlank() },
+                    estimatedDurationMinutes = activity.estimatedDurationMinutes.toInt(),
+                    executionPhase = activity.executionPhase,
+                    activeWeekdays = activity.activeWeekdays.split(",").filter { it.isNotBlank() },
+                    recurrenceAnchorDate = activity.recurrenceAnchorDate,
                     baseRevision = activity.serverRevision,
                     deletedAt = now
                 )
@@ -404,6 +431,7 @@ class ChecklistRepository(
 
     fun insertCompletion(activityId: Long, userId: Long, imagePath: String?, isLate: Boolean) {
         val timestamp = Clock.System.now().toEpochMilliseconds()
+        val serviceDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
         val syncId = newSyncId("completion")
 
         queries.transaction {
@@ -416,6 +444,7 @@ class ChecklistRepository(
                 timestamp,
                 imagePath,
                 if (isLate) 1L else 0L,
+                serviceDate,
                 0L,
                 SyncState.PENDING.name
             )
@@ -425,7 +454,8 @@ class ChecklistRepository(
                 baseRevision = 0L,
                 completedAt = timestamp,
                 imagePath = imagePath,
-                isLate = isLate
+                isLate = isLate,
+                serviceDate = serviceDate
             )
             enqueueOperation(
                 entityType = SyncEntityType.COMPLETION,
@@ -697,6 +727,11 @@ class ChecklistRepository(
                     area.name,
                     freq.name,
                     2L,
+                    "",
+                    15L,
+                    ExecutionPhase.BEFORE_LUNCH.name,
+                    "TUESDAY,FRIDAY,SATURDAY,SUNDAY",
+                    null,
                     0L,
                     SyncState.SYNCED.name,
                     null
@@ -756,6 +791,11 @@ class ChecklistRepository(
                 remote.area,
                 remote.frequency,
                 remote.effort.toLong(),
+                remote.assigneeIds.joinToString(","),
+                remote.estimatedDurationMinutes.toLong(),
+                remote.executionPhase,
+                remote.activeWeekdays.joinToString(","),
+                remote.recurrenceAnchorDate,
                 remote.serverRevision,
                 SyncState.SYNCED.name,
                 null
@@ -767,6 +807,11 @@ class ChecklistRepository(
             remote.area,
             remote.frequency,
             remote.effort.toLong(),
+            remote.assigneeIds.joinToString(","),
+            remote.estimatedDurationMinutes.toLong(),
+            remote.executionPhase,
+            remote.activeWeekdays.joinToString(","),
+            remote.recurrenceAnchorDate,
             remote.serverRevision,
             SyncState.SYNCED.name,
             null,
@@ -789,6 +834,7 @@ class ChecklistRepository(
                 remote.completedAt,
                 remote.imagePath,
                 remote.isLate.toLongFlag(),
+                remote.serviceDate,
                 remote.serverRevision,
                 SyncState.SYNCED.name
             )
@@ -872,6 +918,11 @@ class ChecklistRepository(
             area = Area.fromString(row.area),
             frequency = Frequency.fromString(row.frequency),
             effort = row.effort.toInt(),
+            assigneeIds = row.assigneeIds.split(",").filter { it.isNotBlank() },
+            estimatedDurationMinutes = row.estimatedDurationMinutes.toInt(),
+            executionPhase = runCatching { ExecutionPhase.valueOf(row.executionPhase) }.getOrDefault(ExecutionPhase.BEFORE_LUNCH),
+            activeWeekdays = row.activeWeekdays.split(",").filter { it.isNotBlank() },
+            recurrenceAnchorDate = row.recurrenceAnchorDate,
             serverRevision = row.serverRevision,
             syncState = SyncState.fromString(row.syncState),
             deletedAt = row.deletedAt
@@ -887,6 +938,7 @@ class ChecklistRepository(
             completedAt = row.completedAt,
             imagePath = row.imagePath,
             isLate = row.isLate == 1L,
+            serviceDate = row.serviceDate,
             serverRevision = row.serverRevision,
             syncState = SyncState.fromString(row.syncState)
         )
@@ -915,6 +967,7 @@ private const val DEFAULT_SYNC_BATCH_SIZE = 100
 private const val METADATA_AUTH_TOKEN = "sync.authToken"
 private const val METADATA_REMOTE_USER_ID = "sync.remoteUserId"
 private const val METADATA_SYNC_CURSOR = "sync.cursor"
+private const val METADATA_CHECKLIST_SCHEDULE = "checklist.schedule"
 private const val METADATA_SEED_PURGED = "seed.purged"
 private const val METADATA_WORKSITE_NAME = "worksite.name"
 private const val METADATA_WORKSITE_LATITUDE = "worksite.latitude"
