@@ -68,7 +68,7 @@ public struct ChecklistRootView: View {
         }
         Divider().padding(.vertical, BecoTokens.Spacing.xs)
         Text(sectionTitle).font(.headline)
-        if visibleItems.isEmpty {
+        if scheduledItems.isEmpty {
           VStack(spacing: BecoTokens.Spacing.xs) {
             Text("Nenhuma atividade").font(.headline)
             Text(emptyMessage).font(.subheadline).foregroundStyle(BecoTokens.ColorToken.muted)
@@ -76,7 +76,7 @@ public struct ChecklistRootView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, BecoTokens.Spacing.xxl)
         } else {
-          ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+          ForEach(Array(scheduledItems.enumerated()), id: \.element.id) { index, item in
             let timing = ActivityTiming.today(activity: item.activity, completion: item.completion, now: now, schedule: schedule)
             BecoTaskRow(
               title: item.activity.name,
@@ -86,7 +86,7 @@ public struct ChecklistRootView: View {
               onSelect: { onSelectActivity?(item.activity.id, selectedArea) },
               onComplete: { cameraCapture = CameraCaptureRequest(activityId: item.activity.id) }
             )
-            if index < visibleItems.count - 1 { Divider() }
+            if index < scheduledItems.count - 1 { Divider() }
           }
         }
       }
@@ -138,7 +138,15 @@ public struct ChecklistRootView: View {
     }
   }
 
-  private var pendingItems: [ActivityWithCompletion] { visibleItems.filter { $0.completion == nil } }
+  private var scheduledItems: [ActivityWithCompletion] {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: schedule.timezone) ?? .current
+    let names = [1:"SUNDAY",2:"MONDAY",3:"TUESDAY",4:"WEDNESDAY",5:"THURSDAY",6:"FRIDAY",7:"SATURDAY"]
+    guard let weekday = names[calendar.component(.weekday, from: now)], schedule.days[weekday]?.active == true else { return [] }
+    return visibleItems.filter { $0.activity.activeWeekdays.contains(weekday) }
+  }
+
+  private var pendingItems: [ActivityWithCompletion] { scheduledItems.filter { $0.completion == nil } }
   private var lateCount: Int { pendingItems.filter { ActivityTiming.today(activity: $0.activity, completion: nil, now: now, schedule: schedule).status == .red }.count }
   private var remainingMinutes: Int { pendingItems.reduce(0) { $0 + $1.activity.estimatedDurationMinutes } }
 
@@ -178,7 +186,7 @@ public struct ChecklistRootView: View {
     let center = UNUserNotificationCenter.current()
     _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
     let remoteUserId = user.remoteId
-    for item in items {
+    for item in scheduledItems {
       let identifier = "checklist-reminder-\(item.activity.syncId ?? String(item.id))"
       center.removePendingNotificationRequests(withIdentifiers: [identifier])
       let assigned = item.activity.assigneeIds.isEmpty || remoteUserId == nil || item.activity.assigneeIds.contains(remoteUserId!)

@@ -66,16 +66,25 @@ public struct OperatingDaySchedule: Codable, Equatable, Sendable {
   public let openingTime: String?
   public let closingTime: String?
   public let eventLabel: String?
+  public init(dayOfWeek: String, active: Bool, entryTime: String? = nil, lunchTime: String? = nil, openingTime: String? = nil, closingTime: String? = nil, eventLabel: String? = nil) {
+    self.dayOfWeek = dayOfWeek; self.active = active; self.entryTime = entryTime; self.lunchTime = lunchTime; self.openingTime = openingTime; self.closingTime = closingTime; self.eventLabel = eventLabel
+  }
 }
 
 public struct ChecklistSchedule: Codable, Equatable, Sendable {
   public let timezone: String
   public let days: [String: OperatingDaySchedule]
 
-  public init(timezone: String = "America/Fortaleza", days: [String: OperatingDaySchedule] = [:]) {
+  public init(timezone: String = "America/Fortaleza", days: [String: OperatingDaySchedule] = ChecklistSchedule.defaultDays) {
     self.timezone = timezone
     self.days = days
   }
+  private static let defaultDays = [
+    "TUESDAY": OperatingDaySchedule(dayOfWeek: "TUESDAY", active: true, entryTime: "15:00", lunchTime: "17:00", openingTime: "18:00", closingTime: "00:00", eventLabel: "Forró"),
+    "FRIDAY": OperatingDaySchedule(dayOfWeek: "FRIDAY", active: true, entryTime: "15:00", lunchTime: "17:00", openingTime: "18:00", closingTime: "00:00"),
+    "SATURDAY": OperatingDaySchedule(dayOfWeek: "SATURDAY", active: true, entryTime: "10:00", lunchTime: "11:00", openingTime: "12:00", closingTime: "00:00"),
+    "SUNDAY": OperatingDaySchedule(dayOfWeek: "SUNDAY", active: true, entryTime: "10:00", lunchTime: "11:00", openingTime: "12:00", closingTime: "00:00"),
+  ]
 }
 
 public struct Activity: Identifiable, Equatable, Sendable {
