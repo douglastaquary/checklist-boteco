@@ -1,6 +1,7 @@
 package com.checklistboteco.presentation.viewmodel
 
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.data.sync.SyncCoordinator
 import com.checklistboteco.domain.model.ActivityWithCompletion
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.User
@@ -23,6 +24,7 @@ data class ChecklistUiState(
 class ChecklistViewModel(
     private val repository: ChecklistRepository,
     private val currentUser: User?,
+    private val syncCoordinator: SyncCoordinator?,
     private val scope: CoroutineScope
 ) {
     private val initialArea = currentUser?.checklistAccessibleAreas?.firstOrNull() ?: Area.ATENDIMENTO
@@ -40,6 +42,7 @@ class ChecklistViewModel(
 
     private fun loadActivities() {
         scope.launch {
+            syncCoordinator?.syncOnce()
             repository.getActivitiesWithCompletion(_uiState.value.selectedArea).collect { activities ->
                 _uiState.update { it.copy(activities = activities) }
             }
@@ -50,6 +53,7 @@ class ChecklistViewModel(
         if (currentUser?.canAccessChecklistArea(area) != true) return
         _uiState.update { it.copy(selectedArea = area) }
         scope.launch {
+            syncCoordinator?.syncOnce()
             repository.getActivitiesWithCompletion(area).collect { activities ->
                 _uiState.update { it.copy(activities = activities) }
             }
@@ -74,6 +78,7 @@ class ChecklistViewModel(
         val isLate = false // Lógica de atraso pode ser refinada aqui
         
         repository.insertCompletion(activityId, user.id, imagePath, isLate)
+        syncCoordinator?.requestSync()
         _uiState.update { 
             it.copy(
                 showCameraForActivity = null,

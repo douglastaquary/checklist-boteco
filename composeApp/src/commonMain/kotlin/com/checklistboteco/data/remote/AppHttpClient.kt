@@ -3,6 +3,7 @@ package com.checklistboteco.data.remote
 import com.checklistboteco.platform.AppErrorMapper
 import com.checklistboteco.platform.AppNetworkFeedback
 import com.checklistboteco.platform.ApiException
+import com.checklistboteco.platform.SessionExpiredNotifier
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.HttpSend
@@ -31,8 +32,13 @@ fun createAppHttpClient(
         HttpResponseValidator {
             validateResponse { response ->
                 if (response.status.value < 400) return@validateResponse
+                val status = response.status.value
                 val body = runCatching { response.bodyAsText() }.getOrDefault("")
-                throw ApiException(AppErrorMapper.fromHttp(response.status.value, body))
+                val message = AppErrorMapper.fromHttp(status, body)
+                if (status == 401) {
+                    SessionExpiredNotifier.notify(message)
+                }
+                throw ApiException(message, httpStatus = status)
             }
         }
     }.also { client ->

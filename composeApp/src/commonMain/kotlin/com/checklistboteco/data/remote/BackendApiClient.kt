@@ -216,6 +216,28 @@ class BackendApiClient private constructor(
         bearerAuth(token); contentType(ContentType.Application.Json); setBody(InventoryAuditRequestDto(date))
     }.body()
 
+    suspend fun salesImportPreview(token: String, fileName: String, csv: String): RemoteImportBatch =
+        httpClient.post("$baseUrl/api/sales/imports/preview") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(SalesPreviewRequestDto(fileName = fileName, csv = csv))
+        }.body()
+
+    suspend fun salesImportCommit(
+        token: String,
+        batchId: String,
+        mapping: Map<String, String>? = null
+    ): RemoteImportBatch =
+        httpClient.post("$baseUrl/api/sales/imports/$batchId/commit") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                SalesCommitRequestDto(
+                    mapping = mapping ?: emptyMap()
+                )
+            )
+        }.body()
+
     companion object {
         fun fromEnvironment(): BackendApiClient? {
             val configuredUrl = BackendEnvironment.baseUrl.trim().trimEnd('/')
@@ -402,6 +424,30 @@ data class InventoryCountSessionDto(
 @Serializable data class RemoteInventoryAuditItem(val product:String,val status:String,val notes:String,val openingQuantity:Double=0.0,val soldQuantity:Double=0.0,val theoreticalRemaining:Double=0.0)
 @Serializable data class RemoteApplyDailyAudit(val audit:RemoteInventoryAudit?=null,val balances:List<RemoteAdminStockBalance> = emptyList(),val alreadyApplied:Boolean=false)
 @Serializable data class RemoteAdminStockBalance(val productKey:String,val productName:String,val location:String,val quantity:Double=0.0)
+
+@Serializable private data class SalesPreviewRequestDto(val fileName: String, val csv: String)
+@Serializable private data class SalesCommitRequestDto(
+    val datasetId: String = "sales",
+    val mapping: Map<String, String> = emptyMap(),
+    val preserveColumns: List<String> = emptyList()
+)
+@Serializable data class RemoteImportBatch(
+    val id: String,
+    val fileName: String? = null,
+    val status: String = "PREVIEW",
+    val headers: List<String> = emptyList(),
+    val sampleRows: List<Map<String, String>> = emptyList(),
+    val suggestedMapping: Map<String, String> = emptyMap(),
+    val mapping: Map<String, String> = emptyMap(),
+    val errors: List<RemoteImportError> = emptyList(),
+    val totalRows: Int = 0,
+    val importedRows: Int = 0
+)
+@Serializable data class RemoteImportError(
+    val row: Int = 0,
+    val field: String? = null,
+    val message: String = ""
+)
 
 @Serializable
 private data class SyncPushRequestDto(

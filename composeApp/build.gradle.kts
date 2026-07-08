@@ -35,6 +35,7 @@ kotlin {
                 
                 implementation(libs.sqldelight.runtime)
                 implementation(libs.sqldelight.coroutines)
+                implementation(libs.navigation.compose)
             }
         }
         

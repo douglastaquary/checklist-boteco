@@ -30,6 +30,7 @@ data class LoginUiState(
     val challengeId: String? = null,
     val developmentCode: String? = null,
     val error: String? = null,
+    val twoFactorHint: String? = null,
     val currentUser: User? = null,
     val authToken: String? = null,
     val remoteUserId: String? = null,
@@ -88,7 +89,7 @@ class LoginViewModel(
             return
         }
 
-        val user = repository.getUserByName(name)
+        val user = repository.getUserByEmail(name) ?: repository.getUserByName(name)
         if (user == null || user.password != password) {
             _uiState.update { it.copy(error = "Usuário ou senha inválidos") }
             return
@@ -135,7 +136,23 @@ class LoginViewModel(
 
     fun logout() {
         repository.clearSyncSession()
+        _uiState.update {
+            it.copy(
+                isLoggedIn = false,
+                currentUser = null,
+                authToken = null,
+                remoteUserId = null,
+                requiresTwoFactor = false,
+                challengeId = null,
+                twoFactorHint = null,
+                developmentCode = null
+            )
+        }
         scope.launch { restoreSavedCredentials(autoUnlock = true) }
+    }
+
+    fun showSessionExpiredMessage(message: String) {
+        _uiState.update { it.copy(error = message) }
     }
 
     private suspend fun restorePersistedSessionIfPossible() {
@@ -254,9 +271,10 @@ class LoginViewModel(
                                 requiresTwoFactor = true,
                                 challengeId = result.challengeId,
                                 developmentCode = result.developmentCode,
-                                error = result.developmentCode?.let { code -> "Código de desenvolvimento: $code" }
-                                    ?: result.deliveryHint
-                                    ?: "Confirme este dispositivo"
+                                twoFactorHint = result.developmentCode?.let { code ->
+                                    "Código de desenvolvimento: $code"
+                                } ?: result.deliveryHint ?: "Confirme este dispositivo",
+                                error = null
                             )
                         }
                     } else {

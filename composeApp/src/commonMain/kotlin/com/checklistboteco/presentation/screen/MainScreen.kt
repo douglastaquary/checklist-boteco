@@ -1,153 +1,159 @@
 package com.checklistboteco.presentation.screen
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.automirrored.filled.Assignment
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.data.sync.SyncCoordinator
 import com.checklistboteco.domain.model.User
-import com.checklistboteco.presentation.viewmodel.ActivitiesManagementViewModel
-import com.checklistboteco.presentation.viewmodel.ChecklistViewModel
-import com.checklistboteco.presentation.viewmodel.DashboardViewModel
-import com.checklistboteco.presentation.viewmodel.PermissionManagementViewModel
-import com.checklistboteco.presentation.viewmodel.WorkClockViewModel
-import com.checklistboteco.presentation.viewmodel.InventoryCountViewModel
+import com.checklistboteco.presentation.designsystem.UserHeaderUiModel
+import com.checklistboteco.presentation.designsystem.components.BecoBottomNavigation
+import com.checklistboteco.presentation.designsystem.components.BecoUserHeader
+import com.checklistboteco.presentation.designsystem.tokens.BecoSpacing
+import com.checklistboteco.presentation.navigation.AppDestination
+import com.checklistboteco.presentation.navigation.MainNavGraph
+import com.checklistboteco.presentation.navigation.MainTabContext
+import com.checklistboteco.presentation.navigation.navigateToTab
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
-sealed class Tab(val title: String, val icon: ImageVector) {
-    data object Checklist : Tab("Checklist", Icons.AutoMirrored.Filled.Assignment)
-    data object WorkClock : Tab("Ponto", Icons.Default.AccessTime)
-    data object Dashboard : Tab("Dashboard", Icons.Default.Dashboard)
-    data object Activities : Tab("Atividades", Icons.Default.Settings)
-    data object Permissions : Tab("Permissões", Icons.Default.AdminPanelSettings)
-    data object Inventory : Tab("Contagem", Icons.Default.Inventory2)
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     user: User,
     repository: ChecklistRepository,
+    syncCoordinator: SyncCoordinator?,
     backendApiClient: BackendApiClient?,
     authToken: String?,
     remoteUserId: String?,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scope = rememberCoroutineScope()
-    var selectedTabIndex by rememberSaveable { mutableStateOf(0) }
-    
-    val tabs = remember(user) {
-        buildList {
-            add(Tab.Checklist)
-            if (user.canUseWorkClock()) add(Tab.WorkClock)
-            if (user.canUseInventoryModule()) add(Tab.Inventory)
-            if (user.canUseDashboardModule()) add(Tab.Dashboard)
-            if (user.canUseActivitiesModule()) add(Tab.Activities)
-            if (user.canManagePermissions()) add(Tab.Permissions)
+    val navigationLayout = remember(user) { AppDestination.layoutFor(user) }
+    val destinations = remember(navigationLayout) { navigationLayout.primary + navigationLayout.overflow }
+    val startRoute = destinations.firstOrNull()?.route ?: AppDestination.Checklist.route
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    var loadedRoutes by remember { mutableStateOf(setOf(startRoute)) }
+    var showMore by remember { mutableStateOf(false) }
+    val dateLabel = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString() }
+    val userHeader = remember(user, dateLabel) { UserHeaderUiModel.from(user, dateLabel) }
+    val showsUserHeader = currentRoute in setOf(
+        AppDestination.Checklist.route,
+        AppDestination.WorkClock.route,
+        AppDestination.Inventory.route
+    )
+
+    LaunchedEffect(currentRoute) {
+        currentRoute?.let { route ->
+            loadedRoutes = loadedRoutes + route
         }
     }
 
-    LaunchedEffect(tabs.size) {
-        if (selectedTabIndex >= tabs.size) {
-            selectedTabIndex = 0
+    LaunchedEffect(destinations, currentRoute) {
+        if (currentRoute != null && destinations.none { it.route == currentRoute }) {
+            navController.navigateToTab(destinations.first())
+            loadedRoutes = loadedRoutes + destinations.first().route
         }
+    }
+
+    val tabContext = remember(user, repository, syncCoordinator, backendApiClient, authToken, remoteUserId, onLogout) {
+        MainTabContext(
+            user = user,
+            repository = repository,
+            syncCoordinator = syncCoordinator,
+            backendApiClient = backendApiClient,
+            authToken = authToken,
+            remoteUserId = remoteUserId,
+            onLogout = onLogout
+        )
     }
 
     Scaffold(
-        bottomBar = {
-            if (tabs.size > 1) {
-                NavigationBar {
-                    tabs.forEachIndexed { index, tab ->
-                        NavigationBarItem(
-                            icon = { Icon(tab.icon, contentDescription = tab.title) },
-                            label = { Text(tab.title) },
-                            selected = selectedTabIndex == index,
-                            onClick = { selectedTabIndex = index }
-                        )
-                    }
-                }
+        topBar = {
+            if (showsUserHeader) {
+                BecoUserHeader(
+                    model = userHeader,
+                    onLogout = onLogout,
+                    modifier = Modifier.windowInsetsPadding(
+                        WindowInsets.statusBars.only(WindowInsetsSides.Top)
+                    )
+                )
             }
         },
+        bottomBar = {
+            if (destinations.size > 1) {
+                BecoBottomNavigation(
+                    destinations = navigationLayout.primary,
+                    selectedRoute = currentRoute,
+                    hasOverflow = navigationLayout.overflow.isNotEmpty(),
+                    onDestinationSelected = { destination -> loadedRoutes = loadedRoutes + destination.route; navController.navigateToTab(destination) },
+                    onMoreSelected = { showMore = true }
+                )
+            }
+        },
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         modifier = modifier
     ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
-            when (tabs[selectedTabIndex]) {
-                is Tab.Checklist -> {
-                    val viewModel = remember(user) { ChecklistViewModel(repository, user, scope) }
-                    ChecklistScreen(
-                        viewModel = viewModel,
-                        user = user,
-                        onLogout = onLogout
-                    )
-                }
-                is Tab.Dashboard -> {
-                    val viewModel = remember { DashboardViewModel(repository, scope) }
-                    DashboardScreen(
-                        viewModel = viewModel,
-                        onBack = { selectedTabIndex = 0 }
-                    )
-                }
-                is Tab.Activities -> {
-                    val viewModel = remember { ActivitiesManagementViewModel(repository, scope) }
-                    ActivitiesManagementScreen(
-                        viewModel = viewModel,
-                        onBack = { selectedTabIndex = 0 }
-                    )
-                }
-                is Tab.WorkClock -> {
-                    val viewModel = remember(user, authToken, remoteUserId) {
-                        WorkClockViewModel(
-                            repository = repository,
-                            user = user,
-                            scope = scope,
-                            backendApiClient = backendApiClient,
-                            authToken = authToken,
-                            remoteUserId = remoteUserId
+        val contentModifier = Modifier
+            .padding(padding)
+            .then(
+                if (showsUserHeader) {
+                    Modifier
+                } else {
+                    Modifier
+                        .windowInsetsPadding(
+                            WindowInsets.statusBars.only(WindowInsetsSides.Top)
                         )
-                    }
-                    WorkClockScreen(
-                        viewModel = viewModel,
-                        user = user,
-                        onBack = { selectedTabIndex = 0 }
-                    )
+                        .padding(top = BecoSpacing.xs)
                 }
-                is Tab.Permissions -> {
-                    val viewModel = remember(user, authToken) {
-                        PermissionManagementViewModel(
-                            repository = repository,
-                            currentUser = user,
-                            backendApiClient = backendApiClient,
-                            authToken = authToken,
-                            scope = scope
-                        )
+            )
+        MainNavGraph(
+            context = tabContext,
+            destinations = destinations,
+            loadedRoutes = loadedRoutes,
+            navController = navController,
+            modifier = contentModifier
+        )
+    }
+
+    if (showMore) {
+        ModalBottomSheet(onDismissRequest = { showMore = false }) {
+            Text("Mais módulos", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
+            navigationLayout.overflow.forEach { destination ->
+                ListItem(
+                    headlineContent = { Text(destination.title) },
+                    leadingContent = { Icon(destination.icon, destination.contentDescription) },
+                    modifier = Modifier.clickable {
+                        showMore = false
+                        loadedRoutes = loadedRoutes + destination.route
+                        navController.navigateToTab(destination)
                     }
-                    PermissionManagementScreen(
-                        viewModel = viewModel,
-                        onBack = { selectedTabIndex = 0 }
-                    )
-                }
-                is Tab.Inventory -> InventoryCountScreen(
-                    viewModel=remember(user,authToken){ InventoryCountViewModel(repository,backendApiClient,authToken,scope) },
-                    canCreate=user.canCreateInventoryCounts(),
-                    canViewInsights=user.canViewInventoryInsights(),
-                    canManageAdministrativeStock=user.canManageAdministrativeStock(),
-                    isAdmin=user.canManagePermissions()
                 )
             }
         }

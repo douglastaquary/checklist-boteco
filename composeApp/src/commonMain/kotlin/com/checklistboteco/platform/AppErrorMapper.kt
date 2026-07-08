@@ -16,6 +16,7 @@ object AppErrorMapper {
     fun toUserMessage(error: Throwable): String {
         return when (error) {
             is ApiException -> error.userMessage
+            is RemoteSessionRequiredException -> ""
             is ClientRequestException -> fromHttp(error.response.status.value, error.message.orEmpty())
             is ServerResponseException -> fromHttp(error.response.status.value, error.message.orEmpty())
             is ResponseException -> fromHttp(error.response.status.value, error.message.orEmpty())

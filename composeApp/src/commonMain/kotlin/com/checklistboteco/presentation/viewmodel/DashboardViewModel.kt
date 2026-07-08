@@ -3,6 +3,7 @@ package com.checklistboteco.presentation.viewmodel
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.data.repository.GlobalDashboardStats
 import com.checklistboteco.data.repository.UserRanking
+import com.checklistboteco.data.sync.SyncCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ data class DashboardUiState(
 
 class DashboardViewModel(
     private val repository: ChecklistRepository,
+    private val syncCoordinator: SyncCoordinator?,
     private val scope: CoroutineScope
 ) {
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -32,6 +34,7 @@ class DashboardViewModel(
 
     private fun loadDashboardData() {
         scope.launch {
+            syncCoordinator?.syncOnce()
             _uiState.update { it.copy(isLoading = true) }
             
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date

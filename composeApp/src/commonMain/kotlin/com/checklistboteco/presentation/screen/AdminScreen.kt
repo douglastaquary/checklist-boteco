@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.dp
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.presentation.viewmodel.AdminViewModel
+import com.checklistboteco.presentation.designsystem.components.BecoBackButton
 import com.checklistboteco.presentation.viewmodel.AreaStats
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,9 +47,7 @@ fun AdminScreen(
             TopAppBar(
                 title = { Text("Relatórios") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
+                    BecoBackButton(onClick = onBack)
                 }
             )
         }

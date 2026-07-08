@@ -1,6 +1,7 @@
 package com.checklistboteco.presentation.viewmodel
 
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.data.sync.SyncCoordinator
 import com.checklistboteco.domain.model.Activity
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.Frequency
@@ -23,6 +24,7 @@ data class ActivitiesManagementUiState(
 
 class ActivitiesManagementViewModel(
     private val repository: ChecklistRepository,
+    private val syncCoordinator: SyncCoordinator?,
     private val scope: CoroutineScope
 ) {
     private val _uiState = MutableStateFlow(ActivitiesManagementUiState())
@@ -34,6 +36,7 @@ class ActivitiesManagementViewModel(
 
     private fun loadActivities() {
         scope.launch {
+            syncCoordinator?.syncOnce()
             repository.getAllActivities().collect { activities ->
                 _uiState.update { it.copy(activities = activities) }
             }
@@ -86,6 +89,7 @@ class ActivitiesManagementViewModel(
             frequency = _uiState.value.newActivityFrequency,
             effort = _uiState.value.newActivityEffort
         )
+        syncCoordinator?.requestSync()
         _uiState.update { 
             it.copy(
                 showAddDialog = false,
@@ -96,10 +100,15 @@ class ActivitiesManagementViewModel(
         loadActivities()
     }
 
-    fun refresh() = loadActivities()
+    fun refresh() {
+        scope.launch {
+            syncCoordinator?.syncOnce()
+        }
+    }
 
     fun deleteActivity(activity: Activity) {
         repository.deleteActivity(activity.id)
+        syncCoordinator?.requestSync()
         loadActivities()
     }
 }

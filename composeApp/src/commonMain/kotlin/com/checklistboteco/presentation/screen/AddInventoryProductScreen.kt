@@ -3,23 +3,15 @@ package com.checklistboteco.presentation.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -34,11 +26,10 @@ import com.checklistboteco.domain.model.InventoryCountValidator
 import com.checklistboteco.domain.model.StorageCondition
 import com.checklistboteco.presentation.util.BrazilianCurrencyField
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddInventoryProductScreen(
+fun AddInventoryProductSheetContent(
     isAdmin: Boolean,
-    onBack: () -> Unit,
+    onDismiss: () -> Unit,
     onAdd: (
         name: String,
         quantity: Double,
@@ -61,105 +52,105 @@ fun AddInventoryProductScreen(
     var condition by remember { mutableStateOf(StorageCondition.GELADO) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Adicionar produto") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                }
-            )
-        },
+    Column(
         modifier = modifier
-    ) { padding ->
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        Text("Adicionar produto", style = MaterialTheme.typography.headlineSmall)
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it; error = null },
-                    label = { Text("Nome") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it; error = null },
+                label = { Text("Nome") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = quantity,
+                onValueChange = { quantity = it; error = null },
+                label = { Text("Quantidade") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = volume,
+                onValueChange = { volume = it; error = null },
+                label = { Text("Volume") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = volumeUnit == "ML",
+                    onClick = { volumeUnit = "ML" },
+                    label = { Text("ml") }
                 )
-                OutlinedTextField(
-                    value = quantity,
-                    onValueChange = { quantity = it; error = null },
-                    label = { Text("Quantidade") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                FilterChip(
+                    selected = volumeUnit == "G",
+                    onClick = { volumeUnit = "G" },
+                    label = { Text("gramas") }
                 )
-                OutlinedTextField(
-                    value = volume,
-                    onValueChange = { volume = it; error = null },
-                    label = { Text("Volume") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = volumeUnit == "ML",
-                        onClick = { volumeUnit = "ML" },
-                        label = { Text("ml") }
-                    )
-                    FilterChip(
-                        selected = volumeUnit == "G",
-                        onClick = { volumeUnit = "G" },
-                        label = { Text("gramas") }
-                    )
-                }
+            }
+            BrazilianCurrencyField(
+                cents = saleCents,
+                onCentsChange = { saleCents = it; error = null },
+                label = "Valor de venda",
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (isAdmin) {
                 BrazilianCurrencyField(
-                    cents = saleCents,
-                    onCentsChange = { saleCents = it; error = null },
-                    label = "Valor de venda",
+                    cents = costCents,
+                    onCentsChange = { costCents = it; error = null },
+                    label = "Valor de custo (opcional)",
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (isAdmin) {
-                    BrazilianCurrencyField(
-                        cents = costCents,
-                        onCentsChange = { costCents = it; error = null },
-                        label = "Valor de custo (opcional)",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = category == InventoryCategory.ALCOOLICO,
-                        onClick = { category = InventoryCategory.ALCOOLICO },
-                        label = { Text("Alcoólico") }
-                    )
-                    FilterChip(
-                        selected = category == InventoryCategory.NAO_ALCOOLICO,
-                        onClick = { category = InventoryCategory.NAO_ALCOOLICO },
-                        label = { Text("Não alcoólico") }
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = condition == StorageCondition.GELADO,
-                        onClick = { condition = StorageCondition.GELADO },
-                        label = { Text("Gelado") }
-                    )
-                    FilterChip(
-                        selected = condition == StorageCondition.NATURAL,
-                        onClick = { condition = StorageCondition.NATURAL },
-                        label = { Text("Natural") }
-                    )
-                }
-                error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = category == InventoryCategory.ALCOOLICO,
+                    onClick = { category = InventoryCategory.ALCOOLICO },
+                    label = { Text("Alcoólico") }
+                )
+                FilterChip(
+                    selected = category == InventoryCategory.NAO_ALCOOLICO,
+                    onClick = { category = InventoryCategory.NAO_ALCOOLICO },
+                    label = { Text("Não alcoólico") }
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = condition == StorageCondition.GELADO,
+                    onClick = { condition = StorageCondition.GELADO },
+                    label = { Text("Gelado") }
+                )
+                FilterChip(
+                    selected = condition == StorageCondition.NATURAL,
+                    onClick = { condition = StorageCondition.NATURAL },
+                    label = { Text("Natural") }
+                )
+            }
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Cancelar")
             }
             Button(
                 onClick = {
@@ -195,11 +186,11 @@ fun AddInventoryProductScreen(
                         draft.costPriceInCents,
                         draft.storageCondition
                     )
-                    onBack()
+                    onDismiss()
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f)
             ) {
-                Text("Adicionar à contagem")
+                Text("Adicionar")
             }
         }
     }

@@ -5,10 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,6 +43,7 @@ import com.checklistboteco.domain.model.WorkClockCalculator
 import com.checklistboteco.domain.model.WorkClockEntry
 import com.checklistboteco.domain.model.WorksiteLocation
 import com.checklistboteco.presentation.viewmodel.WorkClockViewModel
+import com.checklistboteco.presentation.designsystem.components.BecoBackButton
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -50,7 +53,6 @@ import kotlinx.datetime.toLocalDateTime
 fun WorkClockScreen(
     viewModel: WorkClockViewModel,
     user: User,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -68,16 +70,6 @@ fun WorkClockScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ponto - ${user.name}") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
-                }
-            )
-        },
         bottomBar = {
             Column(
                 modifier = Modifier
@@ -102,45 +94,52 @@ fun WorkClockScreen(
         },
         modifier = modifier
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            WorkMap(
-                distanceMeters = state.distanceFromWorkMeters,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.4f)
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.6f)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                InfoRow("Colaborador", user.name)
-                InfoRow("Marcação", state.nextType.displayName)
-                InfoRow("Dia e hora", formatDateTime(state.currentTimestamp))
-                InfoRow("Local", WorksiteLocation.address)
-                InfoRow("Distância", if (state.distanceFromWorkMeters == Double.MAX_VALUE) "—" else "${state.distanceFromWorkMeters.toInt()} m")
-                InfoRow("GPS", state.locationStatus)
-                InfoRow("Horas trabalhadas hoje", WorkClockCalculator.formatDuration(state.summary.workedMillis))
-                InfoRow("Horas extras (semana)", WorkClockCalculator.formatDuration(state.summary.overtimeMillis))
-                InfoRow("Descanso devido", WorkClockCalculator.formatDuration(state.summary.missingBreakMillis))
-                InfoRow("Horas devidas hoje", WorkClockCalculator.formatDuration(state.summary.missingDailyMillis))
-
-                if (state.isAdmin) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Ponto", style = MaterialTheme.typography.headlineMedium)
                     Text(
-                        "Usuários admin não têm acesso à funcionalidade de ponto.",
-                        color = MaterialTheme.colorScheme.error
+                        "Próxima marcação: ${state.nextType.displayName}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                } else if (!state.canClockIn) {
+                }
+            }
+            item {
+                WorkMap(
+                    distanceMeters = state.distanceFromWorkMeters,
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
+                )
+            }
+            item {
+                WorkClockInfoSection("Agora") {
+                    InfoRow("Colaborador", user.name)
+                    InfoRow("Dia e hora", formatDateTime(state.currentTimestamp))
+                    InfoRow("Local", WorksiteLocation.address)
+                    InfoRow("Distância", if (state.distanceFromWorkMeters == Double.MAX_VALUE) "—" else "${state.distanceFromWorkMeters.toInt()} m")
+                    InfoRow("GPS", state.locationStatus)
+                }
+            }
+            item {
+                WorkClockInfoSection("Resumo") {
+                    InfoRow("Trabalhadas hoje", WorkClockCalculator.formatDuration(state.summary.workedMillis))
+                    InfoRow("Extras na semana", WorkClockCalculator.formatDuration(state.summary.overtimeMillis))
+                    InfoRow("Descanso devido", WorkClockCalculator.formatDuration(state.summary.missingBreakMillis))
+                    InfoRow("Horas devidas hoje", WorkClockCalculator.formatDuration(state.summary.missingDailyMillis))
+                }
+            }
+            if (state.isAdmin || !state.canClockIn) {
+                item {
                     Text(
-                        state.locationStatus,
-                        color = MaterialTheme.colorScheme.error
+                        if (state.isAdmin) "Usuários admin não têm acesso à funcionalidade de ponto." else state.locationStatus,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
@@ -158,6 +157,14 @@ fun WorkClockScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun WorkClockInfoSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }
 
@@ -235,9 +242,7 @@ private fun WorkClockDetailsScreen(
             TopAppBar(
                 title = { Text("Marcações do dia") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
+                    BecoBackButton(onClick = onBack)
                 }
             )
         },

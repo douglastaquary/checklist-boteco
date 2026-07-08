@@ -232,6 +232,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteSyncOutboxByOperationId:
 DELETE FROM SyncOutbox WHERE operationId = ?;
 
+selectSyncOutboxByOperationId:
+SELECT * FROM SyncOutbox WHERE operationId = ?;
+
 deleteSyncOutboxByEntity:
 DELETE FROM SyncOutbox WHERE entityType = ? AND entitySyncId = ?;
 

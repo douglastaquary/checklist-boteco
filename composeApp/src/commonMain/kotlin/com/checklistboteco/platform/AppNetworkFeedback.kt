@@ -34,6 +34,7 @@ object AppNetworkFeedback {
 
     fun showError(message: String) {
         if (message.isBlank()) return
+        if (SessionExpiredNotifier.isHandling) return
         _errorDialog.value = message
     }
 

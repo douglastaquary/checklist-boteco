@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.presentation.viewmodel.PermissionManagementViewModel
+import com.checklistboteco.presentation.designsystem.components.BecoBackButton
+import com.checklistboteco.presentation.designsystem.components.BecoPageHeader
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -41,7 +43,6 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun PermissionManagementScreen(
     viewModel: PermissionManagementViewModel,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -65,14 +66,7 @@ fun PermissionManagementScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Permissões") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
-                }
-            )
+            BecoPageHeader(title = "Equipe", subtitle = "Usuários e permissões de acesso")
         },
         modifier = modifier
     ) { padding ->
@@ -119,12 +113,7 @@ private fun UserPermissionItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+    Column(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -140,6 +129,7 @@ private fun UserPermissionItem(
                 )
             }
         }
+        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -164,9 +154,7 @@ private fun UserPermissionDetailsScreen(
             TopAppBar(
                 title = { Text("Permissões de usuário") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
+                    BecoBackButton(onClick = onBack)
                 }
             )
         },

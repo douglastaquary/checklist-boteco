@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.checklistboteco.domain.model.WorkSector
+import com.checklistboteco.presentation.designsystem.components.BecoBackButton
 import com.checklistboteco.presentation.viewmodel.UserRegistrationViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,9 +54,7 @@ fun UserRegistrationScreen(
             TopAppBar(
                 title = { Text("Cadastro de usuário") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
+                    BecoBackButton(onClick = onBack)
                 }
             )
         },

@@ -1,6 +1,9 @@
 package com.checklistboteco.presentation.viewmodel
 
 import com.checklistboteco.data.remote.BackendApiClient
+import com.checklistboteco.platform.AppErrorMapper
+import com.checklistboteco.platform.RemoteSessionRequiredException
+import com.checklistboteco.platform.requireRemoteToken
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.domain.model.FeaturePermissions
 import com.checklistboteco.domain.model.User
@@ -40,14 +43,18 @@ class PermissionManagementViewModel(
         scope.launch {
             val api = backendApiClient
             val token = authToken
-            if (api != null && !token.isNullOrBlank()) {
-                runCatching { api.listUsers(token) }
+            if (api != null) {
+                runCatching {
+                    val remoteToken = requireRemoteToken(api, token)
+                    api.listUsers(remoteToken)
+                }
                     .onSuccess { remoteUsers ->
                         repository.upsertRemoteUsers(remoteUsers)
                         _uiState.update { it.copy(error = null) }
                     }
                     .onFailure { error ->
-                        _uiState.update { it.copy(error = error.message) }
+                        if (error is RemoteSessionRequiredException) return@onFailure
+                        _uiState.update { it.copy(error = AppErrorMapper.toUserMessage(error)) }
                     }
             }
             repository.getAllUsers().collect { users ->
@@ -96,15 +103,19 @@ class PermissionManagementViewModel(
         val api = backendApiClient
         val token = authToken
         val remoteId = user.remoteId
-        if (api != null && !token.isNullOrBlank() && !remoteId.isNullOrBlank()) {
+        if (api != null && !remoteId.isNullOrBlank()) {
             scope.launch {
-                runCatching { api.updateUserPermissions(token, remoteId, permissions) }
+                runCatching {
+                    val remoteToken = requireRemoteToken(api, token)
+                    api.updateUserPermissions(remoteToken, remoteId, permissions)
+                }
                     .onSuccess { updated ->
                         repository.updateUserFeaturePermissions(user.id, updated.featurePermissions)
                         applyUpdatedUser(user.copy(featurePermissions = updated.featurePermissions))
                     }
                     .onFailure { error ->
-                        _uiState.update { it.copy(error = error.message) }
+                        if (error is RemoteSessionRequiredException) return@onFailure
+                        _uiState.update { it.copy(error = AppErrorMapper.toUserMessage(error)) }
                     }
             }
             return

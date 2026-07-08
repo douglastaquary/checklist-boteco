@@ -30,6 +30,7 @@ import com.checklistboteco.presentation.screen.UserRegistrationScreen
 import com.checklistboteco.presentation.components.GlobalAppFeedback
 import com.checklistboteco.presentation.theme.ChecklistBotecoTheme
 import com.checklistboteco.presentation.viewmodel.LoginViewModel
+import com.checklistboteco.platform.SessionExpiredNotifier
 import com.checklistboteco.presentation.viewmodel.UserRegistrationViewModel
 
 @Composable
@@ -148,6 +149,15 @@ fun App(
             LoginViewModel(repository, backendApiClient, syncCoordinator)
         }
 
+        LaunchedEffect(loginViewModel) {
+            SessionExpiredNotifier.events.collect { event ->
+                loginViewModel.showSessionExpiredMessage(event.reason)
+                loginViewModel.logout()
+                currentScreen = Screen.Login
+                SessionExpiredNotifier.reset()
+            }
+        }
+
         when (val s = currentScreen) {
             is Screen.Login -> {
                 LoginScreen(
@@ -172,6 +182,7 @@ fun App(
                 MainScreen(
                     user = s.user,
                     repository = repository,
+                    syncCoordinator = syncCoordinator,
                     backendApiClient = backendApiClient,
                     authToken = s.authToken,
                     remoteUserId = s.remoteUserId,

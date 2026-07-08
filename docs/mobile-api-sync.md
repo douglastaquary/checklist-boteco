@@ -46,6 +46,22 @@ Sem URL configurada, o app mantém o **seed offline** (admin/colaborador + ativi
 7. Sem `CHECKLIST_API_BASE_URL` → seed + login offline continua funcionando.
 8. Fechar e reabrir app com API → sessão restaurada sem novo login.
 
+## Sessão expirada (401)
+
+Quando o token JWT expira ou está ausente em operação remota:
+
+| HTTP | Comportamento |
+|------|----------------|
+| **401** | Limpa `SyncSession`, navega para login, mensagem na tela de entrada |
+| **403** | Permanece na tela atual com erro de permissão (não desloga) |
+
+Implementação:
+
+- **Android:** `SessionExpiredNotifier` (disparado em `AppHttpClient` e `AuthSessionGuard`); `App.kt` observa e define `Screen.Login`.
+- **iOS:** `SessionExpiredCenter` (disparado em `APIClient`); `RootView` observa e chama `AppSession.invalidateSession`.
+
+Sync em background (`SyncCoordinator` / `SyncEngine`) também interrompe fila em 401 e dispara o mesmo fluxo.
+
 ## Limitações conhecidas
 
 - Fotos de conclusão usam path local; upload de imagem é fase futura.

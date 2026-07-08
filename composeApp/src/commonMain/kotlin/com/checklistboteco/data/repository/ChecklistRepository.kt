@@ -120,15 +120,36 @@ class ChecklistRepository(
 
     fun acknowledgeSyncOperation(ack: SyncAcknowledgement) {
         queries.transaction {
+            val outbox = queries.selectSyncOutboxByOperationId(ack.operationId).executeAsOneOrNull()
             when (ack.status) {
                 SyncAckStatus.APPLIED,
                 SyncAckStatus.ALREADY_APPLIED -> {
+                    outbox?.let { row ->
+                        when (SyncOperationType.valueOf(row.operationType)) {
+                            SyncOperationType.ACTIVITY_UPSERT,
+                            SyncOperationType.ACTIVITY_DELETE -> {
+                                queries.markActivitySync(
+                                    ack.serverRevision,
+                                    SyncState.SYNCED.name,
+                                    null,
+                                    row.entitySyncId
+                                )
+                            }
+                            SyncOperationType.COMPLETION_CREATE -> {
+                                queries.markCompletionSync(
+                                    ack.serverRevision,
+                                    SyncState.SYNCED.name,
+                                    row.entitySyncId
+                                )
+                            }
+                        }
+                    }
                     queries.deleteSyncOutboxByOperationId(ack.operationId)
                 }
                 SyncAckStatus.CONFLICT,
                 SyncAckStatus.REJECTED -> {
                     queries.updateSyncOutboxAttempt(
-                        0L,
+                        (outbox?.attemptCount ?: 0L) + 1L,
                         Clock.System.now().toEpochMilliseconds() + CONFLICT_RETRY_DELAY_MILLIS,
                         ack.message ?: ack.status.name,
                         OUTBOX_PENDING,
@@ -136,6 +157,57 @@ class ChecklistRepository(
                     )
                 }
             }
+        }
+    }
+
+    fun repairPendingSyncQueue() {
+        queries.transaction {
+            queries.selectAllActivities().executeAsList()
+                .filter { it.syncState == SyncState.PENDING.name && !it.syncId.isNullOrBlank() }
+                .forEach { activity ->
+                    val syncId = activity.syncId ?: return@forEach
+                    val pendingOutbox = queries.selectSyncOutboxByEntity(
+                        SyncEntityType.ACTIVITY.name,
+                        syncId
+                    ).executeAsList().count { it.status == OUTBOX_PENDING }
+                    if (pendingOutbox > 0) return@forEach
+
+                    val now = Clock.System.now().toEpochMilliseconds()
+                    if (activity.deletedAt != null) {
+                        val payload = ActivityPayload(
+                            syncId = syncId,
+                            name = activity.name,
+                            area = activity.area,
+                            frequency = activity.frequency,
+                            effort = activity.effort.toInt(),
+                            baseRevision = activity.serverRevision,
+                            deletedAt = activity.deletedAt
+                        )
+                        enqueueOperation(
+                            entityType = SyncEntityType.ACTIVITY,
+                            entitySyncId = syncId,
+                            operationType = SyncOperationType.ACTIVITY_DELETE,
+                            payload = json.encodeToString(payload),
+                            createdAt = now
+                        )
+                    } else {
+                        val payload = ActivityPayload(
+                            syncId = syncId,
+                            name = activity.name,
+                            area = activity.area,
+                            frequency = activity.frequency,
+                            effort = activity.effort.toInt(),
+                            baseRevision = activity.serverRevision
+                        )
+                        enqueueOperation(
+                            entityType = SyncEntityType.ACTIVITY,
+                            entitySyncId = syncId,
+                            operationType = SyncOperationType.ACTIVITY_UPSERT,
+                            payload = json.encodeToString(payload),
+                            createdAt = now
+                        )
+                    }
+                }
         }
     }
 

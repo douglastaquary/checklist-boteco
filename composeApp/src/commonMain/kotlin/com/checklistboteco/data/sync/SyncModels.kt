@@ -1,6 +1,7 @@
 package com.checklistboteco.data.sync
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
@@ -129,6 +130,7 @@ data class SyncPullResponse(
 
 @Serializable
 data class RemoteActivityRecord(
+    @JsonNames("id")
     val syncId: String,
     val name: String,
     val area: String,
@@ -140,6 +142,7 @@ data class RemoteActivityRecord(
 
 @Serializable
 data class RemoteCompletionRecord(
+    @JsonNames("id")
     val syncId: String,
     val activitySyncId: String,
     val userId: String,
