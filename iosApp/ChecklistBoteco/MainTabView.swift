@@ -35,6 +35,7 @@ struct MainTabView: View {
             Color.clear
           }
         }
+        .toolbar(.hidden, for: .tabBar)
         .tabItem { tab.label }
         .tag(tab)
       }
