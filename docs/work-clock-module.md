@@ -13,6 +13,7 @@ Registro de jornada com geofence GPS, sincronização com DynamoDB e painel admi
 | Descanso em turno longo | 2 h quando jornada diária ≥ 12 h |
 | Geofence | Marcação só dentro de **5 m** do Beco da Praia |
 | Precisão GPS | Accuracy ≤ 20 m |
+| Botão de ponto | Habilitado somente para usuário logado, com GPS permitido, precisão válida e dentro do raio configurado |
 
 Horas trabalhadas contam intervalos entre `ENTRADA`/`ALMOCO_FIM`/`DESCANSO_FIM` e paradas (`ALMOCO_INICIO`, `DESCANSO_INICIO`, `SAIDA`).
 
@@ -54,7 +55,28 @@ Se quiser mapa na tela (não obrigatório para geofence):
 - Push via `POST /api/sync/push` com `workClockEntries`
 - `deviceId` correto via `DeviceIdentity.getOrCreateDeviceId()`
 - Retry automático no `init` do `WorkClockViewModel` e após falha de rede
-- Backend rejeita entradas com `distanceFromWorkMeters > worksite.radiusMeters`
+- Backend rejeita com erro explícito entradas de outro usuário (`403`) ou com `distanceFromWorkMeters > worksite.radiusMeters` (`400`). O app mantém a marcação pendente para tentar novamente quando o envio falhar.
+
+## Uso interno para testes
+
+Estado recomendado para piloto interno:
+
+1. Admin cria o colaborador no painel web.
+2. Colaborador faz login no app mobile com o usuário criado.
+3. Aba **Ponto** aparece apenas para usuário comum; admin acompanha pelo painel web.
+4. Funcionário permite GPS e registra as marcações no estabelecimento.
+5. Sem internet, a marcação fica local e pendente; ao reconectar, o app tenta sincronizar.
+6. Admin valida no painel **Ponto** o resumo, marcações detalhadas e exportações CSV/PDF.
+
+Android e iOS apresentam ao colaborador o mesmo resumo:
+
+- horas trabalhadas no dia;
+- horas restantes para completar as 40 h semanais;
+- horas extras da semana;
+- descanso ainda devido;
+- horas devidas no dia.
+
+Antes de usar em produção ampla, validar em dispositivo físico dentro do Beco da Praia, porque o raio atual é rígido (`5 m`) e depende de precisão GPS ≤ `20 m`.
 
 ## API admin (`Authorization: Bearer`, perfil ADMIN)
 

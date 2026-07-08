@@ -73,17 +73,20 @@ public class ApiResource {
     }
     @POST @Path("/sync/push") public SyncPushResult push(@HeaderParam("Authorization") String auth,SyncPushRequest request){
         TokenService.Payload payload=requireToken(auth); if(request==null) request=new SyncPushRequest();
-        List<WorkClockEntry> own=(request.workClockEntries==null?List.<WorkClockEntry>of():request.workClockEntries).stream()
-            .filter(e->payload.userId.equals(e.userId))
-            .filter(e->e.distanceFromWorkMeters<=worksiteRadiusMeters)
-            .toList();
-        request.workClockEntries=own;
+        validateWorkClockEntries(payload, request.workClockEntries);
         return store.pushSync(payload.userId,payload.isAdmin,request);
     }
     private LoginResponse authenticated(User user){ var result=new LoginResponse(); result.token=tokens.issue(user.id,user.permissionLevel==PermissionLevel.ADMIN); result.user=PublicUser.from(user); return result; }
     private SyncPullResponse response(PullData data){ var result=new SyncPullResponse(); result.serverTime=System.currentTimeMillis(); result.nextCursor=data.nextCursor; result.hasMore=data.hasMore; result.activities=data.activities; result.completions=data.completions; result.tombstones=data.tombstones; return result; }
     private TokenService.Payload requireToken(String authorization){ return guard.requireToken(authorization); }
     private void requireAdmin(String auth){ guard.requireAdmin(auth); }
+    private void validateWorkClockEntries(TokenService.Payload payload,List<WorkClockEntry> entries){
+        for(WorkClockEntry entry: entries==null?List.<WorkClockEntry>of():entries){
+            if(entry==null) fail(Response.Status.BAD_REQUEST,"Marcação de ponto inválida");
+            if(!payload.userId.equals(entry.userId)) fail(Response.Status.FORBIDDEN,"Não é permitido enviar ponto de outro usuário");
+            if(entry.distanceFromWorkMeters>worksiteRadiusMeters) fail(Response.Status.BAD_REQUEST,"Marcação de ponto fora do raio permitido");
+        }
+    }
     private static long parseCursor(String cursor){ try{return cursor==null||cursor.isBlank()?0L:Long.parseLong(cursor);}catch(NumberFormatException error){ return 0L; } }
     private static void fail(Response.Status status,String message){ throw new WebApplicationException(Response.status(status).entity(new ApiError(message)).type(MediaType.APPLICATION_JSON).build()); }
 }
