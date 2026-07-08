@@ -59,7 +59,7 @@ public class PurchaseMcpResource {
         catch(Exception e){ LOG.warnf("MCP analytics call failed method=%s message=%s",request==null?"unknown":request.method,e.getMessage()); return rpcError(id,-32602,e.getMessage()); }
     }
 
-    private Object callTool(Map<String,Object> params) throws Exception {
+    public Object callTool(Map<String,Object> params) throws Exception {
         String name=Objects.toString(params==null?null:params.get("name"),""); Map<String,Object> args=params!=null&&params.get("arguments") instanceof Map<?,?> map?(Map<String,Object>)map:Map.of();
         long started=System.nanoTime(); Object data=switch(name){
             case "purchases_get_schema" -> purchaseQueries.schema(Objects.toString(args.get("datasetId"),"purchases"));
@@ -90,7 +90,7 @@ public class PurchaseMcpResource {
         String json=mapper.writeValueAsString(data); return Map.of("content",List.of(Map.of("type","text","text",json)),"structuredContent",data,"isError",false);
     }
 
-    private List<Map<String,Object>> tools(){
+    public List<Map<String,Object>> tools(){
         Map<String,Object> purchasePeriodProps=Map.ofEntries(Map.entry("from",Map.of("type","string","format","date")),Map.entry("to",Map.of("type","string","format","date")),Map.entry("datasetId",Map.of("type","string")),Map.entry("text",Map.of("type","string")),Map.entry("categories",Map.of("type","array","items",Map.of("type","string"))),Map.entry("locations",Map.of("type","array","items",Map.of("type","string"))),Map.entry("suppliers",Map.of("type","array","items",Map.of("type","string"))),Map.entry("minTotalInCents",Map.of("type","integer")),Map.entry("maxTotalInCents",Map.of("type","integer")),Map.entry("page",Map.of("type","integer","minimum",0)),Map.entry("pageSize",Map.of("type","integer","minimum",1,"maximum",200)));
         Map<String,Object> salesPeriodProps=Map.ofEntries(Map.entry("from",Map.of("type","string","format","date")),Map.entry("to",Map.of("type","string","format","date")),Map.entry("datasetId",Map.of("type","string")),Map.entry("text",Map.of("type","string")),Map.entry("categories",Map.of("type","array","items",Map.of("type","string"))),Map.entry("locations",Map.of("type","array","items",Map.of("type","string"))),Map.entry("minTotalInCents",Map.of("type","integer")),Map.entry("maxTotalInCents",Map.of("type","integer")),Map.entry("page",Map.of("type","integer","minimum",0)),Map.entry("pageSize",Map.of("type","integer","minimum",1,"maximum",200)));
         Map<String,Object> workClockPeriodProps=Map.of(

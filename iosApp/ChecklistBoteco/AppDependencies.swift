@@ -17,6 +17,7 @@ public final class AppDependencies {
   public let workClockClient: WorkClockClient?
   public let dashboardClient: DashboardClient?
   public let inventoryClient: InventoryClient?
+  public let aiChatClient: AIChatClient?
   public let deviceId: String
 
   public init() throws {
@@ -36,6 +37,7 @@ public final class AppDependencies {
     let workClockClient = apiClient.map(WorkClockClient.init)
     let dashboardClient = apiClient.map(DashboardClient.init)
     let inventoryClient = apiClient.map(InventoryClient.init)
+    let aiChatClient = apiClient.map(AIChatClient.init)
     let deviceId = DeviceIdentity.current
     let session = AppSession(
       repository: repository,
@@ -64,6 +66,7 @@ public final class AppDependencies {
     self.workClockClient = workClockClient
     self.dashboardClient = dashboardClient
     self.inventoryClient = inventoryClient
+    self.aiChatClient = aiChatClient
     self.deviceId = deviceId
   }
 }

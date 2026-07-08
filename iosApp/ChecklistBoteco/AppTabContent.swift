@@ -9,6 +9,7 @@ import DashboardFeature
 import AdminFeatures
 import Env
 import Persistence
+import AIChatFeature
 
 /// Dependências compartilhadas entre tabs — passadas para `AppTab.makeContentView`.
 struct MainTabContext {
@@ -17,6 +18,7 @@ struct MainTabContext {
   let inventoryClient: InventoryClient?
   let userClient: UserClient?
   let dashboardClient: DashboardClient?
+  let aiChatClient: AIChatClient?
   let authToken: String?
   let remoteUserId: String?
   let deviceId: String
@@ -37,6 +39,7 @@ extension AppTab {
     case .dashboard: return "chart.bar"
     case .activities: return "slider.horizontal.3"
     case .permissions: return "person.badge.key"
+    case .aiChat: return "sparkles"
     }
   }
 
@@ -114,6 +117,8 @@ extension AppTab {
         userClient: context.userClient,
         authToken: context.authToken
       )
+    case .aiChat:
+      AIChatView(client: context.aiChatClient, token: context.authToken)
     }
   }
 }

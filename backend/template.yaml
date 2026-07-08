@@ -15,6 +15,12 @@ Parameters:
     Type: String
     NoEcho: true
     MinLength: 12
+  OpenAiApiKeySecretArn:
+    Type: String
+    Description: ARN do Secrets Manager contendo a chave OPENAI_API_KEY
+  AiMonthlyLimitCents:
+    Type: Number
+    Default: 500
 
 Globals:
   Function:
@@ -31,6 +37,8 @@ Globals:
         SALES_TABLE: !Ref SalesTable
         PURCHASES_MCP_TOKEN: !Ref PurchasesMcpToken
         QUARKUS_PROFILE: prod
+        OPENAI_API_KEY: !Sub '{{resolve:secretsmanager:${OpenAiApiKeySecretArn}:SecretString:OPENAI_API_KEY}}'
+        AI_MONTHLY_LIMIT_CENTS: !Ref AiMonthlyLimitCents
 
 Resources:
   ChecklistApi:

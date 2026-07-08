@@ -150,3 +150,4 @@ Atalho para colagem inline: copie essa seção de `AGENTS.md` ou use [docs/ai-ag
 - O acesso via MCP é somente leitura.
 - O módulo web de compras e vendas continua restrito a `ADMIN`.
 - Para o módulo web, o login continua sendo administrativo; para MCP, basta o token de serviço.
+- O chat do iOS não chama `/mcp` por HTTP: ele usa `/api/ai/chat`, que reaproveita o mesmo catálogo e os mesmos serviços de analytics com autenticação JWT. Veja [`ai-chat.md`](ai-chat.md).

@@ -31,6 +31,10 @@ DerivedData/
 # Local persistent datasets
 backend/.data/
 backend/backend-data/
+backend/.env.local
+backend/env.local
+.env.local
+env.local
 *.db
 *.db-shm
 *.db-wal
