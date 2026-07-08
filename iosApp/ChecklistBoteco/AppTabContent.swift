@@ -29,7 +29,7 @@ extension AppTab {
     Label(title, systemImage: iconName)
   }
 
-  private var iconName: String {
+  var iconName: String {
     switch self {
     case .checklist: return "checklist"
     case .workClock: return "clock"
@@ -44,22 +44,25 @@ extension AppTab {
   func makeContentView(context: MainTabContext, user: User, tabRouter: TabRouter) -> some View {
     switch self {
     case .checklist:
-      ChecklistRootView(
-        user: user,
-        repository: context.repository,
-        syncController: context.syncController,
-        onLogout: context.onLogout,
-        onSelectActivity: { activityId, area in
-          Task { @MainActor in
-            tabRouter.push(
-              .checklistActivityDetail(activityId: activityId, area: area),
-              on: .checklist
-            )
+      SyncRefreshingContainer(syncController: context.syncController) {
+        ChecklistRootView(
+          user: user,
+          repository: context.repository,
+          syncController: context.syncController,
+          onLogout: context.onLogout,
+          onSelectActivity: { activityId, area in
+            Task { @MainActor in
+              tabRouter.push(
+                .checklistActivityDetail(activityId: activityId, area: area),
+                on: .checklist
+              )
+            }
           }
-        }
-      )
+        )
+      }
     case .workClock:
       WorkClockRootView(
+        user: user,
         userId: user.id,
         authToken: context.authToken,
         remoteUserId: context.remoteUserId ?? user.remoteId,
@@ -70,10 +73,13 @@ extension AppTab {
           Task { @MainActor in
             tabRouter.push(.workClockDayEntries(userId: user.id), on: .workClock)
           }
-        }
+        },
+        onLogout: context.onLogout
       )
     case .inventory:
       InventoryRootView(
+        user: user,
+        onLogout: context.onLogout,
         repository: context.repository,
         inventoryClient: context.inventoryClient,
         token: context.authToken,
@@ -87,17 +93,21 @@ extension AppTab {
         }
       )
     case .dashboard:
-      DashboardRootView(
-        repository: context.repository,
-        dashboardClient: context.dashboardClient,
-        authToken: context.authToken
-      ) { area in
-        Task { @MainActor in
-          tabRouter.push(.dashboardAreaDetail(area: area), on: .dashboard)
+      SyncRefreshingContainer(syncController: context.syncController) {
+        DashboardRootView(
+          repository: context.repository,
+          dashboardClient: context.dashboardClient,
+          authToken: context.authToken
+        ) { area in
+          Task { @MainActor in
+            tabRouter.push(.dashboardAreaDetail(area: area), on: .dashboard)
+          }
         }
       }
     case .activities:
-      ActivitiesManagementView(repository: context.repository)
+      SyncRefreshingContainer(syncController: context.syncController) {
+        ActivitiesManagementView(repository: context.repository)
+      }
     case .permissions:
       PermissionManagementView(
         repository: context.repository,

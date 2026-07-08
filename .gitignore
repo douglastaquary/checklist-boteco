@@ -18,6 +18,7 @@ target/
 
 # Local app artifacts
 .tmp-android/
+.tmp-ios/
 *.log
 *.tmp
 

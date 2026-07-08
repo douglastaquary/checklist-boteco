@@ -90,7 +90,9 @@ private enum AuthScreen: Equatable {
 struct RootView: View {
   let holder: AppDependenciesHolder
   @ObservedObject private var session: AppSession
+  @ObservedObject private var sessionExpiredCenter = SessionExpiredCenter.shared
   @State private var authScreen: AuthScreen = .login
+  @State private var sessionExpiredMessage: String?
 
   init(holder: AppDependenciesHolder) {
     self.holder = holder
@@ -118,8 +120,12 @@ struct RootView: View {
           }
         default:
           LoginView(
-            onLoginSuccess: { authScreen = .main },
-            onRegisterTap: { authScreen = .register }
+            onLoginSuccess: {
+              sessionExpiredMessage = nil
+              authScreen = .main
+            },
+            onRegisterTap: { authScreen = .register },
+            sessionExpiredMessage: sessionExpiredMessage
           )
         }
       }
@@ -131,6 +137,15 @@ struct RootView: View {
         authScreen = .main
       }
     }
+    .onReceive(sessionExpiredCenter.$latestEvent) { event in
+      guard let event else { return }
+      sessionExpiredMessage = event.reason
+      authScreen = .login
+      try? session.invalidateSession(reason: event.reason)
+      sessionExpiredCenter.reset()
+    }
+    .tint(AppColors.primary)
+    .preferredColorScheme(.light)
   }
 
   private func logout() {

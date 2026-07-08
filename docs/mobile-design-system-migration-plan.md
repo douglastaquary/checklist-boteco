@@ -6,6 +6,162 @@ Uniformizar Android e iOS por meio de um contrato visual único, implementado em
 
 O objetivo não é copiar a tela literalmente. O design deve preservar os fluxos e permissões do Checklist Boteco, funcionar com textos em português, suportar os módulos atuais e respeitar os padrões de acessibilidade de cada plataforma.
 
+## Ciclo de correções visuais — referências 1 a 4
+
+Este ciclo complementa a migração original e passa a ser a prioridade antes da remoção do legado. As quatro imagens fornecidas definem a direção visual para ações primárias, botão voltar, tab bar e safe area. O resultado deve ser equivalente em Android/Compose e iOS/SwiftUI, sem depender de APIs indisponíveis no deployment target atual do iOS.
+
+**Status (2026-07-03): implementado.** Tokens preto/branco, `BecoBackButton`, tab bar flutuante, menu de overflow por perfil e safe areas dos headers operacionais foram aplicados nas duas plataformas. A validação Android passou; a validação visual em dispositivos iOS permanece como etapa manual de aceite.
+
+### Premissas técnicas
+
+- O app iOS continua suportando iOS 16. O visual inspirado no iOS 26 deve usar composição própria no iOS 16–25 e poderá adotar APIs nativas de Liquid Glass somente quando compilado e executado no iOS 26.
+- No Android, o mesmo contrato visual será implementado com Material 3, `Surface`, shapes, elevação tonal e insets do Compose; não serão simulados componentes UIKit.
+- Durante este ciclo, o produto permanece em tema claro. O modo escuro deve ficar explicitamente desabilitado até existir uma paleta preto/branco com contraste validado; isso evita manter o lilás apenas para corrigir contraste no esquema escuro atual.
+- `AppDestination.availableFor(user)` continua sendo a fonte de autorização. A tab bar não altera regras de permissão ou rotas.
+
+### Item 1 — Preto como cor primária
+
+Objetivo: aplicar a referência 1, usando preto como cor de ação, seleção e destaque, e eliminar lilás/marrom dos tokens semânticos.
+
+Android:
+
+- alterar `BecoColors.Brand` para `Ink` (`#171717`) e substituir `BrandSoft` por um neutro (`Subtle` ou cinza dedicado);
+- atualizar `ChecklistBotecoTheme`: `primary = Ink`, `onPrimary = White`, `primaryContainer = Ink` e `onPrimaryContainer = White`;
+- remover os valores lilás residuais do esquema escuro e bloquear o tema claro enquanto o dark mode não estiver definido;
+- revisar botões, FABs, indicadores, pills, loading e seleção que usam `MaterialTheme.colorScheme.primary` para garantir que preto representa ação, não erro ou estado operacional.
+
+iOS:
+
+- alterar `AppTheme.tint`/`AppColors.primary` para preto semântico e remover o tint marrom atual;
+- introduzir tokens equivalentes para `primary`, `onPrimary`, `selectedSurface` e `secondaryActionSurface`;
+- aplicar `.tint(AppColors.primary)` no shell e nos controles que herdam o accent color;
+- preservar vermelho para destruição, verde para sucesso e âmbar para atenção; esses estados não devem ser convertidos para preto.
+
+Critérios de aceite:
+
+- nenhuma ocorrência de lilás/marrom permanece nos tokens ou nos controles primários;
+- botão primário tem fundo preto e texto branco; botão secundário tem fundo neutro e texto preto;
+- seleção de tab/pill usa preto com contraste mínimo WCAG AA;
+- testes estáticos procuram os hexadecimais removidos e screenshots cobrem botão habilitado, desabilitado e pressionado.
+
+### Item 2 — Botão voltar inspirado no iOS 26
+
+Objetivo: aplicar a referência 2 em telas de detalhe, com chevron dentro de uma superfície circular translúcida, área de toque adequada e posicionamento seguro abaixo da status bar.
+
+Criar um contrato comum `BecoBackButton`:
+
+- círculo visual de 44–48 pt/dp, hit target mínimo de 48 x 48;
+- chevron direcional (`chevron.left` no iOS e `ArrowBack` autoespelhado no Android);
+- material/translucidez e borda discreta sobre conteúdo claro; fallback opaco neutro quando blur não estiver disponível;
+- label de acessibilidade “Voltar”, suporte a RTL e estado pressionado;
+- uso apenas em destinos hierárquicos; raízes das abas continuam sem botão voltar.
+
+iOS:
+
+- esconder o back button padrão somente nas telas que adotarem o componente;
+- no iOS 26, usar a API nativa de glass disponível no SDK, protegida por `#available`;
+- no iOS 16–25, usar `Material.ultraThin`, `Circle`, overlay e shadow equivalentes;
+- manter o gesto interativo de voltar. A implementação não pode substituir a navegação por um dismiss que desative o swipe-back.
+
+Android:
+
+- integrar o componente à top app bar de detalhe usando `WindowInsets.statusBars`/padding fornecido pelo `Scaffold`;
+- chamar `NavController.popBackStack()` e nunca navegar manualmente para uma aba anterior;
+- validar contraste, ripple e comportamento com navegação gestual e três botões.
+
+Critérios de aceite:
+
+- botão não aparece nas raízes Checklist, Contagem, Dashboard ou Mais;
+- swipe-back do iOS e back do sistema Android continuam funcionando;
+- nenhum botão invade notch, Dynamic Island ou status bar;
+- screenshot tests cobrem fundo claro, conteúdo rolado e texto com Dynamic Type/font scale.
+
+### Item 3 — Tab bar flutuante inspirada no iOS 26
+
+Objetivo: aplicar a referência 3 às duas plataformas: cápsula flutuante, superfície clara/translúcida, seleção interna arredondada, ícone + label e distância correta do indicador de gesto/barra de navegação.
+
+Contrato de `BecoBottomNavigation`/`BecoTabBar`:
+
+- no máximo quatro destinos visíveis; os demais permanecem em “Mais”;
+- cápsula externa com cantos contínuos, blur/material quando suportado, borda sutil e sombra curta;
+- item selecionado em cápsula interna neutra/preta conforme contraste; ícone e texto selecionados usam o token primário preto;
+- itens não selecionados usam `muted`, mantendo labels visíveis;
+- altura e largura se adaptam a texto em português e font scale sem truncar destinos essenciais;
+- a barra respeita bottom safe area e não aplica padding duas vezes.
+
+iOS:
+
+- manter `TabView`, `AppTab`, seleção, lazy loading e uma `NavigationStack` por tab como arquitetura de navegação;
+- encapsular a apresentação em um componente customizado/fallback compatível com iOS 16, sem perder estado ou deep links;
+- usar APIs nativas do iOS 26 somente sob disponibilidade, mantendo aparência equivalente no fallback;
+- garantir que conteúdo rolável permaneça visível acima da barra e que o indicador de gesto não seja coberto.
+
+Android:
+
+- evoluir o `BecoBottomNavigation` existente em vez de criar uma segunda navegação;
+- manter `NavHost`, `navigateToTab`, `saveState`, `restoreState` e `launchSingleTop`;
+- consumir `WindowInsets.navigationBars` no shell e validar edge-to-edge;
+- manter o bottom sheet “Mais” e a distribuição por perfil.
+
+Critérios de aceite:
+
+- troca de tab preserva scroll, formulário/rascunho e back stack por aba;
+- nenhum perfil recebe módulo sem permissão ou mais de quatro itens visíveis;
+- tab bar não cobre FAB, CTA de envio, listas ou indicador de gesto;
+- labels, ícones e estados selected/unselected possuem semantics/accessibility traits;
+- screenshots cobrem funcionário, gestor e administrador em dispositivo compacto e grande.
+
+### Item 4 — Header e safe area
+
+Objetivo: corrigir a sobreposição evidenciada na referência 4. O relógio, notch/Dynamic Island e ícones do sistema devem ocupar exclusivamente a status bar; avatar, saudação e ações começam abaixo da safe area.
+
+Android:
+
+- definir uma única camada proprietária dos insets: `MainScreen`/`BecoAppShell`;
+- aplicar `WindowInsets.safeDrawing.only(WindowInsetsSides.Top + Horizontal)` ou equivalente no shell;
+- remover `statusBarsPadding()` e paddings manuais duplicados dos headers/telas filhas;
+- revisar o uso de `Scaffold` aninhado para que cada nível consuma apenas seu próprio padding;
+- configurar status bar transparente e ícones escuros no tema claro.
+
+iOS:
+
+- manter o header dentro do layout seguro de `NavigationStack`/conteúdo, sem `.ignoresSafeArea(.top)`;
+- usar `safeAreaInset(edge: .top)` no fallback e `safeAreaBar(edge: .top)` somente no iOS 26 quando apropriado;
+- remover offsets/paddings fixos usados para compensar notch;
+- validar iPhone SE, aparelho com notch e aparelho com Dynamic Island, em portrait e landscape.
+
+Critérios de aceite:
+
+- distância entre status bar e header é derivada do sistema, não de valor fixo;
+- não há sobreposição nem espaço superior duplicado em nenhuma tela raiz;
+- rolagem e top app bars continuam previsíveis após a correção;
+- screenshots cobrem status bar com hora, header completo e primeiro item da tela.
+
+### Ordem de implementação
+
+1. Consolidar tokens preto/branco e bloquear tema claro temporariamente.
+2. Corrigir propriedade e consumo de safe areas no shell antes de dimensionar headers e tab bars.
+3. Implementar `BecoBackButton` e migrar uma tela de detalhe piloto em cada plataforma.
+4. Evoluir a tab bar mantendo as arquiteturas de navegação existentes.
+5. Migrar os demais call sites, remover estilos legados e executar a matriz de testes.
+
+### Arquivos principais afetados
+
+| Plataforma | Arquivos/componentes |
+|---|---|
+| Android | `BecoColors.kt`, `Theme.kt`, `BecoBottomNavigation.kt`, `BecoUserHeader.kt`, `BecoPageHeader.kt`, `MainScreen.kt`, top bars das telas de detalhe |
+| iOS | `AppTheme.swift`, `BecoDesignSystem.swift`, novo `BecoBackButton`, `MainTabView.swift`, headers de Checklist/Ponto/Contagem e destinos de detalhe |
+| Documentação/testes | `docs/android-compose-navigation.md`, `docs/ios-swiftui-standards.md`, testes de apresentação, accessibility e screenshots |
+
+### Definition of Done do ciclo
+
+- builds Android e iOS 16 passam sem warnings novos relevantes;
+- testes unitários de distribuição de tabs e permissões permanecem verdes;
+- testes de UI/accessibility validam hit targets, labels, font scale/Dynamic Type e navegação de retorno;
+- comparação visual aprovada para as quatro referências em Android e iOS;
+- busca estática não encontra tokens lilás/marrom antigos nem aplicação duplicada de safe area;
+- documentação e catálogo de componentes refletem o novo contrato.
+
 ## Diagnóstico atual
 
 - O Android usa Compose em `composeApp/src/commonMain`, mas o target configurado atualmente é Android.

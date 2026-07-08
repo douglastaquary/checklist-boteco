@@ -2,6 +2,7 @@ import SwiftUI
 import Models
 import Env
 import Persistence
+import DesignSystem
 
 struct MainTabView: View {
   let context: MainTabContext
@@ -10,9 +11,18 @@ struct MainTabView: View {
 
   @State private var selectedTab: AppTab = .checklist
   @State private var loadedTabs: Set<AppTab> = [.checklist]
+  @State private var isMorePresented = false
 
   private var tabs: [AppTab] {
     AppTab.available(for: user)
+  }
+
+  private var primaryTabs: [AppTab] {
+    tabs.count <= 4 ? tabs : Array(tabs.prefix(3))
+  }
+
+  private var overflowTabs: [AppTab] {
+    tabs.count <= 4 ? [] : Array(tabs.dropFirst(3))
   }
 
   var body: some View {
@@ -29,6 +39,40 @@ struct MainTabView: View {
         .tag(tab)
       }
     }
+    .toolbar(.hidden, for: .tabBar)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      BecoTabBar(
+        items: primaryTabs.map {
+          BecoTabBarItem(id: $0, title: $0.title, systemImage: $0.iconName)
+        },
+        selected: selectedTab,
+        hasOverflow: !overflowTabs.isEmpty,
+        overflowSelected: overflowTabs.contains(selectedTab),
+        onSelect: select,
+        onMore: { isMorePresented = true }
+      )
+    }
+    .sheet(isPresented: $isMorePresented) {
+      NavigationStack {
+        List(overflowTabs) { tab in
+          Button {
+            select(tab)
+            isMorePresented = false
+          } label: {
+            Label(tab.title, systemImage: tab.iconName)
+              .foregroundStyle(BecoTokens.ColorToken.ink)
+          }
+        }
+        .navigationTitle("Mais módulos")
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Fechar") { isMorePresented = false }
+          }
+        }
+      }
+      .presentationDetents([.medium])
+    }
+    .tint(AppColors.primary)
     .onAppear {
       if !tabs.contains(selectedTab) { selectedTab = tabs.first ?? .checklist }
       loadedTabs.insert(selectedTab)
@@ -46,6 +90,11 @@ struct MainTabView: View {
       )
       loadedTabs.insert(selectedTab)
     }
+  }
+
+  private func select(_ tab: AppTab) {
+    selectedTab = tab
+    loadedTabs.insert(tab)
   }
 
   @ViewBuilder
