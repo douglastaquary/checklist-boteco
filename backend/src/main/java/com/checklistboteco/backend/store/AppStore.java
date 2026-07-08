@@ -17,7 +17,10 @@ public interface AppStore {
     PublicUser updatePermissions(String id,FeaturePermissions permissions);
     List<Activity> activities();
     Activity createActivity(CreateActivityRequest request);
+    Activity updateActivity(String id,CreateActivityRequest request);
     List<Completion> completions();
+    ChecklistSchedule checklistSchedule();
+    ChecklistSchedule saveChecklistSchedule(ChecklistSchedule schedule);
     void upsertWorkClockEntries(List<WorkClockEntry> values);
     List<WorkClockEntry> listWorkClockEntries(String userId, LocalDate from, LocalDate to);
     Optional<UserWorkSchedule> getWorkSchedule(String userId);

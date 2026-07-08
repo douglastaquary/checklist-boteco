@@ -4,6 +4,7 @@ let token = localStorage.getItem('checklist-token') || '';
 let challengeId = '';
 let currentUser = null;
 let currentUsers = [];
+let currentActivities = [];
 let purchasePreview = null;
 let purchaseSchema = null;
 let salesPreview = null;
@@ -237,6 +238,8 @@ async function load() {
 
   if (isAdmin()) {
     renderDashboard(await api('/api/admin/dashboard'));
+    await loadChecklistOverview();
+    renderChecklistSchedule(await api('/api/checklist/schedule'));
   } else {
     $('metrics').innerHTML = '';
     $('areaBars').innerHTML = '<p>Disponível apenas para administradores.</p>';
@@ -251,7 +254,9 @@ async function load() {
   }
 
   if (canManageActivities()) {
-    renderActivities(await api('/api/activities'));
+    currentActivities = await api('/api/activities');
+    renderActivities(currentActivities);
+    $('activityAssignees').innerHTML = currentUsers.filter(user => user.permissionLevel !== 'ADMIN').map(user => `<option value="${user.id}">${escapeHtml(user.name)}</option>`).join('');
   } else {
     $('activityCards').innerHTML = '<p>Sem permissão para gerenciar atividades.</p>';
   }
@@ -275,6 +280,34 @@ function renderDashboard(data) {
       <div class="bar"><i style="width:${count / max * 100}%"></i></div>
       <strong>${count}</strong>
     </div>`).join('') || '<p>Nenhuma atividade cadastrada.</p>';
+}
+
+const timingLabel = { GREEN: 'Dentro do prazo', YELLOW: 'No limite', RED: 'Atrasada', COMPLETED: 'Concluída' };
+async function loadChecklistOverview() {
+  if (!isAdmin()) return;
+  const data = await api('/api/admin/checklist/overview');
+  $('checklistOverviewMetrics').innerHTML = [['Dentro do prazo', data.green], ['No limite', data.yellow], ['Atrasadas', data.red], ['Concluídas', data.completed], ['Minutos restantes', data.totalRemainingMinutes]].map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  $('checklistOverviewBody').innerHTML = (data.occurrences || []).map(item => `<tr><td><strong>${escapeHtml(item.activityName)}</strong><small>${escapeHtml(item.executionPhase)} · ${item.estimatedDurationMinutes} min</small></td><td>${new Date(item.deadlineAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</td><td><span class="timing-status timing-${String(item.status).toLowerCase()}">${timingLabel[item.status] || item.status}</span></td><td>${escapeHtml((item.assigneeNames || []).join(', ') || 'Equipe do setor')}</td><td>${item.completion ? `${escapeHtml(item.completedByName || '')}<small>${new Date(item.completion.completedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</small>` : '—'}</td></tr>`).join('') || '<tr><td colspan="5">Nenhuma atividade prevista para hoje.</td></tr>';
+}
+
+const weekdayLabels = { MONDAY:'Segunda', TUESDAY:'Terça', WEDNESDAY:'Quarta', THURSDAY:'Quinta', FRIDAY:'Sexta', SATURDAY:'Sábado', SUNDAY:'Domingo' };
+function renderChecklistSchedule(schedule) {
+  $('checklistScheduleDays').innerHTML = Object.entries(weekdayLabels).map(([day, label]) => {
+    const value = schedule.days?.[day] || { active:false };
+    return `<fieldset data-schedule-day="${day}"><legend>${label}</legend><label><input type="checkbox" data-field="active" ${value.active ? 'checked' : ''}> Em operação</label><label>Entrada<input type="time" data-field="entryTime" value="${value.entryTime || ''}"></label><label>Almoço<input type="time" data-field="lunchTime" value="${value.lunchTime || ''}"></label><label>Abertura<input type="time" data-field="openingTime" value="${value.openingTime || ''}"></label><label>Encerramento<input type="time" data-field="closingTime" value="${value.closingTime || ''}"></label><label>Evento<input data-field="eventLabel" value="${escapeHtml(value.eventLabel || '')}"></label></fieldset>`;
+  }).join('');
+}
+
+async function saveChecklistSchedule(event) {
+  event.preventDefault();
+  const days = {};
+  document.querySelectorAll('[data-schedule-day]').forEach(fieldset => {
+    const read = field => fieldset.querySelector(`[data-field="${field}"]`);
+    const day = fieldset.dataset.scheduleDay;
+    days[day] = { dayOfWeek:day, active:read('active').checked, entryTime:read('entryTime').value || null, lunchTime:read('lunchTime').value || null, openingTime:read('openingTime').value || null, closingTime:read('closingTime').value || null, eventLabel:read('eventLabel').value.trim() || null };
+  });
+  renderChecklistSchedule(await api('/api/checklist/schedule', { method:'PUT', body:JSON.stringify({ timezone:'America/Fortaleza', days }) }));
+  await loadChecklistOverview();
 }
 
 function renderUsers(users) {
@@ -333,9 +366,19 @@ function renderActivities(values) {
   $('activityCards').innerHTML = values.map(value => `
     <div class="activity">
       <h3>${escapeHtml(value.name)}</h3>
-      <footer><span>${value.area}</span><span>${value.frequency} · esforço ${value.effort}</span></footer>
+      <p>${escapeHtml(value.executionPhase || 'BEFORE_LUNCH')} · ${value.estimatedDurationMinutes || 15} min</p>
+      <p>${escapeHtml((value.assigneeIds || []).map(id => currentUsers.find(user => user.id === id)?.name).filter(Boolean).join(', ') || 'Equipe do setor')}</p>
+      <footer><span>${value.area}</span><span>${value.frequency} · esforço ${value.effort}</span><button type="button" class="secondary" data-activity-edit="${value.id}">Editar</button></footer>
     </div>
   `).join('');
+  document.querySelectorAll('[data-activity-edit]').forEach(button => button.addEventListener('click', () => editActivity(button.dataset.activityEdit)));
+}
+
+function editActivity(id) {
+  const value = currentActivities.find(item => item.id === id); if (!value) return;
+  $('activityForm').classList.remove('hidden'); $('activityId').value=value.id; $('activityName').value=value.name; $('activityArea').value=value.area; $('activityFrequency').value=value.frequency; $('activityEffort').value=value.effort; $('activityDuration').value=value.estimatedDurationMinutes || 15; $('activityPhase').value=value.executionPhase || 'BEFORE_LUNCH'; $('activityAnchor').value=value.recurrenceAnchorDate || '';
+  [...$('activityAssignees').options].forEach(option => option.selected=(value.assigneeIds || []).includes(option.value));
+  document.querySelectorAll('[name="activityWeekday"]').forEach(input => input.checked=(value.activeWeekdays || []).includes(input.value));
 }
 
 function resetUserForm() {
@@ -469,16 +512,23 @@ $('challengeForm').addEventListener('submit', async event => {
 $('activityForm').addEventListener('submit', async event => {
   event.preventDefault();
   try {
-    await api('/api/activities', {
-      method: 'POST',
+    const id = $('activityId').value;
+    await api(id ? `/api/activities/${id}` : '/api/activities', {
+      method: id ? 'PUT' : 'POST',
       body: JSON.stringify({
         name: $('activityName').value,
         area: $('activityArea').value,
         frequency: $('activityFrequency').value,
-        effort: Number($('activityEffort').value)
+        effort: Number($('activityEffort').value),
+        estimatedDurationMinutes: Number($('activityDuration').value),
+        executionPhase: $('activityPhase').value,
+        assigneeIds: [...$('activityAssignees').selectedOptions].map(option => option.value),
+        activeWeekdays: [...document.querySelectorAll('[name="activityWeekday"]:checked')].map(input => input.value),
+        recurrenceAnchorDate: $('activityAnchor').value || null
       })
     });
     event.target.reset();
+    $('activityId').value = '';
     event.target.classList.add('hidden');
     await load();
   } catch (error) {
@@ -487,6 +537,9 @@ $('activityForm').addEventListener('submit', async event => {
 });
 
 $('showActivityForm').addEventListener('click', () => $('activityForm').classList.toggle('hidden'));
+$('refreshChecklistOverview').addEventListener('click', loadChecklistOverview);
+$('checklistScheduleForm').addEventListener('submit', saveChecklistSchedule);
+setInterval(() => { if (token && isAdmin() && activeView() === 'dashboard') loadChecklistOverview().catch(() => {}); }, 30_000);
 $('showUserForm').addEventListener('click', () => openUserForm());
 $('userForm').addEventListener('submit', saveUser);
 $('cancelUserForm').addEventListener('click', resetUserForm);

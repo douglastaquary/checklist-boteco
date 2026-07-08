@@ -8,6 +8,7 @@ data class ActivityCompletion(
     val completedAt: Long,
     val imagePath: String?,
     val isLate: Boolean = false,
+    val serviceDate: String = "",
     val serverRevision: Long = 0L,
     val syncState: SyncState = SyncState.SYNCED
 )

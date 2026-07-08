@@ -133,7 +133,12 @@ class SyncCoordinator(
                             name = payload.name,
                             area = payload.area,
                             frequency = payload.frequency,
-                            effort = payload.effort
+                            effort = payload.effort,
+                            assigneeIds = payload.assigneeIds,
+                            estimatedDurationMinutes = payload.estimatedDurationMinutes,
+                            executionPhase = payload.executionPhase,
+                            activeWeekdays = payload.activeWeekdays,
+                            recurrenceAnchorDate = payload.recurrenceAnchorDate
                         )
                     )) as JsonObject
                 )
@@ -166,7 +171,8 @@ class SyncCoordinator(
                             activitySyncId = payload.activitySyncId,
                             completedAt = payload.completedAt,
                             imagePath = payload.imagePath,
-                            isLate = payload.isLate
+                            isLate = payload.isLate,
+                            serviceDate = payload.serviceDate
                         )
                     )) as JsonObject
                 )

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.time.DayOfWeek;
 
 public final class Models {
     private Models() {}
@@ -11,6 +12,8 @@ public final class Models {
     public enum Area { ATENDIMENTO, COZINHA, ESTOQUE, LIMPEZA }
     public enum PermissionLevel { ADMIN, USER }
     public enum Frequency { DIARIO, QUINZENAL, MENSAL }
+    public enum ExecutionPhase { BEFORE_LUNCH, BEFORE_OPENING, DURING_OPERATION }
+    public enum ChecklistTimingStatus { GREEN, YELLOW, RED, COMPLETED }
     public enum SyncStatus { SYNCED, PENDING, DELETED }
     public enum EntityType { ACTIVITY, COMPLETION }
     public enum SyncOperationType { ACTIVITY_UPSERT, ACTIVITY_DELETE, COMPLETION_CREATE }
@@ -79,6 +82,11 @@ public final class Models {
         public Area area;
         public Frequency frequency;
         public int effort = 1;
+        public List<String> assigneeIds = new ArrayList<>();
+        public int estimatedDurationMinutes = 15;
+        public ExecutionPhase executionPhase = ExecutionPhase.BEFORE_LUNCH;
+        public List<DayOfWeek> activeWeekdays = new ArrayList<>(List.of(DayOfWeek.TUESDAY,DayOfWeek.FRIDAY,DayOfWeek.SATURDAY,DayOfWeek.SUNDAY));
+        public String recurrenceAnchorDate;
         public long createdAt, updatedAt, serverRevision, deletedAt;
         public SyncStatus syncStatus = SyncStatus.SYNCED;
     }
@@ -87,6 +95,7 @@ public final class Models {
         public String id, activityId, userId, imagePath;
         public long completedAt, createdAt, updatedAt, serverRevision;
         public boolean isLate;
+        public String serviceDate;
         public SyncStatus syncStatus = SyncStatus.SYNCED;
     }
 
@@ -147,7 +156,53 @@ public final class Models {
         public String newPassword;
     }
     public static class PermissionUpdateRequest { public FeaturePermissions permissions; }
-    public static class CreateActivityRequest { public String name; public Area area; public Frequency frequency; public int effort=1; }
+    public static class CreateActivityRequest {
+        public String name; public Area area; public Frequency frequency; public int effort=1;
+        public List<String> assigneeIds = new ArrayList<>();
+        public int estimatedDurationMinutes = 15;
+        public ExecutionPhase executionPhase = ExecutionPhase.BEFORE_LUNCH;
+        public List<DayOfWeek> activeWeekdays = new ArrayList<>();
+        public String recurrenceAnchorDate;
+    }
+    public static class OperatingDaySchedule {
+        public DayOfWeek dayOfWeek;
+        public boolean active;
+        public String entryTime, lunchTime, openingTime, closingTime;
+        public String eventLabel;
+    }
+    public static class ChecklistSchedule {
+        public String timezone = "America/Fortaleza";
+        public Map<DayOfWeek,OperatingDaySchedule> days = new EnumMap<>(DayOfWeek.class);
+        public static ChecklistSchedule defaults(){
+            var value=new ChecklistSchedule();
+            value.days.put(DayOfWeek.TUESDAY,day(DayOfWeek.TUESDAY,true,"15:00","17:00","18:00","00:00","Forró"));
+            value.days.put(DayOfWeek.FRIDAY,day(DayOfWeek.FRIDAY,true,"15:00","17:00","18:00","00:00",null));
+            value.days.put(DayOfWeek.SATURDAY,day(DayOfWeek.SATURDAY,true,"10:00","11:00","12:00","00:00",null));
+            value.days.put(DayOfWeek.SUNDAY,day(DayOfWeek.SUNDAY,true,"10:00","11:00","12:00","00:00",null));
+            for(var dow:DayOfWeek.values()) value.days.putIfAbsent(dow,day(dow,false,null,null,null,null,null));
+            return value;
+        }
+        private static OperatingDaySchedule day(DayOfWeek dow,boolean active,String entry,String lunch,String opening,String closing,String label){
+            var day=new OperatingDaySchedule(); day.dayOfWeek=dow; day.active=active; day.entryTime=entry; day.lunchTime=lunch; day.openingTime=opening; day.closingTime=closing; day.eventLabel=label; return day;
+        }
+    }
+    public static class ChecklistOccurrence {
+        public String occurrenceId, serviceDate, activityId, activityName;
+        public Area area;
+        public ExecutionPhase executionPhase;
+        public int estimatedDurationMinutes;
+        public List<String> assigneeIds = new ArrayList<>();
+        public List<String> assigneeNames = new ArrayList<>();
+        public long recommendedStartAt, deadlineAt;
+        public ChecklistTimingStatus status;
+        public Completion completion;
+        public String completedByName;
+    }
+    public static class ChecklistOverview {
+        public String serviceDate;
+        public int green, yellow, red, completed, totalRemainingMinutes;
+        public List<ChecklistOccurrence> occurrences = new ArrayList<>();
+    }
     public static class DashboardStats {
         public int totalUsers, totalActivities, totalCompletions, pendingSyncItems;
         public Map<Area,Integer> activitiesByArea = new EnumMap<>(Area.class);
@@ -172,6 +227,7 @@ public final class Models {
         public List<Activity> activities = new ArrayList<>();
         public List<Completion> completions = new ArrayList<>();
         public List<Tombstone> tombstones = new ArrayList<>();
+        public ChecklistSchedule checklistSchedule;
     }
 
     public static class PullData {

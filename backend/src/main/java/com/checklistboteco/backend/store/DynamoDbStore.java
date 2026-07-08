@@ -39,7 +39,7 @@ public class DynamoDbStore extends LocalStore {
 
     private synchronized void ensureHydrated() {
         if (hydrated) return;
-        users.clear(); activities.clear(); completions.clear(); workClock.clear(); userSchedules.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear();
+        users.clear(); activities.clear(); completions.clear(); workClock.clear(); userSchedules.clear(); challenges.clear(); trustedDevices.clear(); deletedUsers.clear(); checklistSchedule=ChecklistSchedule.defaults();
         dynamo.scan(ScanRequest.builder().tableName(table).build()).items().forEach(this::hydrate);
         deletedUsers.forEach(users::remove);
         hydrated=true;
@@ -51,6 +51,8 @@ public class DynamoDbStore extends LocalStore {
     @Override public List<PublicUser> users(){ ensureHydrated(); return super.users(); }
     @Override public List<Activity> activities(){ ensureHydrated(); return super.activities(); }
     @Override public List<Completion> completions(){ ensureHydrated(); return super.completions(); }
+    @Override public ChecklistSchedule checklistSchedule(){ ensureHydrated(); return super.checklistSchedule(); }
+    @Override public synchronized ChecklistSchedule saveChecklistSchedule(ChecklistSchedule value){ ensureHydrated(); ChecklistSchedule result=super.saveChecklistSchedule(value); put("CHECKLIST_SCHEDULE","BECO",result); return result; }
     @Override public DashboardStats dashboard(){ ensureHydrated(); return super.dashboard(); }
     @Override public PullData pullChanges(String userId,long cursor,int limit){ ensureHydrated(); return super.pullChanges(userId,cursor,limit); }
     @Override public boolean isTrustedDevice(String userId,String deviceId){ ensureHydrated(); return super.isTrustedDevice(userId,deviceId); }
@@ -61,6 +63,7 @@ public class DynamoDbStore extends LocalStore {
     @Override public synchronized PublicUser resetUserPassword(String id,String newPassword){ ensureHydrated(); PublicUser result=super.resetUserPassword(id,newPassword); put("USER",id,users.get(id)); return result; }
     @Override public synchronized PublicUser updatePermissions(String id,FeaturePermissions permissions){ ensureHydrated(); PublicUser result=super.updatePermissions(id,permissions); put("USER",id,users.get(id)); return result; }
     @Override public synchronized Activity createActivity(CreateActivityRequest request){ ensureHydrated(); Activity result=super.createActivity(request); put("ACTIVITY",result.id,result); return result; }
+    @Override public synchronized Activity updateActivity(String id,CreateActivityRequest request){ ensureHydrated(); Activity result=super.updateActivity(id,request); put("ACTIVITY",result.id,result); return result; }
     @Override public void upsertWorkClockEntries(List<WorkClockEntry> values){ ensureHydrated(); super.upsertWorkClockEntries(values); safe(values).forEach(v->put("WORK_CLOCK",v.id,v)); }
     @Override public List<WorkClockEntry> listWorkClockEntries(String userId, LocalDate from, LocalDate to){ ensureHydrated(); return super.listWorkClockEntries(userId, from, to); }
     @Override public Optional<UserWorkSchedule> getWorkSchedule(String userId){ ensureHydrated(); return super.getWorkSchedule(userId); }
@@ -105,6 +108,7 @@ public class DynamoDbStore extends LocalStore {
                 case "COMPLETION" -> { Completion value=mapper.readValue(payload,Completion.class); completions.put(value.id,value); }
                 case "WORK_CLOCK" -> { WorkClockEntry value=mapper.readValue(payload,WorkClockEntry.class); workClock.put(value.id,value); }
                 case "USER_SCHEDULE" -> { UserWorkSchedule value=mapper.readValue(payload,UserWorkSchedule.class); userSchedules.put(value.userId,value); }
+                case "CHECKLIST_SCHEDULE" -> checklistSchedule=mapper.readValue(payload,ChecklistSchedule.class);
                 case "TOMBSTONE" -> { Tombstone value=mapper.readValue(payload,Tombstone.class); tombstones.put(value.entityId,value); }
                 case "CHALLENGE" -> { DeviceChallenge value=mapper.readValue(payload,DeviceChallenge.class); if(value.expiresAt>System.currentTimeMillis()) challenges.put(value.id,value); }
                 case "TRUSTED" -> trustedDevices.add(payload);
