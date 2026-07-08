@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -48,11 +49,7 @@ fun LoginScreen(
     val isNetworkLoading by AppNetworkFeedback.isLoading.collectAsState()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Checklist Boteco") }
-            )
-        },
+        containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { padding ->
         Column(
@@ -64,9 +61,19 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                "Bem-vindo!",
-                style = MaterialTheme.typography.headlineMedium,
+                "Beco da Praia",
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                "Bem-vindo",
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                "Acesse sua rotina operacional",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(32.dp))
 
@@ -75,7 +82,7 @@ fun LoginScreen(
                 onValueChange = viewModel::updateUserName,
                 label = { Text("Usuário ou email") },
                 leadingIcon = { Icon(Icons.Default.Person, null) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                 singleLine = true,
                 enabled = !state.pendingBiometricUnlock && !state.biometricUnlockInProgress
             )
@@ -90,7 +97,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = viewModel::unlockRememberedUser,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                     enabled = !state.biometricUnlockInProgress
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -109,7 +116,7 @@ fun LoginScreen(
                 onValueChange = viewModel::updatePassword,
                 label = { Text("Senha") },
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -117,7 +124,7 @@ fun LoginScreen(
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
@@ -133,12 +140,20 @@ fun LoginScreen(
 
             if (state.requiresTwoFactor) {
                 Spacer(Modifier.height(16.dp))
+                state.twoFactorHint?.let { hint ->
+                    Text(
+                        hint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 OutlinedTextField(
                     value = state.twoFactorCode,
                     onValueChange = viewModel::updateTwoFactorCode,
                     label = { Text("Código de verificação") },
                     leadingIcon = { Icon(Icons.Default.Lock, null) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
@@ -157,7 +172,7 @@ fun LoginScreen(
 
             Button(
                 onClick = if (state.requiresTwoFactor) viewModel::verifyTwoFactor else viewModel::login,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                 enabled = !isNetworkLoading && !state.biometricUnlockInProgress && !state.pendingBiometricUnlock
             ) {
                 Text(

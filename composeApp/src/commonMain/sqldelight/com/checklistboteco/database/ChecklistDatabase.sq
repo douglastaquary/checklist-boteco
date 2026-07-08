@@ -232,6 +232,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 deleteSyncOutboxByOperationId:
 DELETE FROM SyncOutbox WHERE operationId = ?;
 
+selectSyncOutboxByOperationId:
+SELECT * FROM SyncOutbox WHERE operationId = ?;
+
 deleteSyncOutboxByEntity:
 DELETE FROM SyncOutbox WHERE entityType = ? AND entitySyncId = ?;
 
@@ -296,3 +299,15 @@ LEFT JOIN ActivityCompletion AS ac ON u.id = ac.userId AND ac.completedAt >= :pe
 LEFT JOIN Activity AS a ON ac.activityId = a.id AND a.deletedAt IS NULL
 GROUP BY u.id, u.name
 ORDER BY totalEffort DESC;
+
+deleteSeedActivities:
+DELETE FROM Activity WHERE syncId LIKE 'seed-%';
+
+deleteSeedUsers:
+DELETE FROM User WHERE email IN ('admin@checklistboteco.com', 'colaborador@checklistboteco.com');
+
+clearAllActivityCompletions:
+DELETE FROM ActivityCompletion;
+
+clearSyncOutbox:
+DELETE FROM SyncOutbox;

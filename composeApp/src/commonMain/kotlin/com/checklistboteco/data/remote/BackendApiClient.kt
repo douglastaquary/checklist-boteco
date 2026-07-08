@@ -6,10 +6,12 @@ import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorkSector
+import com.checklistboteco.domain.model.WorksiteInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -69,6 +71,81 @@ class BackendApiClient private constructor(
             user = user.toDomain(),
             remoteUserId = user.id
         )
+    }
+
+    suspend fun listUsers(token: String): List<User> {
+        return httpClient.get("$baseUrl/api/users") {
+            bearerAuth(token)
+        }.body<List<PublicUserDto>>().map { it.toDomain().copy(remoteId = it.id) }
+    }
+
+    suspend fun createUser(
+        token: String,
+        name: String,
+        email: String,
+        password: String,
+        workSector: WorkSector,
+        permissionLevel: PermissionLevel = PermissionLevel.USER,
+        permissions: FeaturePermissions = FeaturePermissions()
+    ): User {
+        val created = httpClient.post("$baseUrl/api/users") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                CreateUserRequestDto(
+                    name = name,
+                    email = email,
+                    password = password,
+                    workSector = workSector.name,
+                    permissionLevel = permissionLevel.name,
+                    permissions = FeaturePermissionsDto.fromDomain(permissions)
+                )
+            )
+        }.body<PublicUserDto>()
+        return created.toDomain().copy(remoteId = created.id)
+    }
+
+    suspend fun updateUserPermissions(
+        token: String,
+        userId: String,
+        permissions: FeaturePermissions
+    ): User {
+        val updated = httpClient.patch("$baseUrl/api/users/$userId/permissions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(PermissionUpdateRequestDto(FeaturePermissionsDto.fromDomain(permissions)))
+        }.body<PublicUserDto>()
+        return updated.toDomain().copy(remoteId = updated.id)
+    }
+
+    suspend fun fetchWorksite(token: String): WorksiteInfo {
+        val dto = httpClient.get("$baseUrl/api/work-clock/worksite") {
+            bearerAuth(token)
+        }.body<WorksiteInfoDto>()
+        return WorksiteInfo(
+            name = dto.name,
+            latitude = dto.latitude,
+            longitude = dto.longitude,
+            radiusMeters = dto.radiusMeters
+        )
+    }
+
+    suspend fun fetchDashboardStats(token: String): DashboardStatsDto {
+        return httpClient.get("$baseUrl/api/admin/dashboard") {
+            bearerAuth(token)
+        }.body()
+    }
+
+    suspend fun listInventoryCounts(token: String): List<InventoryCountSessionDto> {
+        return httpClient.get("$baseUrl/api/inventory/counts") {
+            bearerAuth(token)
+        }.body()
+    }
+
+    suspend fun listAdminStockBalances(token: String): List<RemoteAdminStockBalance> {
+        return httpClient.get("$baseUrl/api/inventory/admin-stock/balances") {
+            bearerAuth(token)
+        }.body()
     }
 
     suspend fun health(): Boolean {
@@ -138,6 +215,28 @@ class BackendApiClient private constructor(
     suspend fun applyDailyAudit(token: String, date: String): RemoteApplyDailyAudit = httpClient.post("$baseUrl/api/inventory/audit/daily/apply") {
         bearerAuth(token); contentType(ContentType.Application.Json); setBody(InventoryAuditRequestDto(date))
     }.body()
+
+    suspend fun salesImportPreview(token: String, fileName: String, csv: String): RemoteImportBatch =
+        httpClient.post("$baseUrl/api/sales/imports/preview") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(SalesPreviewRequestDto(fileName = fileName, csv = csv))
+        }.body()
+
+    suspend fun salesImportCommit(
+        token: String,
+        batchId: String,
+        mapping: Map<String, String>? = null
+    ): RemoteImportBatch =
+        httpClient.post("$baseUrl/api/sales/imports/$batchId/commit") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                SalesCommitRequestDto(
+                    mapping = mapping ?: emptyMap()
+                )
+            )
+        }.body()
 
     companion object {
         fun fromEnvironment(): BackendApiClient? {
@@ -235,7 +334,8 @@ private data class PublicUserDto(
             allowedAreas = if (level == PermissionLevel.ADMIN) {
                 Area.entries.toList()
             } else {
-                allowedAreas.map { Area.fromString(it) }
+                val parsed = allowedAreas.map { Area.fromString(it) }
+                if (parsed.isEmpty()) listOf(WorkSector.fromString(workSector).activityArea) else parsed
             },
             createdAt = createdAt,
             featurePermissions = permissions.toDomain()
@@ -262,7 +362,60 @@ private data class FeaturePermissionsDto(
             canManageAdministrativeStock = canManageAdministrativeStock
         )
     }
+
+    companion object {
+        fun fromDomain(permissions: FeaturePermissions): FeaturePermissionsDto {
+            return FeaturePermissionsDto(
+                canRegisterUsers = permissions.canRegisterUsers,
+                canCreateActivities = permissions.canCreateActivities,
+                canEditUsers = permissions.canEditUsers,
+                canCreateInventoryCounts = permissions.canCreateInventoryCounts,
+                canViewInventoryInsights = permissions.canViewInventoryInsights,
+                canManageAdministrativeStock = permissions.canManageAdministrativeStock
+            )
+        }
+    }
 }
+
+@Serializable
+private data class CreateUserRequestDto(
+    val name: String,
+    val email: String,
+    val password: String,
+    val workSector: String,
+    val permissionLevel: String,
+    val permissions: FeaturePermissionsDto
+)
+
+@Serializable
+private data class PermissionUpdateRequestDto(
+    val permissions: FeaturePermissionsDto
+)
+
+@Serializable
+private data class WorksiteInfoDto(
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Double,
+    val name: String
+)
+
+@Serializable
+data class DashboardStatsDto(
+    val totalUsers: Int = 0,
+    val totalActivities: Int = 0,
+    val totalCompletions: Int = 0,
+    val pendingSyncItems: Int = 0,
+    val activitiesByArea: Map<String, Int> = emptyMap()
+)
+
+@Serializable
+data class InventoryCountSessionDto(
+    val id: String,
+    val countDate: String,
+    val countedAt: String,
+    val location: String
+)
 
 @Serializable private data class InventoryCountRequestDto(val countDate:String,val countedAt:String,val location:String="Beco da Praia",val items:List<InventoryCountItemDto>)
 @Serializable private data class InventoryCountItemDto(val name:String,val quantity:Double,val category:String,val volume:Double,val volumeUnit:String,val salePriceInCents:Long,val costPriceInCents:Long?,val condition:String)
@@ -271,6 +424,30 @@ private data class FeaturePermissionsDto(
 @Serializable data class RemoteInventoryAuditItem(val product:String,val status:String,val notes:String,val openingQuantity:Double=0.0,val soldQuantity:Double=0.0,val theoreticalRemaining:Double=0.0)
 @Serializable data class RemoteApplyDailyAudit(val audit:RemoteInventoryAudit?=null,val balances:List<RemoteAdminStockBalance> = emptyList(),val alreadyApplied:Boolean=false)
 @Serializable data class RemoteAdminStockBalance(val productKey:String,val productName:String,val location:String,val quantity:Double=0.0)
+
+@Serializable private data class SalesPreviewRequestDto(val fileName: String, val csv: String)
+@Serializable private data class SalesCommitRequestDto(
+    val datasetId: String = "sales",
+    val mapping: Map<String, String> = emptyMap(),
+    val preserveColumns: List<String> = emptyList()
+)
+@Serializable data class RemoteImportBatch(
+    val id: String,
+    val fileName: String? = null,
+    val status: String = "PREVIEW",
+    val headers: List<String> = emptyList(),
+    val sampleRows: List<Map<String, String>> = emptyList(),
+    val suggestedMapping: Map<String, String> = emptyMap(),
+    val mapping: Map<String, String> = emptyMap(),
+    val errors: List<RemoteImportError> = emptyList(),
+    val totalRows: Int = 0,
+    val importedRows: Int = 0
+)
+@Serializable data class RemoteImportError(
+    val row: Int = 0,
+    val field: String? = null,
+    val message: String = ""
+)
 
 @Serializable
 private data class SyncPushRequestDto(

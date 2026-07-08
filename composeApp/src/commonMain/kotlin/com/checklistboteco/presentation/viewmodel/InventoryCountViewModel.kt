@@ -1,10 +1,13 @@
 package com.checklistboteco.presentation.viewmodel
 
 import com.checklistboteco.data.remote.BackendApiClient
+import com.checklistboteco.data.remote.RemoteApplyDailyAudit
+import com.checklistboteco.data.remote.RemoteImportBatch
+import com.checklistboteco.data.remote.RemoteInventoryAudit
 import com.checklistboteco.platform.AppErrorMapper
 import com.checklistboteco.platform.AppNetworkFeedback
-import com.checklistboteco.data.remote.RemoteAdminStockBalance
-import com.checklistboteco.data.remote.RemoteInventoryAudit
+import com.checklistboteco.platform.RemoteSessionRequiredException
+import com.checklistboteco.platform.requireRemoteToken
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.domain.model.*
 import kotlinx.coroutines.CoroutineScope
@@ -14,14 +17,28 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+sealed class AuditSheetStep {
+    data object CheckingSales : AuditSheetStep()
+    data object UploadCsv : AuditSheetStep()
+    data class ReadyToConfirm(val auditPreview: RemoteInventoryAudit?) : AuditSheetStep()
+    data object Processing : AuditSheetStep()
+    data class Done(val result: RemoteApplyDailyAudit) : AuditSheetStep()
+    data class Error(val message: String) : AuditSheetStep()
+}
+
+internal fun shouldSkipCsvUpload(audit: RemoteInventoryAudit): Boolean {
+    return audit.totalSold > 0 || audit.items.any { it.soldQuantity > 0 }
+}
+
 data class InventoryCountUiState(
     val items: List<InventoryCountDraft> = emptyList(),
     val administrativeMode: Boolean = false,
     val sending: Boolean = false,
     val message: String? = null,
-    val audit: RemoteInventoryAudit? = null,
-    val balances: List<RemoteAdminStockBalance> = emptyList(),
-    val auditAlreadyApplied: Boolean = false
+    val auditSheetStep: AuditSheetStep? = null,
+    val showAuditResult: Boolean = false,
+    val auditImportBatch: RemoteImportBatch? = null,
+    val auditImportFileName: String? = null
 )
 
 class InventoryCountViewModel(
@@ -82,10 +99,10 @@ class InventoryCountViewModel(
         scope.launch {
             _state.update { it.copy(sending = true, message = null) }
             runCatching {
-                requireNotNull(api) { "Backend não configurado" }
-                require(!token.isNullOrBlank()) { "Faça login novamente" }
-                val date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
-                if (admin) api.submitAdminStockCount(token, date, values) else api.submitInventoryCount(token, date, values)
+                val client = requireNotNull(api) { "Backend não configurado" }
+                val authToken = requireRemoteToken(client, token)
+                val date = currentDate()
+                if (admin) client.submitAdminStockCount(authToken, date, values) else client.submitInventoryCount(authToken, date, values)
                 repository.clearInventoryCountDraft(admin)
             }.onSuccess {
                 _state.update {
@@ -99,42 +116,120 @@ class InventoryCountViewModel(
                     )
                 }
             }.onFailure { error ->
+                if (error is RemoteSessionRequiredException) {
+                    _state.update { it.copy(sending = false) }
+                    return@onFailure
+                }
                 AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
                 _state.update { it.copy(sending = false) }
             }
         }
     }
 
-    fun loadAudit() {
+    fun openAuditSheet() {
+        _state.update {
+            it.copy(
+                auditSheetStep = AuditSheetStep.CheckingSales,
+                showAuditResult = false,
+                auditImportBatch = null,
+                auditImportFileName = null,
+                message = null
+            )
+        }
         scope.launch {
-            val date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
             runCatching {
-                requireNotNull(api)
-                require(!token.isNullOrBlank())
-                api.inventoryDailyAudit(token, date)
-            }.onSuccess { value ->
-                _state.update { it.copy(audit = value, message = null) }
+                val client = requireNotNull(api)
+                val authToken = requireRemoteToken(client, token)
+                client.inventoryDailyAudit(authToken, currentDate())
+            }.onSuccess { audit ->
+                _state.update {
+                    it.copy(
+                        auditSheetStep = if (shouldSkipCsvUpload(audit)) {
+                            AuditSheetStep.ReadyToConfirm(audit)
+                        } else {
+                            AuditSheetStep.UploadCsv
+                        }
+                    )
+                }
             }.onFailure { error ->
-                AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
+                if (error is RemoteSessionRequiredException) return@onFailure
+                val message = AppErrorMapper.toUserMessage(error)
+                AppNetworkFeedback.showError(message)
+                _state.update { it.copy(auditSheetStep = AuditSheetStep.Error(message)) }
             }
         }
     }
 
-    fun applyAudit() {
+    fun closeAuditSheet() {
+        _state.update {
+            it.copy(
+                auditSheetStep = null,
+                auditImportBatch = null,
+                auditImportFileName = null
+            )
+        }
+    }
+
+    fun closeAuditResult() {
+        _state.update { it.copy(showAuditResult = false, auditSheetStep = null) }
+    }
+
+    fun uploadSalesCsv(fileName: String, content: String) {
+        _state.update {
+            it.copy(
+                auditSheetStep = AuditSheetStep.CheckingSales,
+                auditImportFileName = fileName,
+                auditImportBatch = null,
+                message = null
+            )
+        }
         scope.launch {
-            val date = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
-            _state.update { it.copy(sending = true, message = null) }
             runCatching {
-                requireNotNull(api)
-                require(!token.isNullOrBlank())
-                api.applyDailyAudit(token, date)
+                val client = requireNotNull(api)
+                val authToken = requireRemoteToken(client, token)
+                val preview = client.salesImportPreview(authToken, fileName, content)
+                if (preview.errors.isNotEmpty()) {
+                    error(preview.errors.first().message.ifBlank { "Erro ao processar o CSV." })
+                }
+                val mapping = preview.suggestedMapping.ifEmpty { preview.mapping }
+                val committed = client.salesImportCommit(authToken, preview.id, mapping)
+                if (committed.errors.isNotEmpty()) {
+                    error(committed.errors.first().message.ifBlank { "Erro ao importar vendas." })
+                }
+                committed to client.inventoryDailyAudit(authToken, currentDate())
+            }.onSuccess { (batch, audit) ->
+                _state.update {
+                    it.copy(
+                        auditImportBatch = batch,
+                        auditSheetStep = AuditSheetStep.ReadyToConfirm(audit)
+                    )
+                }
+            }.onFailure { error ->
+                if (error is RemoteSessionRequiredException) return@onFailure
+                val message = AppErrorMapper.toUserMessage(error)
+                AppNetworkFeedback.showError(message)
+                _state.update {
+                    it.copy(
+                        auditSheetStep = AuditSheetStep.UploadCsv,
+                        message = message
+                    )
+                }
+            }
+        }
+    }
+
+    fun confirmAudit() {
+        _state.update { it.copy(auditSheetStep = AuditSheetStep.Processing, message = null) }
+        scope.launch {
+            runCatching {
+                val client = requireNotNull(api)
+                val authToken = requireRemoteToken(client, token)
+                client.applyDailyAudit(authToken, currentDate())
             }.onSuccess { response ->
                 _state.update {
                     it.copy(
-                        sending = false,
-                        audit = response.audit,
-                        balances = response.balances,
-                        auditAlreadyApplied = response.alreadyApplied,
+                        auditSheetStep = AuditSheetStep.Done(response),
+                        showAuditResult = true,
                         message = if (response.alreadyApplied) {
                             "Auditoria já havia sido aplicada ao estoque administrativo."
                         } else {
@@ -143,9 +238,22 @@ class InventoryCountViewModel(
                     )
                 }
             }.onFailure { error ->
-                AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
-                _state.update { it.copy(sending = false) }
+                if (error is RemoteSessionRequiredException) return@onFailure
+                val message = AppErrorMapper.toUserMessage(error)
+                AppNetworkFeedback.showError(message)
+                _state.update {
+                    val previous = it.auditSheetStep
+                    it.copy(
+                        auditSheetStep = when (previous) {
+                            is AuditSheetStep.ReadyToConfirm -> AuditSheetStep.Error(message)
+                            else -> AuditSheetStep.Error(message)
+                        }
+                    )
+                }
             }
         }
     }
+
+    private fun currentDate(): String =
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
 }

@@ -3,6 +3,7 @@ package com.checklistboteco.presentation.viewmodel
 import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.remote.RemoteLoginResult
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.data.sync.SyncCoordinator
 import com.checklistboteco.data.sync.SyncSession
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.platform.AppErrorMapper
@@ -29,6 +30,7 @@ data class LoginUiState(
     val challengeId: String? = null,
     val developmentCode: String? = null,
     val error: String? = null,
+    val twoFactorHint: String? = null,
     val currentUser: User? = null,
     val authToken: String? = null,
     val remoteUserId: String? = null,
@@ -38,13 +40,19 @@ data class LoginUiState(
 class LoginViewModel(
     private val repository: ChecklistRepository,
     private val backendApiClient: BackendApiClient? = BackendApiClient.fromEnvironment(),
+    private val syncCoordinator: SyncCoordinator? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) {
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+    private var didAttemptSessionRestore = false
 
     init {
-        scope.launch { restoreSavedCredentials(autoUnlock = true) }
+        scope.launch {
+            repository.loadWorksite()
+            restorePersistedSessionIfPossible()
+            restoreSavedCredentials(autoUnlock = true)
+        }
     }
 
     fun updateUserName(name: String) {
@@ -81,7 +89,7 @@ class LoginViewModel(
             return
         }
 
-        val user = repository.getUserByName(name)
+        val user = repository.getUserByEmail(name) ?: repository.getUserByName(name)
         if (user == null || user.password != password) {
             _uiState.update { it.copy(error = "Usuário ou senha inválidos") }
             return
@@ -128,7 +136,57 @@ class LoginViewModel(
 
     fun logout() {
         repository.clearSyncSession()
+        _uiState.update {
+            it.copy(
+                isLoggedIn = false,
+                currentUser = null,
+                authToken = null,
+                remoteUserId = null,
+                requiresTwoFactor = false,
+                challengeId = null,
+                twoFactorHint = null,
+                developmentCode = null
+            )
+        }
         scope.launch { restoreSavedCredentials(autoUnlock = true) }
+    }
+
+    fun showSessionExpiredMessage(message: String) {
+        _uiState.update { it.copy(error = message) }
+    }
+
+    private suspend fun restorePersistedSessionIfPossible() {
+        if (didAttemptSessionRestore) return
+        didAttemptSessionRestore = true
+        val api = backendApiClient ?: return
+        val session = repository.getSyncSession() ?: return
+        if (session.authToken.isBlank()) return
+
+        runCatching { api.fetchCurrentUser(session.authToken) }
+            .onSuccess { result ->
+                val remoteUser = result.user ?: return@onSuccess
+                val remoteUserId = result.remoteUserId ?: remoteUser.remoteId ?: return@onSuccess
+                val localUser = repository.getUserByRemoteId(remoteUserId)
+                    ?: repository.getUserByEmail(remoteUser.email)
+                    ?: repository.getUserByName(remoteUser.name)
+                    ?: return@onSuccess
+                val synced = repository.syncLocalUserFromRemote(localUser.id, remoteUser.copy(remoteId = remoteUserId))
+                    ?: localUser
+                refreshWorksite(session.authToken)
+                syncCoordinator?.requestSync()
+                _uiState.update {
+                    it.copy(
+                        currentUser = synced.copy(remoteId = remoteUserId),
+                        authToken = session.authToken,
+                        remoteUserId = remoteUserId,
+                        isLoggedIn = true,
+                        error = null
+                    )
+                }
+            }
+            .onFailure {
+                repository.clearSyncSession()
+            }
     }
 
     private suspend fun restoreSavedCredentials(autoUnlock: Boolean) {
@@ -213,9 +271,10 @@ class LoginViewModel(
                                 requiresTwoFactor = true,
                                 challengeId = result.challengeId,
                                 developmentCode = result.developmentCode,
-                                error = result.developmentCode?.let { code -> "Código de desenvolvimento: $code" }
-                                    ?: result.deliveryHint
-                                    ?: "Confirme este dispositivo"
+                                twoFactorHint = result.developmentCode?.let { code ->
+                                    "Código de desenvolvimento: $code"
+                                } ?: result.deliveryHint ?: "Confirme este dispositivo",
+                                error = null
                             )
                         }
                     } else {
@@ -223,7 +282,19 @@ class LoginViewModel(
                     }
                 },
                 onFailure = { error ->
-                    AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
+                    val localUser = repository.getUserByEmail(email) ?: repository.getUserByName(email)
+                    if (localUser != null && localUser.password == password) {
+                        persistCredentials()
+                        _uiState.update {
+                            it.copy(
+                                currentUser = localUser,
+                                isLoggedIn = true,
+                                error = null
+                            )
+                        }
+                    } else {
+                        AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
+                    }
                 }
             )
         }
@@ -289,6 +360,8 @@ class LoginViewModel(
                 )
             )
 
+            refreshWorksite(token)
+            syncCoordinator?.requestSync()
             persistCredentials()
 
             _uiState.update {
@@ -302,6 +375,13 @@ class LoginViewModel(
                 )
             }
         }
+    }
+
+    private suspend fun refreshWorksite(token: String) {
+        val api = backendApiClient ?: return
+        runCatching { api.fetchWorksite(token) }
+            .onSuccess { repository.saveWorksite(it) }
+            .onFailure { repository.loadWorksite() }
     }
 
     private suspend fun persistCredentials() {

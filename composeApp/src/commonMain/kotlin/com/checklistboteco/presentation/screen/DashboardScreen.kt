@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,36 +22,24 @@ import androidx.compose.ui.unit.sp
 import com.checklistboteco.data.repository.GlobalDashboardStats
 import com.checklistboteco.data.repository.UserRanking
 import com.checklistboteco.presentation.viewmodel.DashboardViewModel
+import com.checklistboteco.presentation.designsystem.components.BecoPageHeader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Visão Geral", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
-                },
-                actions = {
+            BecoPageHeader(
+                title = "Visão Geral",
+                subtitle = "Indicadores operacionais"
+            ) {
                     TextButton(onClick = {}) { Text("Hoje", color = Color.Gray) }
-                    Button(
-                        onClick = {},
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A2E)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Exportar", color = Color.White)
-                    }
-                }
-            )
+            }
         },
         modifier = modifier
     ) { padding ->
@@ -113,8 +100,8 @@ fun DashboardScreen(
 private fun SummaryCard(title: String, value: String, progress: Float, modifier: Modifier = Modifier, progressColor: Color) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
@@ -134,8 +121,8 @@ private fun SummaryCard(title: String, value: String, progress: Float, modifier:
 private fun AlertCard(title: String, count: Int, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
@@ -160,8 +147,8 @@ private fun AlertCard(title: String, count: Int, modifier: Modifier = Modifier) 
 private fun SmallStatCard(label: String, value: String, color: Color = Color.Black, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color)
@@ -173,7 +160,7 @@ private fun SmallStatCard(label: String, value: String, color: Color = Color.Bla
 @Composable
 private fun RankingHeader() {
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF000033), RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).padding(12.dp),
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.onBackground, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         val headerStyle = TextStyle(color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -190,7 +177,7 @@ private fun RankingRow(user: UserRanking) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),

@@ -12,6 +12,13 @@ enum class WorkSector(val displayName: String, val activityArea: Area) {
     ATENDENTE("Atendente", Area.ATENDIMENTO),
     BARMAN("Barman", Area.ATENDIMENTO);
 
+    val isKitchenSector: Boolean
+        get() = this in setOf(COZINHA, CHEFE_DE_COZINHA, AJUDANTE_DE_COZINHA)
+
+    /** Áreas visíveis no checklist: cozinha só vê COZINHA; demais setores veem ATENDIMENTO. */
+    val checklistAreas: List<Area>
+        get() = if (isKitchenSector) listOf(Area.COZINHA) else listOf(Area.ATENDIMENTO)
+
     companion object {
         fun fromString(value: String): WorkSector = entries.find { it.name == value } ?: ATENDIMENTO
     }

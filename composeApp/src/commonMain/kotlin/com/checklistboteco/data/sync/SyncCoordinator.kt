@@ -2,7 +2,9 @@ package com.checklistboteco.data.sync
 
 import com.checklistboteco.data.remote.SyncApiClient
 import com.checklistboteco.data.repository.ChecklistRepository
+import com.checklistboteco.platform.ApiException
 import com.checklistboteco.platform.DeviceIdentity
+import com.checklistboteco.platform.SessionExpiredNotifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,6 +42,7 @@ class SyncCoordinator(
         val client = syncApiClient ?: return
         val session = repository.getSyncSession() ?: return
         mutex.withLock {
+            repository.repairPendingSyncQueue()
             pushPendingOperations(client, session)
             pullRemoteChanges(client, session)
         }
@@ -62,7 +65,6 @@ class SyncCoordinator(
                 client.push(session, newBatchId(), request)
             }.onSuccess { response ->
                 response.acknowledgements.forEach { ack ->
-                    repository.acknowledgeSyncOperation(ack)
                     ack.conflict?.let { conflict ->
                         repository.applyRemoteSync(
                             SyncPullResponse(
@@ -72,8 +74,13 @@ class SyncCoordinator(
                             )
                         )
                     }
+                    repository.acknowledgeSyncOperation(ack)
                 }
             }.onFailure { error ->
+                if (isUnauthorized(error)) {
+                    repository.clearSyncSession()
+                    return
+                }
                 val now = Clock.System.now().toEpochMilliseconds()
                 pending.forEach { operation ->
                     val nextAttemptCount = operation.attemptCount + 1
@@ -94,11 +101,18 @@ class SyncCoordinator(
         session: SyncSession
     ) {
         while (true) {
-            val response = client.pull(
-                session = session,
-                cursor = repository.getSyncCursor(),
-                limit = PULL_PAGE_SIZE
-            )
+            val response = runCatching {
+                client.pull(
+                    session = session,
+                    cursor = repository.getSyncCursor(),
+                    limit = PULL_PAGE_SIZE
+                )
+            }.getOrElse { error ->
+                if (isUnauthorized(error)) {
+                    repository.clearSyncSession()
+                }
+                return
+            }
             repository.applyRemoteSync(response)
             if (!response.hasMore) return
         }
@@ -173,4 +187,11 @@ private fun backoffMillis(attemptCount: Long): Long {
 
 private fun newBatchId(): String {
     return "batch-${Clock.System.now().toEpochMilliseconds()}"
+}
+
+private fun isUnauthorized(error: Throwable): Boolean {
+    return when (error) {
+        is ApiException -> error.httpStatus == 401
+        else -> false
+    }
 }

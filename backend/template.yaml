@@ -11,6 +11,10 @@ Parameters:
     Type: String
     NoEcho: true
     MinLength: 24
+  InitialAdminPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
 
 Globals:
   Function:
@@ -21,6 +25,7 @@ Globals:
     Environment:
       Variables:
         JWT_SECRET: !Ref JwtSecret
+        INITIAL_ADMIN_PASSWORD: !Ref InitialAdminPassword
         CHECKLIST_TABLE: !Ref ChecklistTable
         PURCHASES_TABLE: !Ref PurchasesTable
         SALES_TABLE: !Ref SalesTable

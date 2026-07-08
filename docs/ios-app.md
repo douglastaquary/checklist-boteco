@@ -2,7 +2,7 @@
 
 Aplicativo **100% SwiftUI nativo** (sem Kotlin Multiplatform/Compose), organizado em Swift Packages em [`Packages/`](../Packages/) e shell em [`iosApp/`](../iosApp/).
 
-Integração SPM segue o padrão do [Guia WIMB](https://github.com/douglastaquary/wimb/blob/main/.spdd/INTEGRATION-GUIDE.md): **um package umbrella** em `Packages/` referenciado pelo Xcode.
+Integração SPM usa um package umbrella em `Packages/`, mantido como submódulo na branch dedicada `ios-packages`. O Xcode resolve uma revisão publicada e reproduzível desse package.
 
 ## Requisitos
 
@@ -14,35 +14,67 @@ Integração SPM segue o padrão do [Guia WIMB](https://github.com/douglastaquar
 
 Estado da UI: `ObservableObject` + `@EnvironmentObject` (iOS 16). Sem suporte macOS no app nem nos packages.
 
+## Padrões SwiftUI e agentes de IA
+
+Antes de criar ou refatorar telas:
+
+1. [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](../.cursor/skills/swiftui-ui-patterns/SKILL.md) — regras gerais e anti-patterns
+2. [`docs/ios-swiftui-standards.md`](ios-swiftui-standards.md) — restrições iOS 16, checklist de PR e backlog de refatoração
+3. [`references/components-index.md`](../.cursor/skills/swiftui-ui-patterns/references/components-index.md) — referência por componente (TabView, Form, Sheets, …)
+
+Overlay específico Checklist Boteco: [`.cursor/skills/swiftui-ui-patterns/ios-development.md`](../.cursor/skills/swiftui-ui-patterns/ios-development.md).
+
+Instruções gerais do repositório (MCP, roteamento backend/iOS): [`AGENTS.md`](../AGENTS.md).
+
+Formatação: [`.swiftformat`](../.swiftformat) (2 espaços).
+
 ## Configuração da API
 
 Edite [`iosApp/Config/Debug.xcconfig`](../iosApp/Config/Debug.xcconfig):
 
+```xcconfig
+CHECKLIST_API_BASE_URL = http:/$()/localhost:8181
 ```
-CHECKLIST_API_BASE_URL = http://localhost:8181
-```
+
+> Em arquivos `.xcconfig`, `//` inicia comentário. Use `http:/$()/…` para URLs com `//`.
 
 Para dispositivo físico, use o IP da máquina na rede local. Deixe vazio para modo **offline** (admin local `admin@checklistboteco.com` / `admin123`).
 
+Com API configurada: **sem seed local** — dados vêm do pull pós-login. Detalhes e checklist de teste: [docs/mobile-api-sync.md](mobile-api-sync.md).
+
 ## Abrir no Xcode
 
-1. Gere o projeto (se necessário):
+1. Inicialize o submódulo após clonar ou trocar de branch:
+
+```bash
+git submodule update --init --recursive
+```
+
+2. Gere o projeto (se necessário):
 
 ```bash
 python3 iosApp/generate_xcodeproj.py
 ```
 
-2. Abra `iosApp/ChecklistBoteco.xcodeproj`.
-3. O Xcode resolve **um** package local: `Packages/` (pasta do monorepo, no mesmo repositório que `iosApp/`).
-4. Selecione simulador iPhone e **Run** (⌘R).
+3. Abra `iosApp/ChecklistBoteco.xcodeproj`.
+4. O Xcode resolve **um** package source-control local em `Packages/`, fixado pelo `Package.resolved`.
+5. Selecione simulador iPhone e **Run** (⌘R).
 
-### Adicionar manualmente (se necessário)
+### Atualizar código em `Packages/`
 
-1. **File → Add Package Dependencies... → Add Local...**
-2. Selecione a pasta **`Packages`** na raiz do repositório (não subpastas individuais)
-3. Vincule os produtos ao target **ChecklistBoteco**
+As alterações do submódulo precisam ser publicadas antes de atualizar o ponteiro no projeto principal:
 
-> Após editar código em `Packages/`, commitar **no repositório principal** (mesmo fluxo do backend/composeApp).
+```bash
+cd Packages
+git switch ios-packages
+git add -A
+git commit -m "Descreva a alteração dos packages"
+git push origin ios-packages
+cd ..
+git add Packages iosApp/ChecklistBoteco.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+```
+
+O commit do repositório principal registra o novo gitlink. Não edite a revisão manualmente sem publicar o commit do submódulo.
 
 ## Estrutura de pacotes (umbrella)
 
@@ -104,7 +136,9 @@ Verifique se o package local `Packages` está vinculado ao target **ChecklistBot
 
 ### Package não atualiza após editar código
 
-**File → Packages → Reset Package Caches** no Xcode.
+1. Confirme `git submodule status` sem prefixo `-` ou `+`.
+2. Confirme que o commit de `Packages/` foi enviado para `origin/ios-packages`.
+3. Execute **File → Packages → Reset Package Caches** no Xcode.
 
 ## Funcionalidades (paridade Android)
 
@@ -124,3 +158,7 @@ Verifique se o package local `Packages` está vinculado ao target **ChecklistBot
 - `NSLocationWhenInUseUsageDescription`
 - `UIBackgroundModes`: `fetch`
 - `BGTaskSchedulerPermittedIdentifiers`: `com.checklistboteco.ios.sync`
+
+## Backlog de refatoração UI
+
+Melhorias de padrões SwiftUI planejadas (sem escopo na fase 1 de docs) estão em [`ios-swiftui-standards.md` — Fase 2](ios-swiftui-standards.md#fase-2--refatoração-ui-backlog).

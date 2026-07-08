@@ -6,6 +6,7 @@ import com.checklistboteco.backend.workclock.domain.WorkClockModels.UserWorkSche
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -35,13 +36,14 @@ public class LocalStore implements AppStore {
     private final PasswordHasher passwords=new PasswordHasher();
     private final SecureRandom random=new SecureRandom();
     private long cursorSequence=0L;
+    @ConfigProperty(name="checklist.initial-admin-password", defaultValue="admin123") String initialAdminPassword;
 
     @PostConstruct void initializeLocal(){ if(!(this instanceof DynamoDbStore)) seed(); }
 
     protected void seed() {
         if(!users.isEmpty()) return;
         var request=new CreateUserRequest(); request.name="Administrador"; request.email="admin@checklistboteco.com";
-        request.password="admin123"; request.workSector=WorkSector.GERENTE; request.permissionLevel=PermissionLevel.ADMIN;
+        request.password=initialAdminPassword; request.workSector=WorkSector.GERENTE; request.permissionLevel=PermissionLevel.ADMIN;
         createUser(request);
         createSeedActivity("Abrir o salão",Area.ATENDIMENTO,Frequency.DIARIO,2);
         createSeedActivity("Conferir estoque crítico",Area.ESTOQUE,Frequency.DIARIO,3);
@@ -88,7 +90,7 @@ public class LocalStore implements AppStore {
         user.allowedAreas=user.permissionLevel==PermissionLevel.ADMIN?List.of(Area.values()):List.of(user.area);
         user.createdAt=now;
         user.updatedAt=now;
-        user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():new FeaturePermissions();
+        user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():nonNull(request.permissions);
         users.put(user.id,user);
         return PublicUser.from(user);
     }

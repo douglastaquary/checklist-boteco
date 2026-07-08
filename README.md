@@ -2,6 +2,12 @@
 
 Documentação do módulo de contagem e auditoria diária: [docs/inventory-counting-module.md](docs/inventory-counting-module.md).
 
+Plano de uniformização visual Android/iOS: [docs/mobile-design-system-migration-plan.md](docs/mobile-design-system-migration-plan.md).
+
+Checklist de publicação da primeira versão: [docs/release-v1-checklist.md](docs/release-v1-checklist.md).
+
+Sincronização mobile (offline-first + API): [docs/mobile-api-sync.md](docs/mobile-api-sync.md).
+
 Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform**, backend **Quarkus serverless** e administração web em **Qute + JavaScript vanilla**.
 
 ## Direcionamento backend/web (Cursor)
@@ -122,7 +128,7 @@ Assim, os dados importados continuam disponíveis após reiniciar o backend loca
 Para apontar o app Android para o backend, informe a URL da API no build:
 
 ```bash
-./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8080
+./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8181
 ```
 
 `10.0.2.2` aponta o Android Emulator para o backend da máquina. Para AWS, troque pela URL HTTPS exibida no output `ApiUrl` do SAM. O app rejeita HTTP fora dos hosts locais de desenvolvimento.
@@ -131,9 +137,29 @@ No Android, o build `debug` libera tráfego HTTP claro apenas para `10.0.2.2`, `
 
 ### iOS
 
+App nativo SwiftUI — ver [docs/ios-app.md](docs/ios-app.md).
+
+Padrões de UI e checklist de PR: [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md) · Skill: [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md)
+
 Abra o projeto no Xcode e execute no simulador ou dispositivo.
 
-## Modelo de dados
+## Direcionamento para agentes de IA
+
+**Fonte canônica (agnóstica ao modelo):** [AGENTS.md](AGENTS.md)
+
+| Domínio | Referência |
+|---------|------------|
+| Regras gerais, MCP, roteamento | [AGENTS.md](AGENTS.md) |
+| Backend / admin Quarkus | [.cursor/skills/quarkus-serverless-qute/SKILL.md](.cursor/skills/quarkus-serverless-qute/SKILL.md) |
+| iOS / SwiftUI | [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md) + [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md) |
+| MCP local (setup e testes) | [docs/mcp-local-test.md](docs/mcp-local-test.md) |
+
+Atalhos por ferramenta (stubs que apontam para `AGENTS.md`):
+
+- Cursor: [.cursor/checklist-boteco-agent-instructions.md](.cursor/checklist-boteco-agent-instructions.md)
+- Codex: [.codex/checklist-boteco-agent-instructions.md](.codex/checklist-boteco-agent-instructions.md)
+- Colagem opcional: [docs/ai-agent-instructions.md](docs/ai-agent-instructions.md)
+
 
 - **Áreas**: Atendimento, Cozinha, Estoque, Limpeza
 - **Setores**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente, Barman
@@ -212,10 +238,10 @@ Guia de uso e testes via chat:
 
 - [docs/mcp-local-test.md](docs/mcp-local-test.md)
 
-Snippets de instruções para agentes:
+Regras MCP e heurísticas de linguagem natural estão em [AGENTS.md](AGENTS.md) (seção **Servidor MCP**). Os arquivos abaixo são atalhos que apontam para lá:
 
-- Cursor: [.cursor/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.cursor/checklist-boteco-agent-instructions.md)
-- Codex: [.codex/checklist-boteco-agent-instructions.md](/Users/douglastaquary/ChecklistBoteco/.codex/checklist-boteco-agent-instructions.md)
+- Cursor: [.cursor/checklist-boteco-agent-instructions.md](.cursor/checklist-boteco-agent-instructions.md)
+- Codex: [.codex/checklist-boteco-agent-instructions.md](.codex/checklist-boteco-agent-instructions.md)
 
 ## Ponto de colaboradores
 

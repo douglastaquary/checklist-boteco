@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
@@ -44,12 +43,13 @@ import com.checklistboteco.domain.model.Activity
 import com.checklistboteco.domain.model.Area
 import com.checklistboteco.domain.model.Frequency
 import com.checklistboteco.presentation.viewmodel.ActivitiesManagementViewModel
+import com.checklistboteco.presentation.designsystem.components.BecoEmptyState
+import com.checklistboteco.presentation.designsystem.components.BecoPageHeader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActivitiesManagementScreen(
     viewModel: ActivitiesManagementViewModel,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -57,20 +57,14 @@ fun ActivitiesManagementScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Gerenciar Atividades") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
-                    }
-                }
-            )
+            BecoPageHeader(title = "Atividades", subtitle = "Rotinas operacionais cadastradas")
         },
         floatingActionButton = {
             FloatingActionButton(onClick = viewModel::showAddDialog) {
                 Icon(Icons.Default.Add, "Adicionar")
             }
-        }
+        },
+        modifier = modifier
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -79,6 +73,14 @@ fun ActivitiesManagementScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (state.activities.isEmpty()) {
+                item {
+                    BecoEmptyState(
+                        title = "Nenhuma atividade cadastrada",
+                        message = "Use o botão adicionar para criar a primeira atividade."
+                    )
+                }
+            }
             items(state.activities, key = { it.id }) { activity ->
                 ActivityManagementItem(
                     activity = activity,
@@ -130,12 +132,7 @@ private fun ActivityManagementItem(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -154,6 +151,7 @@ private fun ActivityManagementItem(
                 Icon(Icons.Default.Delete, "Excluir", tint = MaterialTheme.colorScheme.error)
             }
         }
+        androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 

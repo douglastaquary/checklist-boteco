@@ -103,7 +103,8 @@ class SalesResourceTest {
             "preserveColumns",List.of("Cód Produto","Nome","Tipo Preço","Val. Unit","Qtde","Total Venda")
         )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(2)).body("rejectedRows",is(0));
 
-        given().auth().oauth2(token).when().get("/api/sales/schema?datasetId="+dataset).then().statusCode(200).body("coverageFrom",notNullValue()).body("saleCount",is(2));
+        String coverageDate=given().auth().oauth2(token).when().get("/api/sales/schema?datasetId="+dataset).then().statusCode(200)
+            .body("coverageFrom",notNullValue()).body("saleCount",is(2)).extract().path("coverageFrom");
         given().auth().oauth2(token).contentType("application/json").body(Map.of("text","agua","pageSize",50))
             .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
             .body("totalItems",is(1))
@@ -133,7 +134,7 @@ class SalesResourceTest {
             "method","tools/call",
             "params",Map.of(
                 "name","sales_quantity_by_product_in_period",
-                "arguments",Map.of("datasetId",dataset,"product","agua","from","2026-06-01","to","2026-06-30")
+                "arguments",Map.of("datasetId",dataset,"product","agua","from",coverageDate,"to",coverageDate)
             )
         );
         given().auth().oauth2("local-purchases-token").contentType("application/json").body(byPeriodRequest).when().post("/mcp").then().statusCode(200)

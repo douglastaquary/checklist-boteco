@@ -1,13 +1,16 @@
 package com.checklistboteco.presentation.viewmodel
 
+import com.checklistboteco.data.remote.BackendApiClient
 import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.domain.model.UserRegistrationInput
 import com.checklistboteco.domain.model.UserRegistrationValidator
 import com.checklistboteco.domain.model.WorkSector
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class UserRegistrationUiState(
     val firstName: String = "",
@@ -21,7 +24,10 @@ data class UserRegistrationUiState(
 )
 
 class UserRegistrationViewModel(
-    private val repository: ChecklistRepository
+    private val repository: ChecklistRepository,
+    private val backendApiClient: BackendApiClient? = null,
+    private val authToken: String? = null,
+    private val scope: CoroutineScope? = null
 ) {
     private val _uiState = MutableStateFlow(UserRegistrationUiState())
     val uiState: StateFlow<UserRegistrationUiState> = _uiState.asStateFlow()
@@ -69,6 +75,40 @@ class UserRegistrationViewModel(
 
         result.fold(
             onSuccess = { user ->
+                val api = backendApiClient
+                val token = authToken
+                if (api != null) {
+                    if (token.isNullOrBlank()) {
+                        _uiState.update {
+                            it.copy(error = "Com a API ativa, solicite cadastro ao administrador.")
+                        }
+                        return
+                    }
+                    val registrationScope = scope
+                    if (registrationScope == null) {
+                        _uiState.update { it.copy(error = "Não foi possível cadastrar via API.") }
+                        return
+                    }
+                    registrationScope.launch {
+                        runCatching {
+                            api.createUser(
+                                token = token,
+                                name = user.fullName,
+                                email = user.email,
+                                password = user.password,
+                                workSector = user.workSector
+                            )
+                        }.onSuccess { remoteUser ->
+                            repository.upsertRemoteUser(remoteUser)
+                            _uiState.update { UserRegistrationUiState(isSaved = true) }
+                        }.onFailure { error ->
+                            _uiState.update {
+                                it.copy(error = error.message ?: "Não foi possível cadastrar o usuário")
+                            }
+                        }
+                    }
+                    return
+                }
                 if (repository.getUserByName(user.fullName) != null || repository.getUserByEmail(user.email) != null) {
                     _uiState.update { it.copy(error = "Usuário já cadastrado") }
                     return

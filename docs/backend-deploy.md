@@ -139,7 +139,7 @@ sam build --template-file template.yaml
 sam deploy
 ```
 
-No primeiro deploy use `sam deploy --guided` para gerar `samconfig.toml`. Informe `JwtSecret` e `PurchasesMcpToken` com 24 ou mais caracteres.
+No primeiro deploy use `sam deploy --guided`. Informe `JwtSecret` e `PurchasesMcpToken` com 24 ou mais caracteres e uma senha inicial exclusiva de ao menos 12 caracteres em `InitialAdminPassword`. O repositório não mantém valores padrão para esses parâmetros de produção.
 
 O template cria Lambda Java 17 ARM64, HTTP API e **três** tabelas DynamoDB (`ChecklistTable`, `PurchasesTable`, `SalesTable`), aplica permissão CRUD à função e mantém as tabelas quando a stack é removida.
 
@@ -158,6 +158,7 @@ Quando o ambiente dev estiver validado, gere a variante Android apontando para a
 Variáveis da Lambda definidas pelo template:
 
 - `JWT_SECRET`: segredo HMAC dos tokens.
+- `INITIAL_ADMIN_PASSWORD`: senha do primeiro administrador, criada somente quando a tabela operacional está vazia.
 - `CHECKLIST_TABLE`: nome da tabela criada.
 - `PURCHASES_TABLE`: tabela separada de compras e importações.
 - `SALES_TABLE`: tabela separada de vendas e importações.

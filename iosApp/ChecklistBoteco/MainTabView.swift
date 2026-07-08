@@ -1,84 +1,129 @@
 import SwiftUI
 import Models
-import Auth
-import ChecklistFeature
-import WorkClockFeature
-import InventoryFeature
-import DashboardFeature
-import AdminFeatures
-import DesignSystem
 import Env
 import Persistence
+import DesignSystem
+
 struct MainTabView: View {
-  let repository: ChecklistRepository
-  @ObservedObject var session: AppSession
-  @ObservedObject var syncController: SyncController
-  let inventoryClient: InventoryClient?
-  let authToken: String?
-  let deviceId: String
-  let onLogout: () -> Void
+  let context: MainTabContext
+  let user: User
+  @StateObject private var tabRouter = TabRouter()
 
   @State private var selectedTab: AppTab = .checklist
+  @State private var loadedTabs: Set<AppTab> = [.checklist]
+  @State private var isMorePresented = false
+
+  private var tabs: [AppTab] {
+    AppTab.available(for: user)
+  }
+
+  private var primaryTabs: [AppTab] {
+    tabs.count <= 4 ? tabs : Array(tabs.prefix(3))
+  }
+
+  private var overflowTabs: [AppTab] {
+    tabs.count <= 4 ? [] : Array(tabs.dropFirst(3))
+  }
 
   var body: some View {
-    let user = session.currentUser!
-    let tabs = AppTab.available(for: user)
-
     TabView(selection: $selectedTab) {
       ForEach(tabs) { tab in
-        tabContent(tab, user: user)
-          .tabItem { Label(tab.title, systemImage: icon(for: tab)) }
-          .tag(tab)
+        Group {
+          if loadedTabs.contains(tab) {
+            navigationStack(for: tab)
+          } else {
+            Color.clear
+          }
+        }
+        .toolbar(.hidden, for: .tabBar)
+        .tabItem { tab.label }
+        .tag(tab)
       }
     }
+    .toolbar(.hidden, for: .tabBar)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      BecoTabBar(
+        items: primaryTabs.map {
+          BecoTabBarItem(id: $0, title: $0.title, systemImage: $0.iconName)
+        },
+        selected: selectedTab,
+        hasOverflow: !overflowTabs.isEmpty,
+        overflowSelected: overflowTabs.contains(selectedTab),
+        onSelect: select,
+        onMore: { isMorePresented = true }
+      )
+    }
+    .sheet(isPresented: $isMorePresented) {
+      NavigationStack {
+        List(overflowTabs) { tab in
+          Button {
+            select(tab)
+            isMorePresented = false
+          } label: {
+            Label(tab.title, systemImage: tab.iconName)
+              .foregroundStyle(BecoTokens.ColorToken.ink)
+          }
+        }
+        .navigationTitle("Mais módulos")
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Fechar") { isMorePresented = false }
+          }
+        }
+      }
+      .presentationDetents([.medium])
+    }
+    .tint(AppColors.primary)
     .onAppear {
       if !tabs.contains(selectedTab) { selectedTab = tabs.first ?? .checklist }
+      loadedTabs.insert(selectedTab)
     }
+    .onChange(of: selectedTab) { tab in
+      loadedTabs.insert(tab)
+    }
+    .onOpenURL { url in
+      guard let link = AppDeepLink.parse(url) else { return }
+      AppDeepLinkHandler.apply(
+        link,
+        user: user,
+        selectedTab: &selectedTab,
+        tabRouter: tabRouter
+      )
+      loadedTabs.insert(selectedTab)
+    }
+  }
+
+  private func select(_ tab: AppTab) {
+    selectedTab = tab
+    loadedTabs.insert(tab)
   }
 
   @ViewBuilder
-  private func tabContent(_ tab: AppTab, user: User) -> some View {
-    switch tab {
-    case .checklist:
-      ChecklistRootView(
-        repository: repository,
-        syncController: syncController,
-        onLogout: onLogout
-      )
-      .environmentObject(session)
-    case .workClock:
-      WorkClockRootView(
-        repository: repository,
-        syncController: syncController,
-        deviceId: deviceId
-      )
-      .environmentObject(session)
-    case .inventory:
-      InventoryRootView(
-        repository: repository,
-        inventoryClient: inventoryClient,
-        token: authToken,
-        canCreate: user.canCreateInventoryCounts(),
-        canViewInsights: user.canViewInventoryInsights(),
-        canManageAdministrativeStock: user.canManageAdministrativeStock()
-      )
-    case .dashboard:
-      DashboardRootView(repository: repository)
-    case .activities:
-      ActivitiesManagementView(repository: repository)
-    case .permissions:
-      PermissionManagementView(repository: repository)
+  private func navigationStack(for tab: AppTab) -> some View {
+    NavigationStack(path: tabRouter.binding(for: tab)) {
+      tab.makeContentView(context: context, user: user, tabRouter: tabRouter)
+        .navigationDestination(for: AppTabRoute.self) { route in
+          route.destination(context: context)
+        }
     }
   }
+}
 
-  private func icon(for tab: AppTab) -> String {
-    switch tab {
-    case .checklist: return "checklist"
-    case .workClock: return "clock"
-    case .inventory: return "shippingbox"
-    case .dashboard: return "chart.bar"
-    case .activities: return "slider.horizontal.3"
-    case .permissions: return "person.badge.key"
-    }
+extension MainTabView {
+  init(dependencies: AppDependenciesHolder, user: User, onLogout: @escaping () -> Void) {
+    self.init(
+      context: MainTabContext(
+        repository: dependencies.repository,
+        syncController: dependencies.syncController,
+        inventoryClient: dependencies.inventoryClient,
+        userClient: dependencies.userClient,
+        dashboardClient: dependencies.dashboardClient,
+        authToken: dependencies.authToken,
+        remoteUserId: dependencies.remoteUserId,
+        deviceId: dependencies.deviceId,
+        onLogout: onLogout
+      ),
+      user: user
+    )
   }
 }

@@ -6,7 +6,16 @@ import Network
 
 @main
 struct ChecklistBotecoApp: App {
-  @StateObject private var launch = AppLaunchState()
+  @StateObject private var launch: AppLaunchState
+
+  init() {
+    let launch = AppLaunchState()
+    _launch = StateObject(wrappedValue: launch)
+
+    if case .ready(let holder) = launch.status {
+      BackgroundSyncScheduler.register(syncController: holder.syncController)
+    }
+  }
 
   var body: some Scene {
     WindowGroup {
@@ -41,14 +50,11 @@ struct AppLaunchGate: View {
     switch launch.status {
     case .ready(let holder):
       RootView(holder: holder)
-        .environmentObject(holder.session)
-        .environmentObject(NetworkFeedback.shared)
-        .onAppear {
-          #if os(iOS)
-          BackgroundSyncScheduler.register(syncController: holder.syncController)
-          BackgroundSyncScheduler.schedule()
-          #endif
-        }
+        .withAppDependencyGraph(
+          session: holder.session,
+          syncController: holder.syncController
+        )
+        .environmentObject(AppTheme.shared)
     case .failed(let message):
       VStack(spacing: 16) {
         Text("Não foi possível iniciar o app")
@@ -56,7 +62,7 @@ struct AppLaunchGate: View {
         Text(message)
           .font(.footnote)
           .multilineTextAlignment(.center)
-          .foregroundStyle(.secondary)
+          .foregroundColor(.secondary)
       }
       .padding()
     }
@@ -64,11 +70,13 @@ struct AppLaunchGate: View {
 }
 
 @MainActor
-final class AppDependenciesHolder: ObservableObject {
+final class AppDependenciesHolder {
   let repository: ChecklistRepository
   let session: AppSession
   let syncController: SyncController
   let apiClient: APIClient?
+  let userClient: UserClient?
+  let dashboardClient: DashboardClient?
   let inventoryClient: InventoryClient?
   let deviceId: String
 
@@ -77,47 +85,85 @@ final class AppDependenciesHolder: ObservableObject {
     session = deps.session
     syncController = deps.syncController
     apiClient = deps.apiClient
+    userClient = deps.userClient
+    dashboardClient = deps.dashboardClient
     inventoryClient = deps.inventoryClient
     deviceId = deps.deviceId
   }
 }
 
+private enum AuthScreen: Equatable {
+  case login
+  case register
+  case main
+}
+
 struct RootView: View {
-  @ObservedObject var holder: AppDependenciesHolder
-  @EnvironmentObject private var session: AppSession
-  @State private var isAuthenticated = false
-  @State private var showRegister = false
+  let holder: AppDependenciesHolder
+  @ObservedObject private var session: AppSession
+  @ObservedObject private var sessionExpiredCenter = SessionExpiredCenter.shared
+  @State private var authScreen: AuthScreen = .login
+  @State private var sessionExpiredMessage: String?
+
+  init(holder: AppDependenciesHolder) {
+    self.holder = holder
+    _session = ObservedObject(wrappedValue: holder.session)
+  }
 
   var body: some View {
     ZStack {
       Group {
-        if isAuthenticated, session.currentUser != nil {
-          MainTabView(dependencies: holder) { logout() }
-        } else if showRegister {
+        switch authScreen {
+        case .main where session.currentUser != nil:
+          MainTabView(dependencies: holder, user: session.currentUser!) { logout() }
+        case .register:
           NavigationStack {
-            RegisterUserView(repository: holder.repository)
+            RegisterUserView(
+              repository: holder.repository,
+              userClient: holder.userClient,
+              authToken: session.authToken
+            )
               .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                  Button("Voltar") { showRegister = false }
+                  Button("Voltar") { authScreen = .login }
                 }
               }
           }
-        } else {
+        default:
           LoginView(
-            onLoginSuccess: { isAuthenticated = true },
-            onRegisterTap: { showRegister = true }
+            onLoginSuccess: {
+              sessionExpiredMessage = nil
+              authScreen = .main
+            },
+            onRegisterTap: { authScreen = .register },
+            sessionExpiredMessage: sessionExpiredMessage
           )
         }
       }
       GlobalFeedbackOverlay()
     }
-    .task { await holder.syncController.syncOnce() }
+    .task {
+      await session.restorePersistedSessionIfPossible()
+      if session.isLoggedIn {
+        authScreen = .main
+      }
+    }
+    .onReceive(sessionExpiredCenter.$latestEvent) { event in
+      guard let event else { return }
+      sessionExpiredMessage = event.reason
+      authScreen = .login
+      try? session.invalidateSession(reason: event.reason)
+      sessionExpiredCenter.reset()
+    }
+    .tint(AppColors.primary)
+    .preferredColorScheme(.light)
   }
 
   private func logout() {
-    try? session.logout()
-    isAuthenticated = false
-    showRegister = false
+    authScreen = .login
+    Task { @MainActor in
+      try? session.logout()
+    }
   }
 }
 
@@ -126,18 +172,5 @@ import InventoryFeature
 
 extension AppDependenciesHolder {
   var authToken: String? { session.authToken }
-}
-
-extension MainTabView {
-  init(dependencies: AppDependenciesHolder, onLogout: @escaping () -> Void) {
-    self.init(
-      repository: dependencies.repository,
-      session: dependencies.session,
-      syncController: dependencies.syncController,
-      inventoryClient: dependencies.inventoryClient,
-      authToken: dependencies.authToken,
-      deviceId: dependencies.deviceId,
-      onLogout: onLogout
-    )
-  }
+  var remoteUserId: String? { session.remoteUserId }
 }

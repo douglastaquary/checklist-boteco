@@ -15,6 +15,20 @@ data class InventoryCountDraft(
 enum class InventoryCategory { ALCOOLICO, NAO_ALCOOLICO }
 enum class StorageCondition { GELADO, NATURAL }
 
+data class InventoryAuditItemSnapshot(
+    val product: String,
+    val auditDate: String,
+    val location: String,
+    val status: String,
+    val notes: String,
+    val openingQuantity: Double,
+    val soldQuantity: Double,
+    val theoreticalRemaining: Double,
+    val totalOpening: Double,
+    val totalSold: Double,
+    val totalRemaining: Double
+)
+
 object InventoryCountValidator {
     fun validate(value:InventoryCountDraft):List<String> = buildList {
         if(value.name.isBlank()) add("Nome obrigatório")

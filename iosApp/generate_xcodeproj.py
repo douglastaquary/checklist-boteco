@@ -11,7 +11,13 @@ PROJECT_DIR = os.path.join(ROOT, "ChecklistBoteco.xcodeproj")
 APP_SOURCES = [
   "ChecklistBoteco/ChecklistBotecoApp.swift",
   "ChecklistBoteco/MainTabView.swift",
+  "ChecklistBoteco/MainTabViewPreview.swift",
   "ChecklistBoteco/AppDependencies.swift",
+  "ChecklistBoteco/AppDependencyGraph.swift",
+  "ChecklistBoteco/AppTabContent.swift",
+  "ChecklistBoteco/AppTabRoute.swift",
+  "ChecklistBoteco/AppDeepLink.swift",
+  "ChecklistBoteco/TabRouter.swift",
 ]
 
 APP_PRODUCTS = [
@@ -43,6 +49,10 @@ info_plist = uid()
 debug_xcconfig = uid()
 release_xcconfig = uid()
 packages_ref = uid()
+packages_url = "../Packages"
+packages_isa = "XCRemoteSwiftPackageReference"
+packages_section = "XCRemoteSwiftPackageReference"
+packages_ref_line = f'repositoryURL = "{packages_url}"; requirement = {{kind = branch; branch = main;}};'
 product_deps = {name: uid() for name in APP_PRODUCTS}
 framework_build_files = {name: uid() for name in APP_PRODUCTS}
 
@@ -53,9 +63,6 @@ for src in APP_SOURCES:
   bf = uid()
   file_refs[src] = ref
   build_files.append((bf, ref))
-
-packages_url = "../Packages"
-packages_requirement = "{kind = branch; branch = main;}"
 
 pbx = f"""// !$*UTF8*$!
 {{
@@ -188,18 +195,18 @@ pbx += (
 )
 pbx += "/* End XCBuildConfiguration section */\n\n"
 
-pbx += "/* Begin XCRemoteSwiftPackageReference section */\n"
+pbx += f"/* Begin {packages_section} section */\n"
 pbx += (
-  f"\t\t{packages_ref} /* XCRemoteSwiftPackageReference Packages */ = {{isa = XCRemoteSwiftPackageReference; "
-  f"repositoryURL = \"{packages_url}\"; requirement = {packages_requirement}; }};\n"
+  f"\t\t{packages_ref} /* {packages_section} Packages */ = {{isa = {packages_isa}; "
+  f"{packages_ref_line} }};\n"
 )
-pbx += "/* End XCRemoteSwiftPackageReference section */\n\n"
+pbx += f"/* End {packages_section} section */\n\n"
 
 pbx += "/* Begin XCSwiftPackageProductDependency section */\n"
 for name in APP_PRODUCTS:
   pbx += (
     f"\t\t{product_deps[name]} /* {name} */ = {{isa = XCSwiftPackageProductDependency; productName = {name}; "
-    f"package = {packages_ref} /* XCRemoteSwiftPackageReference Packages */; }};\n"
+    f"package = {packages_ref} /* {packages_section} Packages */; }};\n"
   )
 pbx += "/* End XCSwiftPackageProductDependency section */\n\n"
 

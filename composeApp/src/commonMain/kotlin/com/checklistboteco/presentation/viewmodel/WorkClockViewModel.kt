@@ -11,6 +11,7 @@ import com.checklistboteco.domain.model.WorkClockSummary
 import com.checklistboteco.domain.model.WorkClockType
 import com.checklistboteco.domain.model.WorksiteLocation
 import com.checklistboteco.platform.DeviceIdentity
+import com.checklistboteco.platform.requireRemoteToken
 import com.checklistboteco.platform.LocationProvider
 import com.checklistboteco.platform.LocationUpdate
 import kotlinx.coroutines.CoroutineScope
@@ -174,10 +175,10 @@ class WorkClockViewModel(
 
     private fun retryPendingEntries() {
         val api = backendApiClient ?: return
-        val token = authToken ?: return
-        val backendUserId = remoteUserId ?: return
         scope.launch {
             runCatching {
+                val token = requireRemoteToken(api, authToken)
+                val backendUserId = remoteUserId ?: return@runCatching
                 repository.retryPendingWorkClockEntries(
                     userId = user.id,
                     remoteUserId = backendUserId,
@@ -204,10 +205,10 @@ class WorkClockViewModel(
         isLate: Boolean
     ) {
         val api = backendApiClient ?: return
-        val token = authToken ?: return
-        val backendUserId = remoteUserId ?: return
         scope.launch {
             runCatching {
+                val token = requireRemoteToken(api, authToken)
+                val backendUserId = remoteUserId ?: return@runCatching
                 val remoteId = api.pushWorkClockEntry(
                     token = token,
                     deviceId = DeviceIdentity.getOrCreateDeviceId(),
