@@ -141,7 +141,59 @@ class WorkClockResourceTest {
         given().header("Authorization", "Bearer " + admin).delete("/api/users/" + userId).then().statusCode(204);
     }
 
+    @Test
+    void syncRejectsWorkClockEntryFromAnotherUser() {
+        String admin = login("admin@checklistboteco.com", "admin123");
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String email = "ponto-outro+" + suffix + "@teste.com";
+        String created = given().header("Authorization", "Bearer " + admin).contentType("application/json").body(Map.of(
+            "name", "Ponto Outro " + suffix,
+            "email", email,
+            "password", "senha123",
+            "workSector", "BARMAN",
+            "permissionLevel", "USER"
+        )).post("/api/users").then().statusCode(201).extract().asString();
+        String userId = JsonPath.from(created).getString("id");
+        String token = login(email, "senha123");
+        long entrada = LocalDate.of(2026, 6, 19).atTime(8, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
+
+        given().header("Authorization", "Bearer " + token).contentType("application/json").body(Map.of(
+            "workClockEntries", List.of(workClockEntry("outro-usuario", "ENTRADA", entrada))
+        )).post("/api/sync/push").then().statusCode(403)
+            .body("message", containsString("outro usuário"));
+
+        given().header("Authorization", "Bearer " + admin).delete("/api/users/" + userId).then().statusCode(204);
+    }
+
+    @Test
+    void syncRejectsWorkClockEntryOutsideWorksiteRadius() {
+        String admin = login("admin@checklistboteco.com", "admin123");
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String email = "ponto-raio+" + suffix + "@teste.com";
+        String created = given().header("Authorization", "Bearer " + admin).contentType("application/json").body(Map.of(
+            "name", "Ponto Raio " + suffix,
+            "email", email,
+            "password", "senha123",
+            "workSector", "BARMAN",
+            "permissionLevel", "USER"
+        )).post("/api/users").then().statusCode(201).extract().asString();
+        String userId = JsonPath.from(created).getString("id");
+        String token = login(email, "senha123");
+        long entrada = LocalDate.of(2026, 6, 20).atTime(8, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
+
+        given().header("Authorization", "Bearer " + token).contentType("application/json").body(Map.of(
+            "workClockEntries", List.of(workClockEntry(userId, "ENTRADA", entrada, 25.0))
+        )).post("/api/sync/push").then().statusCode(400)
+            .body("message", containsString("fora do raio"));
+
+        given().header("Authorization", "Bearer " + admin).delete("/api/users/" + userId).then().statusCode(204);
+    }
+
     private Map<String, Object> workClockEntry(String userId, String type, long registeredAt) {
+        return workClockEntry(userId, type, registeredAt, 2.0);
+    }
+
+    private Map<String, Object> workClockEntry(String userId, String type, long registeredAt, double distanceFromWorkMeters) {
         return Map.of(
             "id", userId + "-" + type + "-" + registeredAt,
             "userId", userId,
@@ -149,7 +201,7 @@ class WorkClockResourceTest {
             "registeredAt", registeredAt,
             "latitude", -23.85491,
             "longitude", -46.13872,
-            "distanceFromWorkMeters", 2.0,
+            "distanceFromWorkMeters", distanceFromWorkMeters,
             "isLate", false,
             "createdAt", registeredAt,
             "updatedAt", registeredAt
