@@ -2,6 +2,7 @@ package com.checklistboteco.backend.sales.persistence;
 
 import com.checklistboteco.backend.sales.domain.SalesModels.ImportBatch;
 import com.checklistboteco.backend.sales.domain.SalesModels.Sale;
+import com.checklistboteco.backend.sales.domain.SalesFingerprint;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.annotation.PostConstruct;
@@ -32,16 +33,18 @@ public class LocalSalesRepository implements SalesRepository {
         try {
             Snapshot snapshot=mapper.readValue(Files.readString(file),Snapshot.class);
             snapshot.imports.forEach(batch->imports.put(batch.id,batch));
-            snapshot.sales.forEach(sale->{ sales.put(sale.id,sale); rowHashes.add(sale.datasetId+":"+sale.rowHash); });
+            snapshot.sales.forEach(sale->{ sales.put(sale.id,sale); rowHashes.add(uniqueKey(sale)); if(sale.rowHash!=null&&!sale.rowHash.isBlank()) rowHashes.add(sale.datasetId+":legacy:"+sale.rowHash); });
         } catch(Exception e){ throw new IllegalStateException("Falha ao carregar vendas locais persistidas",e); }
     }
 
     public synchronized void saveBatch(ImportBatch batch){ imports.put(batch.id,batch); persist(); }
     public ImportBatch getBatch(String id){ return imports.get(id); }
     public List<ImportBatch> batches(){ return imports.values().stream().sorted(Comparator.comparing((ImportBatch b)->b.createdAt).reversed()).toList(); }
+    public boolean existsFingerprint(String datasetId,String fingerprint){ return fingerprint!=null&&!fingerprint.isBlank()&&rowHashes.contains(datasetId+":"+fingerprint); }
     public synchronized boolean saveIfAbsent(Sale sale){
-        String key=sale.datasetId+":"+sale.rowHash;
+        String key=uniqueKey(sale);
         if(!rowHashes.add(key)) return false;
+        if(sale.rowHash!=null&&!sale.rowHash.isBlank()) rowHashes.add(sale.datasetId+":legacy:"+sale.rowHash);
         sales.put(sale.id,sale); persist(); return true;
     }
     public List<Sale> sales(String datasetId){
@@ -57,4 +60,5 @@ public class LocalSalesRepository implements SalesRepository {
             mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(),snapshot);
         } catch(Exception e){ throw new IllegalStateException("Falha ao persistir vendas locais",e); }
     }
+    private static String uniqueKey(Sale sale){ return sale.datasetId+":"+SalesFingerprint.existingOrComputed(sale); }
 }

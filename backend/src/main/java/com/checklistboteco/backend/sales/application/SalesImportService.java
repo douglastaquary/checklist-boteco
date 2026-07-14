@@ -4,6 +4,7 @@ import static com.checklistboteco.backend.sales.domain.SalesModels.*;
 
 import com.checklistboteco.backend.model.Models.User;
 import com.checklistboteco.backend.sales.csv.CsvSupport;
+import com.checklistboteco.backend.sales.domain.SalesFingerprint;
 import com.checklistboteco.backend.sales.persistence.SalesRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -28,7 +29,7 @@ public class SalesImportService {
         "quantity",List.of("quantidade","qtd","qtde","quantity"),
         "totalInCents",List.of("total","valor_total","valor","receita","faturamento","total_venda","valor_venda"),
         "documentNumber",List.of("cupom","pedido","documento","numero_documento","cod_produto","codigo_produto"),
-        "unit",List.of("unidade","un","unit","tipo_preco"),
+        "unit",List.of("unidade","un","unit","tipo","tipo_preco"),
         "unitPriceInCents",List.of("valor_unitario","preco_unitario","ticket_medio","unit_price","val_unit","vl_unit","val_unitario")
     );
     @Inject SalesRepository repository;
@@ -39,7 +40,7 @@ public class SalesImportService {
         char delimiter=CsvSupport.detectDelimiter(request.csv); List<List<String>> rows=CsvSupport.parse(request.csv,delimiter);
         require(rows.size()>=2,"O CSV precisa ter cabeçalho e ao menos uma linha"); require(rows.size()<=10_100,"CSV excede o limite de 10.000 linhas");
         ImportBatch batch=new ImportBatch(); batch.id=UUID.randomUUID().toString(); batch.fileName=cleanFileName(request.fileName);
-        batch.fileHash=hash(request.csv); batch.createdBy=admin.id; batch.createdAt=Instant.now(); batch.delimiter=delimiter; batch.rawCsv=request.csv;
+        batch.fileHash=hash(request.csv); batch.datasetId=request.datasetId==null||request.datasetId.isBlank()?"sales":request.datasetId.trim(); batch.createdBy=admin.id; batch.createdAt=Instant.now(); batch.delimiter=delimiter; batch.rawCsv=request.csv;
         int headerIndex=findHeader(rows); require(headerIndex>=0,"Não foi possível localizar um cabeçalho com produto e quantidade no CSV de vendas");
         batch.referenceYear=referenceYear(request.csv);
         PreparedRows prepared=prepareRows(rows,headerIndex,batch.referenceYear);
@@ -56,28 +57,33 @@ public class SalesImportService {
         deduplicateColumns(batch);
         batch.suggestedMapping=suggest(batch.headers);
         batch.totalRows=batch.rows.size(); for(int i=0;i<Math.min(batch.rows.size(),5);i++) batch.sampleRows.add(new LinkedHashMap<>(batch.rows.get(i)));
-        if(requiresExplicitDate(batch.headers)&&!batch.suggestedMapping.containsKey("saleDate")) batch.errors.add(new ImportError(1,"saleDate","Mapeie a coluna de data da venda"));
+        if(!batch.suggestedMapping.containsKey("saleDate")) batch.errors.add(new ImportError(1,"saleDate","Mapeie a coluna de data da venda"));
         if(!batch.suggestedMapping.containsKey("description")) batch.errors.add(new ImportError(1,"description","Mapeie a coluna do produto vendido"));
         if(!batch.suggestedMapping.containsKey("quantity")) batch.errors.add(new ImportError(1,"quantity","Mapeie a coluna de quantidade"));
+        analyzePreview(batch,batch.suggestedMapping);
         repository.saveBatch(batch); return publicBatch(batch);
     }
 
     public ImportBatch commit(User admin,String id,CommitRequest request){
         ImportBatch batch=repository.getBatch(id); require(batch!=null,"Importação não encontrada"); require("PREVIEW".equals(batch.status),"Importação já processada");
         Map<String,String> mapping=request!=null&&request.mapping!=null?request.mapping:batch.suggestedMapping;
-        require(mapping.containsKey("description")&&mapping.containsKey("quantity"),"Produto e quantidade são obrigatórios");
-        if(requiresExplicitDate(batch.headers)) require(mapping.containsKey("saleDate"),"Esse CSV possui coluna de data. Mapeie a data da venda antes de importar");
+        require(mapping.containsKey("saleDate")&&mapping.containsKey("description")&&mapping.containsKey("quantity"),"Data da venda, produto e quantidade são obrigatórios");
         for(String header:mapping.values()) require(batch.headers.contains(header),"Coluna mapeada não existe: "+header);
         String dataset=request==null||request.datasetId==null||request.datasetId.isBlank()?"sales":request.datasetId.trim();
         Set<String> preserve=request==null||request.preserveColumns==null||request.preserveColumns.isEmpty()?new LinkedHashSet<>(batch.headers):new LinkedHashSet<>(request.preserveColumns);
         preserve=sanitizePreserveColumns(batch,preserve,mapping);
         batch.mapping=new LinkedHashMap<>(mapping); batch.datasetId=dataset; batch.errors.clear();
+        resetValidation(batch);
+        Set<String> seenInFile=new HashSet<>();
         for(int index=0;index<batch.rows.size();index++){
             Map<String,String> source=batch.rows.get(index);
             try {
                 Sale sale=toSale(batch,source,mapping,preserve);
-                if(repository.saveIfAbsent(sale)) batch.importedRows++; else batch.duplicateRows++;
-            } catch(IllegalArgumentException e){ batch.rejectedRows++; batch.errors.add(new ImportError(index+1,"row",e.getMessage())); }
+                trackCoverage(batch,sale);
+                if(!seenInFile.add(sale.saleFingerprint)){ batch.duplicateRows++; batch.inFileDuplicateRows++; continue; }
+                if(repository.saveIfAbsent(sale)){ batch.importedRows++; batch.newRows++; }
+                else { batch.duplicateRows++; batch.existingDuplicateRows++; }
+            } catch(IllegalArgumentException e){ batch.rejectedRows++; if(isDateError(e)) batch.missingDateRows++; batch.errors.add(new ImportError(index+1,"row",e.getMessage())); }
         }
         batch.status=batch.rejectedRows==batch.totalRows?"FAILED":"COMMITTED"; batch.rawCsv=null; repository.saveBatch(batch); return publicBatch(batch);
     }
@@ -87,7 +93,7 @@ public class SalesImportService {
 
     private Sale toSale(ImportBatch batch,Map<String,String> source,Map<String,String> mapping,Set<String> preserve){
         Sale sale=new Sale(); sale.id=UUID.randomUUID().toString(); sale.datasetId=batch.datasetId; sale.importId=batch.id; sale.importedAt=Instant.now();
-        String date=value(source,mapping,"saleDate"); sale.saleDate=date.isBlank()?defaultSaleDate(batch):parseDate(date,batch.referenceYear);
+        String date=required(value(source,mapping,"saleDate"),"Data da venda vazia"); sale.saleDate=parseDate(date,batch.referenceYear);
         sale.description=required(value(source,mapping,"description"),"Produto vendido vazio");
         sale.location=defaultLocation(value(source,mapping,"location"));
         sale.category=nullable(value(source,mapping,"category"));
@@ -101,9 +107,41 @@ public class SalesImportService {
             sale.unitPriceInCents=toCents(BigDecimal.valueOf(sale.totalInCents,2).divide(sale.quantity,4,RoundingMode.HALF_UP));
         }
         for(String header:preserve){ String raw=source.getOrDefault(header,""); if(!raw.isBlank()) sale.attributes.put(uniqueAttributeKey(sale.attributes,CsvSupport.key(header)),infer(raw)); }
-        sale.rowHash=hash(sale.datasetId+"|"+source);
+        sale.saleFingerprint=SalesFingerprint.of(sale);
+        sale.rowHash=sale.saleFingerprint;
         return sale;
     }
+
+    private void analyzePreview(ImportBatch batch,Map<String,String> mapping){
+        resetValidation(batch);
+        if(!mapping.containsKey("saleDate")||!mapping.containsKey("description")||!mapping.containsKey("quantity")){
+            batch.validationWarnings.add("Validação de duplicidade será concluída após mapear data, produto e quantidade.");
+            return;
+        }
+        Set<String> seenInFile=new HashSet<>();
+        for(int index=0;index<batch.rows.size();index++){
+            try {
+                Sale sale=toSale(batch,batch.rows.get(index),mapping,Set.of());
+                trackCoverage(batch,sale);
+                if(!seenInFile.add(sale.saleFingerprint)){ batch.duplicateRows++; batch.inFileDuplicateRows++; continue; }
+                if(repository.existsFingerprint(batch.datasetId,sale.saleFingerprint)){ batch.duplicateRows++; batch.existingDuplicateRows++; }
+                else batch.newRows++;
+            } catch(IllegalArgumentException e){ batch.rejectedRows++; if(isDateError(e)) batch.missingDateRows++; }
+        }
+        if(batch.duplicateRows>0) batch.validationWarnings.add(batch.duplicateRows+" linha(s) duplicada(s) serão ignoradas no commit.");
+        if(batch.missingDateRows>0) batch.validationWarnings.add(batch.missingDateRows+" linha(s) sem data válida precisam ser corrigidas antes da importação.");
+    }
+
+    private static void resetValidation(ImportBatch batch){
+        batch.importedRows=0; batch.duplicateRows=0; batch.rejectedRows=0; batch.newRows=0; batch.inFileDuplicateRows=0; batch.existingDuplicateRows=0; batch.missingDateRows=0;
+        batch.coverageFrom=null; batch.coverageTo=null; batch.validationWarnings.clear();
+    }
+    private static void trackCoverage(ImportBatch batch,Sale sale){
+        if(sale.saleDate==null) return;
+        if(batch.coverageFrom==null||sale.saleDate.isBefore(batch.coverageFrom)) batch.coverageFrom=sale.saleDate;
+        if(batch.coverageTo==null||sale.saleDate.isAfter(batch.coverageTo)) batch.coverageTo=sale.saleDate;
+    }
+    private static boolean isDateError(IllegalArgumentException e){ String message=e.getMessage()==null?"":e.getMessage().toLowerCase(Locale.ROOT); return message.contains("data"); }
 
     private static Map<String,String> suggest(List<String> headers){
         Map<String,String> result=new LinkedHashMap<>();
@@ -248,7 +286,6 @@ public class SalesImportService {
     private static long parseMoney(String raw){ try { return parseDecimal(raw).movePointRight(2).setScale(0,RoundingMode.HALF_UP).longValueExact(); } catch(ArithmeticException e){ throw new IllegalArgumentException("Valor monetário inválido: "+raw); } }
     private static long toCents(BigDecimal value){ return value.movePointRight(2).setScale(0,RoundingMode.HALF_UP).longValue(); }
     private static Object infer(String raw){ try { return parseDecimal(raw); } catch(Exception ignored) {} try { return parseDate(raw,null).toString(); } catch(Exception ignored) {} return raw.trim(); }
-    private static LocalDate defaultSaleDate(ImportBatch batch){ return LocalDate.ofInstant(batch.createdAt==null?Instant.now():batch.createdAt,ZoneId.systemDefault()); }
     private static String defaultLocation(String value){
         String normalized=value==null?"":value.trim();
         if(normalized.isBlank()) return DEFAULT_LOCATION;
@@ -267,6 +304,7 @@ public class SalesImportService {
     private ImportBatch publicBatch(ImportBatch source){
         ImportBatch batch=new ImportBatch(); batch.id=source.id; batch.fileName=source.fileName; batch.fileHash=source.fileHash; batch.datasetId=source.datasetId; batch.createdBy=source.createdBy; batch.status=source.status;
         batch.createdAt=source.createdAt; batch.delimiter=source.delimiter; batch.referenceYear=source.referenceYear; batch.headers=new ArrayList<>(source.headers); batch.suggestedMapping=new LinkedHashMap<>(source.suggestedMapping); batch.mapping=new LinkedHashMap<>(source.mapping);
-        batch.sampleRows=new ArrayList<>(source.sampleRows); batch.errors=new ArrayList<>(source.errors); batch.totalRows=source.totalRows; batch.importedRows=source.importedRows; batch.duplicateRows=source.duplicateRows; batch.rejectedRows=source.rejectedRows; return batch;
+        batch.sampleRows=new ArrayList<>(source.sampleRows); batch.errors=new ArrayList<>(source.errors); batch.validationWarnings=new ArrayList<>(source.validationWarnings); batch.coverageFrom=source.coverageFrom; batch.coverageTo=source.coverageTo;
+        batch.totalRows=source.totalRows; batch.importedRows=source.importedRows; batch.duplicateRows=source.duplicateRows; batch.rejectedRows=source.rejectedRows; batch.newRows=source.newRows; batch.inFileDuplicateRows=source.inFileDuplicateRows; batch.existingDuplicateRows=source.existingDuplicateRows; batch.missingDateRows=source.missingDateRows; return batch;
     }
 }

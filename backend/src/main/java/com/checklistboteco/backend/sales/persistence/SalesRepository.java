@@ -8,6 +8,7 @@ public interface SalesRepository {
     void saveBatch(ImportBatch batch);
     ImportBatch getBatch(String id);
     List<ImportBatch> batches();
+    boolean existsFingerprint(String datasetId,String fingerprint);
     boolean saveIfAbsent(Sale sale);
     List<Sale> sales(String datasetId);
 }

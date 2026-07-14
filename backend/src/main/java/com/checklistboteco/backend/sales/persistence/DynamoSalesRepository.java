@@ -2,6 +2,7 @@ package com.checklistboteco.backend.sales.persistence;
 
 import com.checklistboteco.backend.sales.domain.SalesModels.ImportBatch;
 import com.checklistboteco.backend.sales.domain.SalesModels.Sale;
+import com.checklistboteco.backend.sales.domain.SalesFingerprint;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.annotation.PostConstruct;
@@ -38,12 +39,38 @@ public class DynamoSalesRepository implements SalesRepository {
     public void saveBatch(ImportBatch batch){ imports.put(batch.id,batch); put("IMPORT#"+batch.id,"META","IMPORT",batch); }
     public ImportBatch getBatch(String id){ return imports.get(id); }
     public List<ImportBatch> batches(){ return imports.values().stream().sorted(Comparator.comparing((ImportBatch b)->b.createdAt).reversed()).toList(); }
+    public boolean existsFingerprint(String datasetId,String fingerprint){ return fingerprint!=null&&!fingerprint.isBlank()&&rowHashes.contains(datasetId+":"+fingerprint); }
     public synchronized boolean saveIfAbsent(Sale sale){
-        String hashKey=sale.datasetId+":"+sale.rowHash;
+        String fingerprint=SalesFingerprint.existingOrComputed(sale);
+        String hashKey=sale.datasetId+":"+fingerprint;
         if(!rowHashes.add(hashKey)) return false;
-        sales.put(sale.id,sale);
-        put("DATASET#"+sale.datasetId,"SALE#"+(sale.saleDate==null?"UNDATED":sale.saleDate)+"#"+sale.id,"SALE",sale);
-        return true;
+        try {
+            Map<String,AttributeValue> unique=Map.of(
+                "pk",AttributeValue.fromS("UNIQUE#"+sale.datasetId),
+                "sk",AttributeValue.fromS(fingerprint),
+                "kind",AttributeValue.fromS("SALE_UNIQUE"),
+                "saleId",AttributeValue.fromS(sale.id)
+            );
+            Map<String,AttributeValue> item=Map.of(
+                "pk",AttributeValue.fromS("DATASET#"+sale.datasetId),
+                "sk",AttributeValue.fromS("SALE#"+(sale.saleDate==null?"UNDATED":sale.saleDate)+"#"+sale.id),
+                "kind",AttributeValue.fromS("SALE"),
+                "payload",AttributeValue.fromS(mapper.writeValueAsString(sale))
+            );
+            dynamo.transactWriteItems(TransactWriteItemsRequest.builder().transactItems(
+                TransactWriteItem.builder().put(Put.builder().tableName(table).item(unique).conditionExpression("attribute_not_exists(pk)").build()).build(),
+                TransactWriteItem.builder().put(Put.builder().tableName(table).item(item).build()).build()
+            ).build());
+            sales.put(sale.id,sale);
+            if(sale.rowHash!=null&&!sale.rowHash.isBlank()) rowHashes.add(sale.datasetId+":legacy:"+sale.rowHash);
+            return true;
+        } catch(TransactionCanceledException e){
+            rowHashes.remove(hashKey);
+            return false;
+        } catch(Exception e){
+            rowHashes.remove(hashKey);
+            throw new IllegalStateException("Falha ao gravar venda no DynamoDB",e);
+        }
     }
     public List<Sale> sales(String datasetId){ return sales.values().stream().filter(value->Objects.equals(datasetId,value.datasetId)).toList(); }
 
@@ -57,9 +84,11 @@ public class DynamoSalesRepository implements SalesRepository {
     }
     private void hydrate(Map<String,AttributeValue> item){
         try {
-            String kind=item.get("kind").s(),payload=item.get("payload").s();
+            String kind=item.get("kind").s();
+            if("SALE_UNIQUE".equals(kind)) return;
+            String payload=item.get("payload").s();
             if("IMPORT".equals(kind)){ ImportBatch batch=mapper.readValue(payload,ImportBatch.class); imports.put(batch.id,batch); }
-            if("SALE".equals(kind)){ Sale sale=mapper.readValue(payload,Sale.class); sales.put(sale.id,sale); rowHashes.add(sale.datasetId+":"+sale.rowHash); }
+            if("SALE".equals(kind)){ Sale sale=mapper.readValue(payload,Sale.class); sales.put(sale.id,sale); rowHashes.add(sale.datasetId+":"+SalesFingerprint.existingOrComputed(sale)); if(sale.rowHash!=null&&!sale.rowHash.isBlank()) rowHashes.add(sale.datasetId+":legacy:"+sale.rowHash); }
         } catch(Exception e){ throw new IllegalStateException("Item de vendas inválido no DynamoDB",e); }
     }
 }

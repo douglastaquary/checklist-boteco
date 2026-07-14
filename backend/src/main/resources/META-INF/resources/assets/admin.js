@@ -29,7 +29,7 @@ const mappingFields = [
   ['unit', 'Unidade'],
   ['unitPriceInCents', 'Valor unitário']
 ];
-const requiredSalesMappingFields = new Set(['description', 'quantity']);
+const requiredSalesMappingFields = new Set(['saleDate', 'description', 'quantity']);
 const salesMappingFields = [
   ['saleDate', 'Data'],
   ['description', 'Produto'],
@@ -65,7 +65,7 @@ const semanticColumnKey = value => {
     quantity: ['quantidade', 'qtd', 'qtde', 'quantity'],
     totalInCents: ['total', 'valor_total', 'valor', 'receita', 'faturamento', 'total_venda', 'valor_venda'],
     documentNumber: ['cupom', 'pedido', 'documento', 'numero_documento', 'cod_produto', 'codigo_produto'],
-    unit: ['unidade', 'un', 'unit', 'tipo_preco'],
+    unit: ['unidade', 'un', 'unit', 'tipo', 'tipo_preco'],
     unitPriceInCents: ['valor_unitario', 'preco_unitario', 'ticket_medio', 'unit_price', 'val_unit', 'vl_unit', 'val_unitario']
   };
   for (const [field, values] of Object.entries(aliases)) {
@@ -600,7 +600,6 @@ function renderSalesPreview(data) {
   $('salesPreview').classList.remove('hidden');
   $('salesPreviewTitle').textContent = `${data.fileName} · ${data.totalRows} linhas`;
   const requiredSalesFields = new Set(requiredSalesMappingFields);
-  if (data.errors?.some(error => error.field === 'saleDate')) requiredSalesFields.add('saleDate');
   $('salesMapping').innerHTML = salesMappingFields.map(([key, label]) => `
     <label>${label} <small>${requiredSalesFields.has(key) ? '(obrigatório)' : '(opcional)'}</small>
       <select data-sales-map="${key}">
@@ -611,7 +610,11 @@ function renderSalesPreview(data) {
   `).join('');
   $('salesPreviewHead').innerHTML = `<tr>${data.headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr>`;
   $('salesPreviewBody').innerHTML = data.sampleRows.map(row => `<tr>${data.headers.map(header => `<td>${escapeHtml(row[header])}</td>`).join('')}</tr>`).join('');
-  $('salesImportMessage').textContent = data.errors?.map(error => error.message).join(' · ') || 'Mapeie ao menos produto e quantidade. Data e local podem ser preenchidos automaticamente quando não vierem no relatório.';
+  const period = data.coverageFrom && data.coverageTo ? `Período: ${data.coverageFrom} até ${data.coverageTo}. ` : '';
+  const summary = `Novas: ${data.newRows || 0}. Duplicadas: ${data.duplicateRows || 0} (${data.inFileDuplicateRows || 0} no arquivo, ${data.existingDuplicateRows || 0} já existentes). Rejeitadas: ${data.rejectedRows || 0}.`;
+  const warnings = data.validationWarnings?.length ? ` ${data.validationWarnings.join(' · ')}` : '';
+  const errors = data.errors?.length ? ` ${data.errors.map(error => error.message).join(' · ')}` : '';
+  $('salesImportMessage').textContent = `${period}${summary}${warnings}${errors}`.trim();
 }
 
 async function loadPurchaseSchema() {
@@ -852,7 +855,7 @@ $('salesImportForm').addEventListener('submit', async event => {
   try {
     const data = await api('/api/sales/imports/preview', {
       method: 'POST',
-      body: JSON.stringify({ fileName: file?.name || 'vendas-coladas.csv', csv: file ? await file.text() : pasted })
+      body: JSON.stringify({ fileName: file?.name || 'vendas-coladas.csv', csv: file ? await file.text() : pasted, datasetId: 'sales' })
     });
     renderSalesPreview(data);
   } catch (error) {
@@ -867,12 +870,9 @@ $('commitSalesImport').addEventListener('click', async () => {
     if (select.value) mapping[select.dataset.salesMap] = select.value;
   });
   const requiredSalesFields = new Set(requiredSalesMappingFields);
-  if (salesPreview?.errors?.some(error => error.field === 'saleDate')) requiredSalesFields.add('saleDate');
   const missing = [...requiredSalesFields].filter(key => !mapping[key]);
   if (missing.length) {
-    $('salesImportMessage').textContent = requiredSalesFields.has('saleDate')
-      ? 'Mapeie data, produto e quantidade antes de importar.'
-      : 'Mapeie produto e quantidade antes de importar.';
+    $('salesImportMessage').textContent = 'Mapeie data, produto e quantidade antes de importar.';
     return;
   }
   $('salesImportMessage').textContent = 'Importando…';
@@ -881,7 +881,7 @@ $('commitSalesImport').addEventListener('click', async () => {
       method: 'POST',
       body: JSON.stringify({ datasetId: 'sales', mapping, preserveColumns: salesPreview.headers })
     });
-    $('salesImportMessage').innerHTML = `<span class="import-ok">${data.importedRows} linhas importadas, ${data.duplicateRows} duplicadas e ${data.rejectedRows} rejeitadas.</span>`;
+    $('salesImportMessage').innerHTML = `<span class="import-ok">${data.importedRows} linhas importadas, ${data.duplicateRows} duplicadas (${data.inFileDuplicateRows || 0} no arquivo, ${data.existingDuplicateRows || 0} já existentes) e ${data.rejectedRows} rejeitadas.</span>`;
     $('salesPreview').classList.add('hidden');
     salesPreview = null;
     await loadSales();
