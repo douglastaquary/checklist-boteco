@@ -86,20 +86,24 @@ class SalesResourceTest {
         String token=adminToken(),dataset="sales-flex-"+UUID.randomUUID();
         String csv="""
             Cód Produto;Nome;Tipo Preço;Val. Unit;Qtde;Total Venda
+            10/06/2026;;;;;
             197;ADICIONAL DE BATATA;A Vista;6,9;3;20,7
             143;AGUA COM GAS;A Vista;6,989259;81;566,13
             """;
         String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","RelatorioVenda.csv","csv",csv))
             .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("suggestedMapping.saleDate",is("Data da Venda"))
             .body("suggestedMapping.description",is("Nome"))
             .body("suggestedMapping.quantity",is("Qtde"))
             .body("suggestedMapping.unitPriceInCents",is("Val. Unit"))
             .body("suggestedMapping.totalInCents",is("Total Venda"))
+            .body("coverageFrom",is("2026-06-10"))
+            .body("newRows",is(2))
             .extract().asString();
         String id=JsonPath.from(preview).getString("id");
         given().auth().oauth2(token).contentType("application/json").body(Map.of(
             "datasetId",dataset,
-            "mapping",Map.of("description","Nome","quantity","Qtde","unitPriceInCents","Val. Unit","totalInCents","Total Venda","documentNumber","Cód Produto","unit","Tipo Preço"),
+            "mapping",Map.of("saleDate","Data da Venda","description","Nome","quantity","Qtde","unitPriceInCents","Val. Unit","totalInCents","Total Venda","documentNumber","Cód Produto","unit","Tipo Preço"),
             "preserveColumns",List.of("Cód Produto","Nome","Tipo Preço","Val. Unit","Qtde","Total Venda")
         )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(2)).body("rejectedRows",is(0));
 
@@ -159,7 +163,7 @@ class SalesResourceTest {
             "datasetId",dataset,
             "mapping",Map.of("description","Nome","quantity","Qtde","totalInCents","Total Venda")
         )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(400)
-            .body("message",containsString("Mapeie a data da venda"));
+            .body("message",containsString("Data da venda"));
     }
 
     @Test void salesImportPropagatesDateMarkersFromProductCodeColumn(){
@@ -262,6 +266,79 @@ class SalesResourceTest {
             .body("fields.key",not(hasItem("nome")))
             .body("fields.key",not(hasItem("quantidade")))
             .body("fields.key",not(hasItem("total_venda")));
+    }
+
+    @Test void salesImportIsIdempotentAcrossDailyWeeklyAndMonthlyOverlaps(){
+        String token=adminToken(),dataset="sales-overlap-"+UUID.randomUUID();
+        String daily="""
+            Data;Produto;Local;Quantidade;Valor;Tipo
+            10/03/2026;HEINEKEN LATA;Beco da Praia;12;144;A Vista
+            """;
+        String dailyPreview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-dia.csv","csv",daily,"datasetId",dataset))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("coverageFrom",is("2026-03-10"))
+            .body("coverageTo",is("2026-03-10"))
+            .body("newRows",is(1))
+            .extract().asString();
+        String dailyId=JsonPath.from(dailyPreview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","location","Local","quantity","Quantidade","totalInCents","Valor","unit","Tipo")
+        )).when().post("/api/sales/imports/"+dailyId+"/commit").then().statusCode(200)
+            .body("importedRows",is(1))
+            .body("duplicateRows",is(0));
+
+        String weekly="""
+            Data da Venda;Nome;PDV;Qtde;Total Venda;Tipo Preço
+            10/03/2026;HEINEKEN LATA;beco;12;144;A Vista
+            11/03/2026;HEINEKEN LATA;Beco da Praia;8;96;A Vista
+            """;
+        String weeklyPreview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-semana.csv","csv",weekly,"datasetId",dataset))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("coverageFrom",is("2026-03-10"))
+            .body("coverageTo",is("2026-03-11"))
+            .body("newRows",is(1))
+            .body("duplicateRows",is(1))
+            .body("existingDuplicateRows",is(1))
+            .extract().asString();
+        String weeklyId=JsonPath.from(weeklyPreview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data da Venda","description","Nome","location","PDV","quantity","Qtde","totalInCents","Total Venda","unit","Tipo Preço")
+        )).when().post("/api/sales/imports/"+weeklyId+"/commit").then().statusCode(200)
+            .body("importedRows",is(1))
+            .body("duplicateRows",is(1))
+            .body("existingDuplicateRows",is(1));
+
+        String monthly="""
+            Data;Produto;Local;Quantidade;Valor;Tipo
+            10/03/2026;HEINEKEN LATA;Beco da Praia;12;144;A Vista
+            11/03/2026;HEINEKEN LATA;Beco da Praia;8;96;A Vista
+            12/03/2026;HEINEKEN LATA;Beco da Praia;5;60;A Vista
+            12/03/2026;HEINEKEN LATA;Beco da Praia;5;60;A Vista
+            """;
+        String monthlyPreview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-mes.csv","csv",monthly,"datasetId",dataset))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("newRows",is(1))
+            .body("duplicateRows",is(3))
+            .body("existingDuplicateRows",is(2))
+            .body("inFileDuplicateRows",is(1))
+            .extract().asString();
+        String monthlyId=JsonPath.from(monthlyPreview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","location","Local","quantity","Quantidade","totalInCents","Valor","unit","Tipo")
+        )).when().post("/api/sales/imports/"+monthlyId+"/commit").then().statusCode(200)
+            .body("importedRows",is(1))
+            .body("duplicateRows",is(3))
+            .body("existingDuplicateRows",is(2))
+            .body("inFileDuplicateRows",is(1));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-03-01","to","2026-03-31","text","heineken","pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(3))
+            .body("totalInCents",is(30000))
+            .body("totalQuantity",anyOf(is(25),is("25")));
     }
 
     private static String adminToken(){

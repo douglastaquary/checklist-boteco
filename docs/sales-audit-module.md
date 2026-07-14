@@ -17,6 +17,7 @@ Criar um fluxo administrativo para importar relatórios CSV de vendas, normaliza
 - importação CSV com prévia e mapeamento;
 - campos obrigatórios de vendas: `data`, `produto`, `local` e `quantidade`;
 - colunas adicionais preservadas como atributos dinâmicos;
+- importação idempotente para uploads diários, semanais e mensais sobrepostos;
 - persistência em tabela DynamoDB separada;
 - consulta web com filtros por período, categoria, local, texto e valor;
 - auditoria `vendido x abastecido`;
@@ -54,6 +55,24 @@ O backend cruza compras e vendas pelo produto normalizado e local.
 - `ALERTA`: quantidade vendida é maior que a quantidade abastecida;
 - `ATENCAO`: houve abastecimento, mas não houve saída registrada;
 - `OK`: quantidades compatíveis no período.
+
+## Idempotência e validação de datas
+
+Toda venda importada recebe uma chave única normalizada (`saleFingerprint`) calculada a partir de `dataset`, data da venda, produto, local, quantidade, valores, unidade/tipo preço e documento/código quando disponível. Essa chave evita duplicidade quando o mesmo dado aparece em uploads diários, semanais ou mensais.
+
+Regras aplicadas:
+
+- `saleDate` é obrigatório para novas importações.
+- CSVs sem coluna explícita de data só são aceitos quando o importador encontra marcadores de data no arquivo, como linhas `15/05/2026` na primeira coluna.
+- Reenvio do mesmo arquivo ou upload de período sobreposto não duplica vendas já persistidas.
+- O preview e o commit retornam cobertura (`coverageFrom`, `coverageTo`) e contadores:
+  - `newRows`;
+  - `duplicateRows`;
+  - `inFileDuplicateRows`;
+  - `existingDuplicateRows`;
+  - `missingDateRows`;
+  - `rejectedRows`.
+- Em produção, o DynamoDB grava um item de unicidade por venda com escrita condicional para impedir duplicidade mesmo em uploads concorrentes.
 
 ## MCP local para testes
 

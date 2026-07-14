@@ -97,6 +97,8 @@ Rotas principais:
 - `POST /api/sales/aggregate`
 - `POST /api/sales/audit/stock`
 
+Importações de vendas são idempotentes: cada linha válida gera uma chave única normalizada por data da venda, produto, local, quantidade, valores, unidade/tipo preço e documento quando disponível. Uploads diários, semanais e mensais podem se sobrepor; linhas já importadas são contabilizadas como duplicadas e não são gravadas novamente. O preview/commit retorna cobertura de datas (`coverageFrom`, `coverageTo`) e contadores como `newRows`, `duplicateRows`, `inFileDuplicateRows`, `existingDuplicateRows`, `missingDateRows` e `rejectedRows`.
+
 O endpoint MCP local continua em `POST /mcp` e agora expõe ferramentas de compras e vendas somente leitura.
 
 Para perguntas por produto, o MCP expõe a tool `sales_by_product`, útil para frases como:

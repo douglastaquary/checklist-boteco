@@ -16,7 +16,7 @@ public final class SalesModels {
         public BigDecimal quantity=BigDecimal.ZERO;
         public long unitPriceInCents,totalInCents;
         public Map<String,Object> attributes=new LinkedHashMap<>();
-        public String importId,rowHash;
+        public String importId,rowHash,saleFingerprint;
         public Instant importedAt;
     }
 
@@ -32,7 +32,9 @@ public final class SalesModels {
         public Map<String,String> mapping=new LinkedHashMap<>();
         public List<Map<String,String>> sampleRows=new ArrayList<>();
         public List<ImportError> errors=new ArrayList<>();
-        public int totalRows,importedRows,duplicateRows,rejectedRows;
+        public List<String> validationWarnings=new ArrayList<>();
+        public LocalDate coverageFrom,coverageTo;
+        public int totalRows,importedRows,duplicateRows,rejectedRows,newRows,inFileDuplicateRows,existingDuplicateRows,missingDateRows;
     }
 
     public static class ImportError {
@@ -56,7 +58,7 @@ public final class SalesModels {
         public long saleCount;
     }
 
-    public static class PreviewRequest { public String fileName,csv; }
+    public static class PreviewRequest { public String fileName,csv,datasetId="sales"; }
     public static class CommitRequest {
         public String datasetId="sales";
         public Map<String,String> mapping=new LinkedHashMap<>();
