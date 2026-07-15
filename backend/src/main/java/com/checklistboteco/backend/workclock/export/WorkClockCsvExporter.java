@@ -9,7 +9,7 @@ import java.util.List;
 public class WorkClockCsvExporter {
     public byte[] export(List<WorkClockMonthlyExportRow> rows) {
         StringBuilder csv = new StringBuilder();
-        csv.append("Colaborador;Horas trabalhadas;Horas extras;Horas faltantes;Almoço;Descanso;Faltas (dias)\n");
+        csv.append("Colaborador;Horas trabalhadas;Horas extras;Horas faltantes;Almoço;Descanso;Faltas (dias);Dias de falta\n");
         for (WorkClockMonthlyExportRow row : rows) {
             csv.append(escape(row.name)).append(';')
                 .append(format(row.workedHours)).append(';')
@@ -17,7 +17,8 @@ public class WorkClockCsvExporter {
                 .append(format(row.missingHours)).append(';')
                 .append(format(row.lunchHours)).append(';')
                 .append(format(row.restHours)).append(';')
-                .append(row.absenceDays).append('\n');
+                .append(row.absenceDays).append(';')
+                .append(escape(String.join(", ", row.absenceDates == null ? List.of() : row.absenceDates))).append('\n');
         }
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }

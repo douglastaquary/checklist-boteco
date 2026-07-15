@@ -55,10 +55,31 @@ class WorkClockCalculatorTest {
         assertEquals(1, absences);
     }
 
+    @Test
+    void absenceDetailsListMissingEntryAndMissingExitForPastDays() {
+        UserWorkSchedule schedule = new UserWorkSchedule();
+        schedule.workingDaysOfWeek = List.of(1, 2, 3, 4, 5, 6);
+        LocalDate friday = LocalDate.of(2026, 6, 19);
+        LocalDate saturday = LocalDate.of(2026, 6, 20);
+        WorkClockEntry saturdayEntry = entry("ENTRADA", saturday, 8);
+
+        var absences = WorkClockCalculator.absenceDetails(List.of(saturdayEntry), schedule, friday, saturday);
+
+        assertEquals(2, absences.size());
+        assertEquals("2026-06-19", absences.get(0).date);
+        assertEquals("Sem entrada registrada", absences.get(0).reason);
+        assertEquals("2026-06-20", absences.get(1).date);
+        assertEquals("Entrada sem saída registrada", absences.get(1).reason);
+    }
+
     private WorkClockEntry entry(String type, int hour) {
+        return entry(type, LocalDate.of(2026, 6, 20), hour);
+    }
+
+    private WorkClockEntry entry(String type, LocalDate date, int hour) {
         WorkClockEntry entry = new WorkClockEntry();
         entry.type = type;
-        entry.registeredAt = LocalDate.of(2026, 6, 20).atTime(hour, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
+        entry.registeredAt = date.atTime(hour, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
         return entry;
     }
 }

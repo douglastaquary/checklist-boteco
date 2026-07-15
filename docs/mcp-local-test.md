@@ -106,6 +106,7 @@ Se estiver tudo certo, a resposta lista as ferramentas MCP de compras, vendas, e
 Ferramentas de **ponto** (histórico de jornada):
 
 - `work_clock_summary` — resumo por colaborador (horas, extras, faltas, descansos)
+- `work_clock_absences` — faltas por colaborador com quantidade e datas
 - `work_clock_entries` — marcações detalhadas de um colaborador
 - `work_clock_schedule` — escala 4x3 (dias de trabalho)
 - `work_clock_worksite` — coordenadas e raio do Beco da Praia
@@ -134,6 +135,7 @@ Exemplos mais objetivos para validar o fluxo:
 - `Use o MCP checklist-boteco-analytics e faça sales_audit_stock de 2026-06-01 a 2026-06-30.`
 - `Use inventory_daily_audit para conferir a contagem de abertura, as vendas e o saldo teórico de 2026-06-20.`
 - `Use work_clock_summary de 2026-06-01 a 2026-06-30 e diga quem teve horas extras.`
+- `Use work_clock_absences de 2026-06-01 a 2026-06-30 e diga quantas faltas cada colaborador teve e em quais dias.`
 - `Use work_clock_entries para listar as marcações de ponto de um colaborador em 2026-06-18.`
 - `Use work_clock_schedule e informe em quais dias da semana o colaborador trabalha.`
 

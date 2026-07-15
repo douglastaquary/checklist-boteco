@@ -116,6 +116,7 @@ extension MainTabView {
         repository: dependencies.repository,
         syncController: dependencies.syncController,
         inventoryClient: dependencies.inventoryClient,
+        workClockClient: dependencies.workClockClient,
         userClient: dependencies.userClient,
         dashboardClient: dependencies.dashboardClient,
         aiChatClient: dependencies.aiChatClient,

@@ -42,6 +42,23 @@ public class WorkClockResource {
     }
 
     @GET
+    @Path("/me/summary")
+    @Produces(MediaType.APPLICATION_JSON)
+    public WorkClockSummaryRow mySummary(
+        @HeaderParam("Authorization") String auth,
+        @QueryParam("from") LocalDate from,
+        @QueryParam("to") LocalDate to
+    ) {
+        var payload = guard.requireToken(auth);
+        LocalDate start = from != null ? from : LocalDate.now().with(java.time.temporal.TemporalAdjusters.firstDayOfMonth());
+        LocalDate end = to != null ? to : start.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
+        return service.summary(start, end, payload.userId).stream().findFirst()
+            .orElseThrow(() -> new jakarta.ws.rs.WebApplicationException(
+                Response.status(Response.Status.NOT_FOUND).entity(java.util.Map.of("message", "Resumo de ponto não encontrado")).build()
+            ));
+    }
+
+    @GET
     @Path("/entries")
     @Produces(MediaType.APPLICATION_JSON)
     public List<WorkClockEntry> entries(

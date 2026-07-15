@@ -16,6 +16,7 @@ struct MainTabContext {
   let repository: ChecklistRepository
   let syncController: SyncController
   let inventoryClient: InventoryClient?
+  let workClockClient: WorkClockClient?
   let userClient: UserClient?
   let dashboardClient: DashboardClient?
   let aiChatClient: AIChatClient?
@@ -70,6 +71,7 @@ extension AppTab {
         authToken: context.authToken,
         remoteUserId: context.remoteUserId ?? user.remoteId,
         repository: context.repository,
+        workClockClient: context.workClockClient,
         syncController: context.syncController,
         deviceId: context.deviceId,
         onShowDayEntries: {

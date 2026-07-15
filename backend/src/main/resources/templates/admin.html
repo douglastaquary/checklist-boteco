@@ -40,7 +40,7 @@
             <button type="submit">Filtrar</button>
           </form>
           <div id="workClockMessage" class="message"></div>
-          <div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Horas</th><th>Extras</th><th>Faltantes</th><th>Descansos</th><th>Faltas (dias)</th><th>Detalhe</th></tr></thead><tbody id="workClockBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Horas</th><th>Extras</th><th>Faltantes</th><th>Descansos</th><th>Faltas (dias)</th><th>Dias de falta</th><th>Detalhe</th></tr></thead><tbody id="workClockBody"></tbody></table></div>
         </article>
         <article>
           <div class="section-title"><div><p class="eyebrow">ESCALA 4x3</p><h2>Dias de trabalho por colaborador</h2><p>Marque os dias da semana em que o colaborador deve trabalhar (padrão seg–qui).</p></div></div>
@@ -60,7 +60,7 @@
             <button id="exportWorkClockPdf" type="button" class="secondary">Exportar PDF</button>
           </form>
         </article>
-        <dialog id="workClockEntriesDialog"><article><div class="section-title"><div><p class="eyebrow">DETALHE</p><h2 id="workClockEntriesTitle">Marcações</h2></div><button id="closeWorkClockEntries" type="button" class="secondary">Fechar</button></div><div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Horário</th><th>Distância (m)</th><th>Atraso</th></tr></thead><tbody id="workClockEntriesBody"></tbody></table></div></article></dialog>
+        <dialog id="workClockEntriesDialog"><article><div class="section-title"><div><p class="eyebrow">DETALHE</p><h2 id="workClockEntriesTitle">Marcações</h2></div><button id="closeWorkClockEntries" type="button" class="secondary">Fechar</button></div><div id="workClockAbsenceDetails" class="message"></div><div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Horário</th><th>Distância (m)</th><th>Atraso</th></tr></thead><tbody id="workClockEntriesBody"></tbody></table></div></article></dialog>
       </section>
       <section id="purchases" class="view hidden">
         <article class="purchase-import">

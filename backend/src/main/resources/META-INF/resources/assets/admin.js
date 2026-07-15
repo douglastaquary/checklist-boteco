@@ -1083,6 +1083,12 @@ const workClockTypeLabels = {
   DESCANSO_FIM: 'Fim descanso',
   SAIDA: 'Saída'
 };
+let workClockSummaryRows = [];
+const formatIsoDateBR = value => {
+  if (!value) return '';
+  const [year, month, day] = String(value).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : String(value);
+};
 
 function initWorkClockDates() {
   const today = new Date();
@@ -1124,6 +1130,7 @@ async function loadWorkClockSummary() {
   const query = new URLSearchParams({ from, to });
   if (userId) query.set('userId', userId);
   const rows = await api(`/api/work-clock/summary?${query.toString()}`);
+  workClockSummaryRows = rows;
   $('workClockBody').innerHTML = rows.map(row => `<tr>
     <td>${escapeHtml(row.name)}</td>
     <td>${Number(row.workedHours).toFixed(2)} h</td>
@@ -1131,6 +1138,7 @@ async function loadWorkClockSummary() {
     <td>${Number(row.missingHours).toFixed(2)} h</td>
     <td>${Number(row.breakHours).toFixed(2)} h</td>
     <td>${row.absenceDays}</td>
+    <td>${escapeHtml((row.absenceDates || []).map(formatIsoDateBR).join(', ') || '—')}</td>
     <td><button type="button" class="secondary" data-workclock-user="${escapeHtml(row.userId)}" data-workclock-name="${escapeHtml(row.name)}">Ver</button></td>
   </tr>`).join('');
   document.querySelectorAll('[data-workclock-user]').forEach(button => {
@@ -1143,7 +1151,10 @@ async function openWorkClockEntries(userId, name) {
   const to = $('workClockTo').value;
   const query = new URLSearchParams({ userId, from, to });
   const entries = await api(`/api/work-clock/entries?${query.toString()}`);
+  const summary = workClockSummaryRows.find(row => row.userId === userId);
+  const absenceText = (summary?.absenceDetails || []).map(item => `${escapeHtml(formatIsoDateBR(item.date))} — ${escapeHtml(item.reason)}`).join('<br>');
   $('workClockEntriesTitle').textContent = `Marcações — ${name}`;
+  $('workClockAbsenceDetails').innerHTML = absenceText ? `<strong>Faltas no período:</strong><br>${absenceText}` : 'Sem faltas no período.';
   $('workClockEntriesBody').innerHTML = entries.map(entry => `<tr>
     <td>${escapeHtml(workClockTypeLabels[entry.type] || entry.type)}</td>
     <td>${new Date(entry.registeredAt).toLocaleString('pt-BR')}</td>

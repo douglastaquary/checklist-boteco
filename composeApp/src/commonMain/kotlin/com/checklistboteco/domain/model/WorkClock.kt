@@ -52,6 +52,11 @@ data class WorkClockSummary(
     val requiresTwoHoursRest: Boolean
 )
 
+data class WorkClockAbsenceDetail(
+    val date: String,
+    val reason: String
+)
+
 object WorksiteLocation {
     private var cached: WorksiteInfo? = null
 

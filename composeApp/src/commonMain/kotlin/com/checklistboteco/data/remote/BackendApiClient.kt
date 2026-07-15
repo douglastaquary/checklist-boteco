@@ -5,6 +5,7 @@ import com.checklistboteco.domain.model.FeaturePermissions
 import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.domain.model.WorkClockType
+import com.checklistboteco.domain.model.WorkClockAbsenceDetail
 import com.checklistboteco.domain.model.WorkSector
 import com.checklistboteco.domain.model.WorksiteInfo
 import io.ktor.client.HttpClient
@@ -127,6 +128,17 @@ class BackendApiClient private constructor(
             latitude = dto.latitude,
             longitude = dto.longitude,
             radiusMeters = dto.radiusMeters
+        )
+    }
+
+    suspend fun fetchMyWorkClockSummary(token: String, from: String, to: String): RemoteWorkClockSummary {
+        val dto = httpClient.get("$baseUrl/api/work-clock/me/summary?from=$from&to=$to") {
+            bearerAuth(token)
+        }.body<WorkClockSummaryDto>()
+        return RemoteWorkClockSummary(
+            absenceDays = dto.absenceDays,
+            absenceDates = dto.absenceDates,
+            absenceDetails = dto.absenceDetails.map { WorkClockAbsenceDetail(it.date, it.reason) }
         )
     }
 
@@ -260,6 +272,12 @@ class BackendApiClient private constructor(
         }
     }
 }
+
+data class RemoteWorkClockSummary(
+    val absenceDays: Int,
+    val absenceDates: List<String>,
+    val absenceDetails: List<WorkClockAbsenceDetail>
+)
 
 data class RemoteLoginResult(
     val token: String? = null,
@@ -398,6 +416,19 @@ private data class WorksiteInfoDto(
     val longitude: Double,
     val radiusMeters: Double,
     val name: String
+)
+
+@Serializable
+private data class WorkClockSummaryDto(
+    val absenceDays: Int = 0,
+    val absenceDates: List<String> = emptyList(),
+    val absenceDetails: List<WorkClockAbsenceDetailDto> = emptyList()
+)
+
+@Serializable
+private data class WorkClockAbsenceDetailDto(
+    val date: String,
+    val reason: String
 )
 
 @Serializable

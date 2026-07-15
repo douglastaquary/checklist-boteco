@@ -75,6 +75,7 @@ Android e iOS apresentam ao colaborador o mesmo resumo:
 - horas extras da semana;
 - descanso ainda devido;
 - horas devidas no dia.
+- quantidade de faltas no mês atual e os dias correspondentes, quando o backend estiver acessível.
 
 Antes de usar em produção ampla, validar em dispositivo físico dentro do Beco da Praia, porque o raio atual é rígido (`5 m`) e depende de precisão GPS ≤ `20 m`.
 
@@ -83,6 +84,7 @@ Antes de usar em produção ampla, validar em dispositivo físico dentro do Beco
 | Método | Path | Descrição |
 |--------|------|-----------|
 | GET | `/api/work-clock/summary?from&to&userId` | Resumo por colaborador |
+| GET | `/api/work-clock/me/summary?from&to` | Resumo do próprio colaborador autenticado |
 | GET | `/api/work-clock/entries?userId&from&to` | Marcações detalhadas |
 | GET/PUT | `/api/work-clock/schedule/{userId}` | Escala 4x3 (dias da semana) |
 | GET | `/api/work-clock/export.csv?month&year` | CSV mensal |
@@ -91,7 +93,14 @@ Antes de usar em produção ampla, validar em dispositivo físico dentro do Beco
 
 ## Admin web
 
-Aba **Ponto** (somente admin): filtros de período, tabela resumo, configuração de escala por usuário, export CSV/PDF e modal de marcações.
+Aba **Ponto** (somente admin): filtros de período, tabela resumo com quantidade e datas de faltas, configuração de escala por usuário, export CSV/PDF e modal de marcações.
+
+Os relatórios mensais CSV/PDF incluem `Faltas (dias)` e `Dias de falta`. As datas são calculadas pela escala do colaborador:
+
+- dia escalado sem `ENTRADA` conta como falta;
+- dia escalado com `ENTRADA` sem `SAIDA` conta como falta somente depois que o dia já passou;
+- `offDateExceptions` não contam falta;
+- `workDateExceptions` contam como dia escalado.
 
 ## MCP (somente leitura)
 
@@ -100,6 +109,7 @@ O histórico de ponto é exposto no mesmo servidor MCP `checklist-boteco-analyti
 | Tool | Descrição |
 |------|-----------|
 | `work_clock_summary` | Resumo por colaborador (`from`, `to`, `userId` opcional) |
+| `work_clock_absences` | Lista colaboradores com faltas, quantidade e datas (`from`, `to`, `userId` opcional) |
 | `work_clock_entries` | Marcações detalhadas (`userId`, `from`, `to`) |
 | `work_clock_schedule` | Escala 4x3 do colaborador (`userId`) |
 | `work_clock_worksite` | Coordenadas e raio do Beco da Praia |

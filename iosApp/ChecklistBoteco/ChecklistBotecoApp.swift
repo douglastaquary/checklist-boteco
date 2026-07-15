@@ -76,6 +76,7 @@ final class AppDependenciesHolder {
   let syncController: SyncController
   let apiClient: APIClient?
   let userClient: UserClient?
+  let workClockClient: WorkClockClient?
   let dashboardClient: DashboardClient?
   let inventoryClient: InventoryClient?
   let aiChatClient: AIChatClient?
@@ -87,6 +88,7 @@ final class AppDependenciesHolder {
     syncController = deps.syncController
     apiClient = deps.apiClient
     userClient = deps.userClient
+    workClockClient = deps.workClockClient
     dashboardClient = deps.dashboardClient
     inventoryClient = deps.inventoryClient
     aiChatClient = deps.aiChatClient
