@@ -28,24 +28,19 @@ O objetivo não é criar um ERP pesado. É criar uma camada prática para o dono
 
 ## Produto em telas
 
-Prints atuais dos apps mobile com o design system novo aplicado em iOS e Android.
+Prints atuais dos apps mobile com o layout vigente aplicado em iOS e Android.
 
 <table>
   <tr>
-    <td align="center" width="33%">
+    <td align="center" width="50%">
       <img src="docs/assets/readme/ios-ai-chat.png" alt="Chat IA no app iOS" width="260"><br>
       <strong>iOS · Chat IA</strong><br>
       Perguntas em linguagem natural sobre vendas, compras, estoque, perdas e ponto.
     </td>
-    <td align="center" width="33%">
+    <td align="center" width="50%">
       <img src="docs/assets/readme/android-checklist.png" alt="Checklist operacional no app Android" width="260"><br>
       <strong>Android · Checklist</strong><br>
       Rotina operacional por perfil, filtros rápidos e navegação inferior atualizada.
-    </td>
-    <td align="center" width="33%">
-      <img src="docs/assets/readme/android-inventory.png" alt="Contagem de mercadorias no app Android" width="260"><br>
-      <strong>Android · Contagem</strong><br>
-      Lançamento de contagens antes da abertura para cruzar abastecimento e vendas.
     </td>
   </tr>
 </table>
@@ -309,7 +304,6 @@ Detalhes de parâmetros, segredos e produção: [docs/backend-deploy.md](docs/ba
 - [docs/sales-audit-module.md](docs/sales-audit-module.md) — vendas, CSV e auditoria.
 - [docs/work-clock-module.md](docs/work-clock-module.md) — ponto, geofence, horas e faltas.
 - [docs/mobile-api-sync.md](docs/mobile-api-sync.md) — sync mobile offline-first.
-- [docs/mobile-design-system-migration-plan.md](docs/mobile-design-system-migration-plan.md) — UI unificada Android/iOS.
 - [docs/release-v1-checklist.md](docs/release-v1-checklist.md) — checklist da primeira versão.
 
 ## Direcionamento para desenvolvimento com IA
