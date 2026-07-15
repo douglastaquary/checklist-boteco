@@ -35,12 +35,12 @@ class WorkClockResourceTest {
         String created = given().header("Authorization", "Bearer " + admin).contentType("application/json").body(Map.of(
             "name", "MCP Ponto " + suffix,
             "email", email,
-            "password", "senha123",
+            "password", "Senha1!",
             "workSector", "BARMAN",
             "permissionLevel", "USER"
         )).post("/api/users").then().statusCode(201).extract().asString();
         String userId = JsonPath.from(created).getString("id");
-        String token = login(email, "senha123");
+        String token = login(email, "Senha1!");
         long entrada = LocalDate.of(2026, 6, 18).atTime(8, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
         long saida = LocalDate.of(2026, 6, 18).atTime(17, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
 
@@ -89,12 +89,12 @@ class WorkClockResourceTest {
         String created = given().header("Authorization", "Bearer " + admin).contentType("application/json").body(Map.of(
             "name", "Ponto " + suffix,
             "email", email,
-            "password", "senha123",
+            "password", "Senha1!",
             "workSector", "BARMAN",
             "permissionLevel", "USER"
         )).post("/api/users").then().statusCode(201).extract().asString();
         String userId = JsonPath.from(created).getString("id");
-        String token = login(email, "senha123");
+        String token = login(email, "Senha1!");
         long entrada = LocalDate.of(2026, 6, 16).atTime(8, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
         long saida = LocalDate.of(2026, 6, 16).atTime(17, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
 
@@ -177,12 +177,12 @@ class WorkClockResourceTest {
         String created = given().header("Authorization", "Bearer " + admin).contentType("application/json").body(Map.of(
             "name", "Ponto Outro " + suffix,
             "email", email,
-            "password", "senha123",
+            "password", "Senha1!",
             "workSector", "BARMAN",
             "permissionLevel", "USER"
         )).post("/api/users").then().statusCode(201).extract().asString();
         String userId = JsonPath.from(created).getString("id");
-        String token = login(email, "senha123");
+        String token = login(email, "Senha1!");
         long entrada = LocalDate.of(2026, 6, 19).atTime(8, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
 
         given().header("Authorization", "Bearer " + token).contentType("application/json").body(Map.of(
@@ -201,12 +201,12 @@ class WorkClockResourceTest {
         String created = given().header("Authorization", "Bearer " + admin).contentType("application/json").body(Map.of(
             "name", "Ponto Raio " + suffix,
             "email", email,
-            "password", "senha123",
+            "password", "Senha1!",
             "workSector", "BARMAN",
             "permissionLevel", "USER"
         )).post("/api/users").then().statusCode(201).extract().asString();
         String userId = JsonPath.from(created).getString("id");
-        String token = login(email, "senha123");
+        String token = login(email, "Senha1!");
         long entrada = LocalDate.of(2026, 6, 20).atTime(8, 0).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli();
 
         given().header("Authorization", "Bearer " + token).contentType("application/json").body(Map.of(

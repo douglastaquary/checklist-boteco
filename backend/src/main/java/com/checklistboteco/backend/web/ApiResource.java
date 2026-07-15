@@ -49,6 +49,10 @@ public class ApiResource {
     @GET @Path("/me") public PublicUser me(@HeaderParam("Authorization") String auth){
         TokenService.Payload payload=requireToken(auth); User user=store.getUser(payload.userId); if(user==null) fail(Response.Status.UNAUTHORIZED,"Usuário não encontrado"); return PublicUser.from(user);
     }
+    @POST @Path("/me/change-password") public PublicUser changeOwnPassword(@HeaderParam("Authorization") String auth,ChangePasswordRequest request){
+        TokenService.Payload payload=requireToken(auth); if(request==null) fail(Response.Status.BAD_REQUEST,"Dados de senha obrigatórios");
+        return store.changeOwnPassword(payload.userId,request.currentPassword,request.newPassword);
+    }
     @GET @Path("/users") public List<PublicUser> users(@HeaderParam("Authorization") String auth){ guard.requireUserManagementReadAccess(auth); return store.users(); }
     @POST @Path("/users") public Response createUser(@HeaderParam("Authorization") String auth,CreateUserRequest request){
         guard.requireUserManagementAccess(auth,true); return Response.status(Response.Status.CREATED).entity(store.createUser(request)).build();

@@ -6,6 +6,7 @@ import com.checklistboteco.data.repository.ChecklistRepository
 import com.checklistboteco.data.sync.SyncCoordinator
 import com.checklistboteco.data.sync.SyncSession
 import com.checklistboteco.domain.model.User
+import com.checklistboteco.domain.security.PasswordPolicy
 import com.checklistboteco.platform.AppErrorMapper
 import com.checklistboteco.platform.AppNetworkFeedback
 import com.checklistboteco.platform.DeviceIdentity
@@ -34,7 +35,8 @@ data class LoginUiState(
     val currentUser: User? = null,
     val authToken: String? = null,
     val remoteUserId: String? = null,
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val requiresPasswordChange: Boolean = false
 )
 
 class LoginViewModel(
@@ -145,7 +147,8 @@ class LoginViewModel(
                 requiresTwoFactor = false,
                 challengeId = null,
                 twoFactorHint = null,
-                developmentCode = null
+                developmentCode = null,
+                requiresPasswordChange = false
             )
         }
         scope.launch { restoreSavedCredentials(autoUnlock = true) }
@@ -153,6 +156,60 @@ class LoginViewModel(
 
     fun showSessionExpiredMessage(message: String) {
         _uiState.update { it.copy(error = message) }
+    }
+
+    fun changeRequiredPassword(newPassword: String, confirmation: String) {
+        val state = _uiState.value
+        val api = backendApiClient ?: return
+        val token = state.authToken
+        val currentUser = state.currentUser
+        val currentPassword = state.password
+        if (token.isNullOrBlank() || currentUser == null || currentPassword.isBlank()) {
+            _uiState.update { it.copy(error = "Faça login novamente para trocar a senha.") }
+            return
+        }
+        if (newPassword != confirmation) {
+            _uiState.update { it.copy(error = "A confirmação deve ser igual à nova senha.") }
+            return
+        }
+        PasswordPolicy.firstInvalidMessage(newPassword)?.let { message ->
+            _uiState.update { it.copy(error = message) }
+            return
+        }
+
+        _uiState.update { it.copy(error = null) }
+        scope.launch {
+            runCatching {
+                api.changeMyPassword(token, currentPassword, newPassword)
+            }.fold(
+                onSuccess = { remoteUser ->
+                    val updated = repository.updateUserPasswordState(
+                        localUserId = currentUser.id,
+                        password = newPassword,
+                        mustChangePassword = false
+                    ) ?: currentUser.copy(password = newPassword, mustChangePassword = false)
+                    remoteUser.remoteId?.takeIf { it.isNotBlank() }?.let { repository.updateUserRemoteId(updated.id, it) }
+                    repository.syncLocalUserFromRemote(updated.id, remoteUser.copy(mustChangePassword = false))
+                    _uiState.update {
+                        it.copy(
+                            password = newPassword,
+                            currentUser = updated.copy(
+                                remoteId = remoteUser.remoteId ?: updated.remoteId,
+                                featurePermissions = remoteUser.featurePermissions,
+                                mustChangePassword = false
+                            ),
+                            requiresPasswordChange = false,
+                            isLoggedIn = true,
+                            error = null
+                        )
+                    }
+                    persistCredentials()
+                },
+                onFailure = { error ->
+                    AppNetworkFeedback.showError(AppErrorMapper.toUserMessage(error))
+                }
+            )
+        }
     }
 
     private suspend fun restorePersistedSessionIfPossible() {
@@ -172,6 +229,10 @@ class LoginViewModel(
                     ?: return@onSuccess
                 val synced = repository.syncLocalUserFromRemote(localUser.id, remoteUser.copy(remoteId = remoteUserId))
                     ?: localUser
+                if (synced.mustChangePassword) {
+                    repository.clearSyncSession()
+                    return@onSuccess
+                }
                 refreshWorksite(session.authToken)
                 syncCoordinator?.requestSync()
                 _uiState.update {
@@ -180,6 +241,7 @@ class LoginViewModel(
                         authToken = session.authToken,
                         remoteUserId = remoteUserId,
                         isLoggedIn = true,
+                        requiresPasswordChange = false,
                         error = null
                     )
                 }
@@ -332,7 +394,8 @@ class LoginViewModel(
                         allowedAreas = profile.allowedAreas,
                         createdAt = profile.createdAt,
                         remoteId = remoteUserId,
-                        featurePermissions = profile.featurePermissions
+                        featurePermissions = profile.featurePermissions,
+                        mustChangePassword = profile.mustChangePassword
                     )
                     repository.getUserByRemoteId(remoteUserId)
                         ?: repository.getUserByEmail(profile.email)
@@ -349,7 +412,8 @@ class LoginViewModel(
                 remoteUser = profile
             ) ?: localUser.copy(
                 remoteId = remoteUserId,
-                featurePermissions = profile.featurePermissions
+                featurePermissions = profile.featurePermissions,
+                mustChangePassword = profile.mustChangePassword
             )
 
             repository.saveSyncSession(
@@ -362,7 +426,9 @@ class LoginViewModel(
 
             refreshWorksite(token)
             syncCoordinator?.requestSync()
-            persistCredentials()
+            if (!syncedUser.mustChangePassword) {
+                persistCredentials()
+            }
 
             _uiState.update {
                 it.copy(
@@ -370,7 +436,8 @@ class LoginViewModel(
                     authToken = token,
                     remoteUserId = remoteUserId,
                     requiresTwoFactor = false,
-                    isLoggedIn = true,
+                    requiresPasswordChange = syncedUser.mustChangePassword,
+                    isLoggedIn = !syncedUser.mustChangePassword,
                     error = null
                 )
             }

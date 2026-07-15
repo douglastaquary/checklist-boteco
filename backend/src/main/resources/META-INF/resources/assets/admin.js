@@ -389,7 +389,7 @@ function resetUserForm() {
   $('userForm').reset();
   $('userId').value = '';
   $('userPassword').required = false;
-  $('userPassword').placeholder = 'Obrigatória ao criar';
+  $('userPassword').placeholder = 'Mín. 6, maiúscula, número e especial';
   $('userForm').classList.add('hidden');
   userMessage('');
 }
@@ -401,6 +401,7 @@ function openUserForm({ user = null } = {}) {
   $('userEmail').value = user?.email || '';
   $('userPassword').value = '';
   $('userPassword').required = !user;
+  $('userPassword').placeholder = user ? 'Não altera senha ao editar' : 'Mín. 6, maiúscula, número e especial';
   $('userWorkSector').value = user?.workSector || 'GERENTE';
   $('userPermissionLevel').value = user?.permissionLevel || 'USER';
   userMessage('');
@@ -431,7 +432,7 @@ async function saveUser(event) {
         method: 'POST',
         body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false, canCreateInventoryCounts: false, canViewInventoryInsights: false, canManageAdministrativeStock: false } })
       });
-      userMessage('Usuário criado com sucesso.', true);
+      userMessage('Usuário criado com sucesso. No primeiro acesso mobile, a senha deverá ser trocada.', true);
     }
     await load();
     resetUserForm();
@@ -443,11 +444,11 @@ async function saveUser(event) {
 async function resetPassword(userId) {
   const user = currentUsers.find(value => value.id === userId);
   if (!user) return;
-  const newPassword = prompt(`Nova senha para ${user.name}:`);
+  const newPassword = prompt(`Nova senha para ${user.name} (mín. 6, maiúscula, número e especial):`);
   if (!newPassword) return;
   try {
     await api(`/api/users/${userId}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) });
-    userMessage(`Senha de ${user.name} redefinida com sucesso.`, true);
+    userMessage(`Senha de ${user.name} redefinida com sucesso. No próximo acesso mobile, a senha deverá ser trocada.`, true);
   } catch (error) {
     userMessage(error.message);
   }

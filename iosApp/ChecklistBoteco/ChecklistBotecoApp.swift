@@ -99,6 +99,7 @@ final class AppDependenciesHolder {
 private enum AuthScreen: Equatable {
   case login
   case register
+  case changePassword
   case main
 }
 
@@ -118,6 +119,11 @@ struct RootView: View {
     ZStack {
       Group {
         switch authScreen {
+        case .changePassword:
+          ChangePasswordView {
+            sessionExpiredMessage = nil
+            authScreen = .main
+          }
         case .main where session.currentUser != nil:
           MainTabView(dependencies: holder, user: session.currentUser!) { logout() }
         case .register:
@@ -137,7 +143,7 @@ struct RootView: View {
           LoginView(
             onLoginSuccess: {
               sessionExpiredMessage = nil
-              authScreen = .main
+              authScreen = session.currentUser?.mustChangePassword == true ? .changePassword : .main
             },
             onRegisterTap: { authScreen = .register },
             sessionExpiredMessage: sessionExpiredMessage
@@ -149,7 +155,7 @@ struct RootView: View {
     .task {
       await session.restorePersistedSessionIfPossible()
       if session.isLoggedIn {
-        authScreen = .main
+        authScreen = session.currentUser?.mustChangePassword == true ? .changePassword : .main
       }
     }
     .onReceive(sessionExpiredCenter.$latestEvent) { event in

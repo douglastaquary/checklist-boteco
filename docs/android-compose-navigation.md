@@ -77,6 +77,7 @@ SecondaryTabRow(selectedTabIndex = selectedIndex) {
 ## Checklist de validação manual
 
 - [ ] Admin vê 5–6 itens na barra inferior; colaborador vê apenas abas permitidas.
+- [ ] Usuário com `mustChangePassword=true` após login remoto é direcionado para `ChangePasswordScreen` antes da `MainScreen`.
 - [ ] Trocar de aba preserva estado ao retornar (scroll, seleções locais).
 - [ ] Checklist com múltiplas áreas usa `SecondaryTabRow`.
 - [ ] Dashboard, Atividades, Permissões e Ponto **não** têm seta voltar na raiz.

@@ -44,24 +44,33 @@ class ApiResourceTest {
             .body(Map.of(
                 "name","Colaborador Teste",
                 "email",email,
-                "password","senha123",
+                "password","Senha1!",
                 "workSector","GARCON",
                 "permissionLevel","USER",
                 "permissions",Map.of("canRegisterUsers",false,"canCreateActivities",false,"canEditUsers",false)
             ))
             .when().post("/api/users")
-            .then().statusCode(201).body("email",is(email)).extract().asString();
+            .then().statusCode(201).body("email",is(email)).body("mustChangePassword",is(true)).extract().asString();
 
         String userId=JsonPath.from(created).getString("id");
 
-        String initialUserToken=login(email,"senha123");
+        String initialUserToken=login(email,"Senha1!");
         given().header("Authorization","Bearer "+initialUserToken).when().get("/api/me").then().statusCode(200)
             .body("permissions.canRegisterUsers",is(false))
             .body("permissions.canCreateActivities",is(false))
             .body("permissions.canEditUsers",is(false))
             .body("permissions.canCreateInventoryCounts",is(false))
             .body("permissions.canViewInventoryInsights",is(false))
-            .body("permissions.canManageAdministrativeStock",is(false));
+            .body("permissions.canManageAdministrativeStock",is(false))
+            .body("mustChangePassword",is(true));
+
+        given()
+            .header("Authorization","Bearer "+initialUserToken)
+            .contentType("application/json")
+            .body(Map.of("currentPassword","Senha1!","newPassword","Senha2!"))
+            .when().post("/api/me/change-password")
+            .then().statusCode(200)
+            .body("mustChangePassword",is(false));
 
         given()
             .header("Authorization","Bearer "+adminToken)
@@ -80,12 +89,13 @@ class ApiResourceTest {
         given()
             .header("Authorization","Bearer "+adminToken)
             .contentType("application/json")
-            .body(Map.of("newPassword","novaSenha123"))
+            .body(Map.of("newPassword","Nova1!"))
             .when().post("/api/users/"+userId+"/reset-password")
             .then().statusCode(200)
-            .body("id",is(userId));
+            .body("id",is(userId))
+            .body("mustChangePassword",is(true));
 
-        String userToken=login("editado+"+suffix+"@checklistboteco.com","novaSenha123");
+        String userToken=login("editado+"+suffix+"@checklistboteco.com","Nova1!");
         given().header("Authorization","Bearer "+userToken).when().get("/api/me").then().statusCode(200).body("name",is("Colaborador Editado"));
 
         given()
@@ -102,7 +112,7 @@ class ApiResourceTest {
             .then().statusCode(200)
             .body("permissions.canCreateInventoryCounts",is(true));
 
-        String userTokenAfterGrant=login("editado+"+suffix+"@checklistboteco.com","novaSenha123");
+        String userTokenAfterGrant=login("editado+"+suffix+"@checklistboteco.com","Nova1!");
         given().header("Authorization","Bearer "+userTokenAfterGrant).when().get("/api/me").then().statusCode(200)
             .body("permissions.canCreateInventoryCounts",is(true));
 
@@ -128,7 +138,7 @@ class ApiResourceTest {
             .body(Map.of(
                 "name","Gestor Equipe "+suffix,
                 "email","gestor+"+suffix+"@checklistboteco.com",
-                "password","senha123",
+                "password","Senha1!",
                 "workSector","GERENTE",
                 "permissionLevel","USER",
                 "permissions",Map.of("canRegisterUsers",true,"canCreateActivities",false,"canEditUsers",false)
@@ -149,7 +159,7 @@ class ApiResourceTest {
             .then().statusCode(200)
             .body("permissions.canRegisterUsers",is(true));
 
-        String managerToken=login("gestor+"+suffix+"@checklistboteco.com","senha123");
+        String managerToken=login("gestor+"+suffix+"@checklistboteco.com","Senha1!");
 
         given()
             .header("Authorization","Bearer "+managerToken)
@@ -162,7 +172,7 @@ class ApiResourceTest {
             .body(Map.of(
                 "name","Novo Usuario "+suffix,
                 "email","novo+"+suffix+"@checklistboteco.com",
-                "password","senha123",
+                "password","Senha1!",
                 "workSector","CUMIM",
                 "permissionLevel","USER",
                 "permissions",Map.of("canRegisterUsers",false,"canCreateActivities",false,"canEditUsers",false)

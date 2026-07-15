@@ -72,6 +72,8 @@ Regras de acesso:
 Comportamentos importantes:
 
 - reset de senha invalida dispositivos confiáveis e desafios de verificação pendentes daquele usuário;
+- novos usuários e usuários com senha resetada recebem `mustChangePassword=true`; nos apps mobile eles devem trocar a senha no primeiro acesso via `POST /api/me/change-password`;
+- a política de nova senha exige ao menos 6 caracteres, uma letra maiúscula, um número e um caractere especial;
 - não é permitido remover o último administrador do sistema;
 - ao promover um usuário para `ADMIN`, ele recebe todas as permissões automaticamente;
 - ao rebaixar um `ADMIN` para `USER`, as permissões delegadas são zeradas por segurança e podem ser reatribuídas manualmente por um administrador.
@@ -175,6 +177,7 @@ Opcionalmente, `CORS_ORIGINS` restringe as origens da interface web. O valor pad
 - `POST /api/auth/login`
 - `POST /api/auth/verify-device`
 - `GET /api/me`
+- `POST /api/me/change-password`
 - `GET|POST /api/users`
 - `PUT /api/users/{id}`
 - `DELETE /api/users/{id}`

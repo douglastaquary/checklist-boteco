@@ -22,10 +22,10 @@ class InventoryResourceTest {
     @Test void delegatedUserSubmitsImmutableCountWithServerOwnedAuditFields(){
         String admin=login("admin@checklistboteco.com","admin123"); String suffix=UUID.randomUUID().toString().substring(0,8); String email="contador+"+suffix+"@teste.com";
         String created=given().header("Authorization","Bearer "+admin).contentType("application/json").body(Map.of(
-            "name","Contador "+suffix,"email",email,"password","senha123","workSector","BARMAN","permissionLevel","USER",
+            "name","Contador "+suffix,"email",email,"password","Senha1!","workSector","BARMAN","permissionLevel","USER",
             "permissions",Map.of("canCreateInventoryCounts",true,"canViewInventoryInsights",true)
         )).post("/api/users").then().statusCode(201).extract().asString();
-        String userId=JsonPath.from(created).getString("id"); String token=login(email,"senha123");
+        String userId=JsonPath.from(created).getString("id"); String token=login(email,"Senha1!");
         String product="Heineken Teste "+suffix;
         String session=given().header("Authorization","Bearer "+token).contentType("application/json").body(("""
             {"countDate":"2026-06-20","countedAt":"2026-06-20T20:15:00Z","location":"beco","items":[
@@ -47,11 +47,11 @@ class InventoryResourceTest {
         String suffix=UUID.randomUUID().toString().substring(0,8);
         String email="estoque+"+suffix+"@teste.com";
         String created=given().header("Authorization","Bearer "+admin).contentType("application/json").body(Map.of(
-            "name","Estoque "+suffix,"email",email,"password","senha123","workSector","GERENTE","permissionLevel","USER",
+            "name","Estoque "+suffix,"email",email,"password","Senha1!","workSector","GERENTE","permissionLevel","USER",
             "permissions",Map.of("canManageAdministrativeStock",true,"canViewInventoryInsights",true)
         )).post("/api/users").then().statusCode(201).extract().asString();
         String userId=JsonPath.from(created).getString("id");
-        String token=login(email,"senha123");
+        String token=login(email,"Senha1!");
         String product="Produto Admin "+suffix;
         long dateOffset=Long.parseUnsignedLong(suffix,16)%1_000_000L;
         String auditDate=LocalDate.of(2100,1,1).plusDays(dateOffset).toString();

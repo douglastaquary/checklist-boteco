@@ -32,7 +32,7 @@ object UserRegistrationValidator {
         if (lastName.isBlank()) return Result.failure(IllegalArgumentException("Digite o sobrenome"))
         if (!emailRegex.matches(email)) return Result.failure(IllegalArgumentException("Digite um email válido com @ e .com"))
         if (!isStrongPassword(input.password)) {
-            return Result.failure(IllegalArgumentException("A senha deve ter 8 caracteres, maiúscula, minúscula, número e caractere especial"))
+            return Result.failure(IllegalArgumentException("A senha deve ter ao menos 6 caracteres, maiúscula, número e caractere especial"))
         }
         if (input.password != input.confirmPassword) {
             return Result.failure(IllegalArgumentException("A confirmação de senha não confere"))
@@ -61,9 +61,8 @@ object UserRegistrationValidator {
     }
 
     fun isStrongPassword(value: String): Boolean {
-        return value.length >= 8 &&
+        return value.length >= 6 &&
             value.any { it.isUpperCase() } &&
-            value.any { it.isLowerCase() } &&
             value.any { it.isDigit() } &&
             specialCharacterRegex.containsMatchIn(value)
     }

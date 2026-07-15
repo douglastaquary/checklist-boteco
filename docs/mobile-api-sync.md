@@ -20,15 +20,17 @@ Sem URL configurada, o app mantém o **seed offline** (admin/colaborador + ativi
 
 1. Login remoto (`POST /api/auth/login` + 2FA se necessário).
 2. `GET /api/me` confirma perfil e permissões.
-3. Token e `remoteUserId` persistem em `SyncMetadata`.
-4. **Cold start:** restaura sessão via metadata + `GET /api/me` (sem limpar token no boot).
-5. **Pull inicial paginado** após login (`GET /api/sync/pull` até `hasMore = false`).
-6. Push de outbox local (`POST /api/sync/push`).
+3. Se `user.mustChangePassword == true`, mobile abre a tela obrigatória de troca e chama `POST /api/me/change-password` antes da tela principal.
+4. Token e `remoteUserId` persistem em `SyncMetadata` somente para sessão válida.
+5. **Cold start:** restaura sessão via metadata + `GET /api/me`; se ainda houver troca obrigatória, limpa a sessão e pede novo login, pois a senha atual não é persistida em memória.
+6. **Pull inicial paginado** após login (`GET /api/sync/pull` até `hasMore = false`).
+7. Push de outbox local (`POST /api/sync/push`).
 
 ## Endpoints integrados
 
 | Recurso | Endpoints |
 |---------|-----------|
+| Auth mobile | `/api/auth/login`, `/api/auth/verify-device`, `/api/me`, `/api/me/change-password` |
 | Checklist | `/api/sync/pull`, `/api/sync/push` |
 | Usuários | `GET/POST /api/users`, `PATCH .../permissions` |
 | Ponto | `GET /api/work-clock/worksite` (cache local + geofence) |
