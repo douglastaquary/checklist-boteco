@@ -12,9 +12,9 @@ public final class SalesModels {
         public String id;
         public String datasetId="sales";
         public LocalDate saleDate;
-        public String description,category,location,documentNumber,unit;
+        public String description,category,location,documentNumber,unit,seller;
         public BigDecimal quantity=BigDecimal.ZERO;
-        public long unitPriceInCents,totalInCents;
+        public long unitPriceInCents,totalInCents,serviceChargeInCents;
         public Map<String,Object> attributes=new LinkedHashMap<>();
         public String importId,rowHash,saleFingerprint;
         public Instant importedAt;
@@ -71,6 +71,7 @@ public final class SalesModels {
         public LocalDate from,to;
         public List<String> categories=new ArrayList<>();
         public List<String> locations=new ArrayList<>();
+        public List<String> sellers=new ArrayList<>();
         public Long minTotalInCents,maxTotalInCents;
         public String text;
         public Map<String,AttributeCondition> attributes=new LinkedHashMap<>();
@@ -81,6 +82,7 @@ public final class SalesModels {
         public List<Sale> items=new ArrayList<>();
         public int page,pageSize,totalPages;
         public long totalItems,totalInCents;
+        public long serviceChargeInCents;
         public BigDecimal totalQuantity=BigDecimal.ZERO;
         public List<String> filtersApplied=new ArrayList<>();
         public String currency="BRL";
@@ -88,13 +90,13 @@ public final class SalesModels {
     public static class AggregateRequest extends SaleQuery { public String groupBy="category"; }
     public static class AggregateBucket {
         public String key;
-        public long count,totalInCents;
+        public long count,totalInCents,serviceChargeInCents;
         public BigDecimal quantity=BigDecimal.ZERO;
     }
     public static class AggregateResponse {
         public String groupBy,currency="BRL";
         public List<AggregateBucket> groups=new ArrayList<>();
-        public long totalInCents,totalItems;
+        public long totalInCents,serviceChargeInCents,totalItems;
         public BigDecimal totalQuantity=BigDecimal.ZERO;
     }
 
@@ -114,6 +116,25 @@ public final class SalesModels {
         public List<String> filtersApplied=new ArrayList<>();
         public List<ProductMatch> items=new ArrayList<>();
         public long totalItems,totalInCents;
+        public BigDecimal totalQuantity=BigDecimal.ZERO;
+    }
+
+    public static class SellerSearchRequest extends SaleQuery {
+        public String seller;
+        public int limit=50;
+    }
+    public static class SellerSalesMatch {
+        public String seller,location;
+        public long salesCount,totalInCents,serviceChargeInCents;
+        public BigDecimal quantity=BigDecimal.ZERO;
+    }
+    public static class SellerSalesResponse {
+        public String datasetId="sales",seller,currency="BRL";
+        public LocalDate from,to;
+        public List<String> locations=new ArrayList<>();
+        public List<String> filtersApplied=new ArrayList<>();
+        public List<SellerSalesMatch> items=new ArrayList<>();
+        public long totalItems,totalInCents,serviceChargeInCents;
         public BigDecimal totalQuantity=BigDecimal.ZERO;
     }
 

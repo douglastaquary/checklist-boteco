@@ -36,7 +36,7 @@ Antes de implementar, leia a skill ou doc indicada para o domínio da tarefa.
 
 Use o MCP **antes de responder por memória** quando a conversa mencionar:
 
-`beco`, `Beco da Praia`, `vendas`, `compras`, `abastecimento`, `extravio`, `perdas`, `quantas vendeu`, `quanto vendeu`, `qual a quantidade vendida`, `ponto`, `jornada`, `horas extras`, `faltas`, `escala`, contagem ou auditoria de estoque.
+`beco`, `Beco da Praia`, `vendas`, `compras`, `abastecimento`, `extravio`, `perdas`, `quantas vendeu`, `quanto vendeu`, `qual a quantidade vendida`, `vendedor`, `garçom`, `usuário`, `10%`, `gorjeta`, `ponto`, `jornada`, `horas extras`, `faltas`, `escala`, contagem ou auditoria de estoque.
 
 ### Contexto fixo
 
@@ -49,6 +49,7 @@ Use o MCP **antes de responder por memória** quando a conversa mencionar:
 | Pergunta | Tool MCP |
 |----------|----------|
 | Vendas por produto / “quantas X vendeu?” | `sales_by_product` ou `sales_quantity_by_product_in_period` |
+| Vendas por usuário/vendedor/garçom e 10% | `sales_by_seller` ou `sales_aggregate` com `groupBy=seller` |
 | Listagem de vendas | `sales_list` |
 | Totalizações (produto, categoria, local) | `sales_aggregate` |
 | Auditoria vendido × abastecido / extravio | `sales_audit_stock` |
@@ -64,6 +65,8 @@ Use o MCP **antes de responder por memória** quando a conversa mencionar:
 
 - `quantas cervejas vendeu em 10/06/2026?` → `sales_by_product`
 - `qual a quantidade de produto X no beco no período Y?` → `sales_by_product` com período
+- `quanto o João Rodrigues vendeu ontem no forró?` → `sales_by_seller` com período resolvido e local Beco da Praia
+- `quanto deu de 10% por garçom?` → `sales_aggregate` com `groupBy=seller`
 - `houve extravio de água com gás?` → `sales_audit_stock` com filtro textual
 
 ### Configuração local do MCP

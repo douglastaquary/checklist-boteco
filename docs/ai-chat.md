@@ -110,11 +110,15 @@ Para reduzir consumo, o servidor:
 - “Quanto vendemos em abril no Beco?”
 - “Quantas Heinekens foram vendidas em fevereiro de 2026?”
 - “Quantas Heinekens vendemos em março de 2026?”
+- “Quanto o João Rodrigues vendeu ontem no forró e quanto deu de 10%?”
+- “Quanto deu de 10% por garçom no fim de semana?”
 - “Quais foram os maiores gastos com mercadorias este mês?”
 - “Houve perda ou extravio no estoque hoje?”
 - “Quem fez horas extras nesta semana?”
 
 Se não houver dados ou período suficiente, o chat informa o que falta em vez de estimar números.
+
+Para perguntas por usuário/vendedor, o relatório de vendas precisa ter uma coluna mapeada como `seller` (`usuario`, `vendedor`, `garçom`, `atendente`, etc.). Se não existir coluna de taxa de serviço, o backend calcula automaticamente 10% do total vendido. O termo `forró` é tratado como contexto/filtro textual quando houver essa informação no CSV; caso contrário, o chat responde pelo período/local disponíveis e informa a ausência do marcador de evento.
 
 ## Teste local com dados de vendas
 

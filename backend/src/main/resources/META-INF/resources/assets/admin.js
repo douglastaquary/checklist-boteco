@@ -36,7 +36,9 @@ const salesMappingFields = [
   ['location', 'Local'],
   ['quantity', 'Quantidade'],
   ['category', 'Categoria'],
+  ['seller', 'Usuário/Vendedor'],
   ['totalInCents', 'Valor'],
+  ['serviceChargeInCents', '10% serviço'],
   ['documentNumber', 'Documento'],
   ['unit', 'Unidade'],
   ['unitPriceInCents', 'Valor unitário']
@@ -64,6 +66,8 @@ const semanticColumnKey = value => {
     location: ['local', 'loja', 'unidade', 'pdv', 'location'],
     quantity: ['quantidade', 'qtd', 'qtde', 'quantity'],
     totalInCents: ['total', 'valor_total', 'valor', 'receita', 'faturamento', 'total_venda', 'valor_venda'],
+    serviceChargeInCents: ['10', '10_por_cento', 'dez_por_cento', 'taxa_10', 'taxa_servico', 'taxa_de_servico', 'servico', 'gorjeta', 'valor_servico', 'valor_10'],
+    seller: ['usuario', 'user', 'vendedor', 'garcom', 'atendente', 'operador', 'funcionario', 'colaborador', 'responsavel', 'login', 'caixa'],
     documentNumber: ['cupom', 'pedido', 'documento', 'numero_documento', 'cod_produto', 'codigo_produto'],
     unit: ['unidade', 'un', 'unit', 'tipo', 'tipo_preco'],
     unitPriceInCents: ['valor_unitario', 'preco_unitario', 'ticket_medio', 'unit_price', 'val_unit', 'vl_unit', 'val_unitario']
@@ -651,6 +655,7 @@ function salesQuery(schema) {
   const query = {
     categories: $('salesCategory').value ? [$('salesCategory').value] : [],
     locations: $('salesLocation').value ? [$('salesLocation').value] : [],
+    sellers: $('salesSeller').value ? [$('salesSeller').value] : [],
     text: $('salesText').value,
     page: 0,
     pageSize: 100,
@@ -686,16 +691,32 @@ async function loadSales() {
   try {
     $('salesFilterMessage').textContent = 'Buscando…';
     const schema = await loadSalesSchema();
-    const data = await api('/api/sales/query', { method: 'POST', body: JSON.stringify(salesQuery(schema)) });
+    const query = salesQuery(schema);
+    const data = await api('/api/sales/query', { method: 'POST', body: JSON.stringify(query) });
+    const sellers = await api('/api/sales/aggregate', { method: 'POST', body: JSON.stringify({ ...query, groupBy: 'seller' }) });
     renderSales(schema, data);
+    renderSalesSellers(sellers);
     $('salesFilterMessage').textContent = data.filtersApplied?.length ? `Filtros ativos: ${data.filtersApplied.join(' · ')}` : '';
     await loadSalesAudit();
   } catch (error) {
     $('salesFilterMessage').textContent = error.message;
     $('salesBody').innerHTML = '';
+    $('salesSellerBody').innerHTML = '';
     $('salesMetrics').innerHTML = '';
     $('salesEmpty').classList.remove('hidden');
   }
+}
+
+function renderSalesSellers(data) {
+  $('salesSellerBody').innerHTML = (data.groups || []).slice(0, 10).map(item => `
+    <tr>
+      <td>${escapeHtml(item.key || 'Sem usuário')}</td>
+      <td>Beco da Praia</td>
+      <td>${escapeHtml(item.count)}</td>
+      <td class="money">${money(item.totalInCents)}</td>
+      <td class="money">${money(item.serviceChargeInCents)}</td>
+    </tr>
+  `).join('');
 }
 
 function renderPurchases(schema, data) {
@@ -726,7 +747,7 @@ function renderPurchases(schema, data) {
 }
 
 function renderSales(schema, data) {
-  const normalizedKeys = ['saleDate', 'description', 'category', 'location', 'quantity', 'unit', 'unitPriceInCents', 'totalInCents'];
+  const normalizedKeys = ['saleDate', 'description', 'category', 'location', 'seller', 'quantity', 'unit', 'unitPriceInCents', 'totalInCents', 'serviceChargeInCents'];
   const usedDynamicKeys = new Set();
   const dynamic = (schema.fields || [])
     .filter(field => !field.normalized)
@@ -743,10 +764,12 @@ function renderSales(schema, data) {
     ['description', 'Produto'],
     ['category', 'Categoria'],
     ['location', 'Local'],
+    ['seller', 'Usuário'],
     ['quantity', 'Qtd.'],
     ['unit', 'Unidade'],
     ['unitPriceInCents', 'Valor unit.'],
-    ['totalInCents', 'Valor']
+    ['totalInCents', 'Valor'],
+    ['serviceChargeInCents', '10%']
   ].filter(([key]) => (data.items || []).some(item => item[key] !== null && item[key] !== undefined && item[key] !== '' && (!key.endsWith('InCents') || item[key] !== 0)));
   const columns = [...normalized, ...dynamic.map(field => [field.key, field.label])];
   $('salesHead').innerHTML = `<tr>${columns.map(column => `<th>${escapeHtml(column[1])}</th>`).join('')}</tr>`;
@@ -760,6 +783,7 @@ function renderSales(schema, data) {
   $('salesMetrics').innerHTML = `
     <span><strong>${data.totalItems}</strong> registros</span>
     <span><strong>${money(data.totalInCents)}</strong> vendido</span>
+    <span><strong>${money(data.serviceChargeInCents)}</strong> 10%</span>
     <span><strong>${dynamic.length}</strong> campos dinâmicos</span>
   `;
 }
@@ -917,6 +941,7 @@ $('refreshSalesAudit').addEventListener('click', loadSalesAudit);
 $('clearSalesFilters').addEventListener('click', () => {
   $('salesCategory').value = '';
   $('salesLocation').value = '';
+  $('salesSeller').value = '';
   $('salesMinTotal').value = '';
   $('salesMaxTotal').value = '';
   $('salesText').value = '';

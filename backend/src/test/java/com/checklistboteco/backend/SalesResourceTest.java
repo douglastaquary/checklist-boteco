@@ -79,7 +79,56 @@ class SalesResourceTest {
 
         Map<String,Object> request=Map.of("jsonrpc","2.0","id",1,"method","tools/list","params",Map.of());
         given().auth().oauth2("local-purchases-token").contentType("application/json").body(request).when().post("/mcp").then().statusCode(200)
-            .body("result.tools.name",hasItems("sales_get_schema","sales_list","sales_aggregate","sales_by_product","sales_quantity_by_product_in_period","sales_get_imports","sales_audit_stock"));
+            .body("result.tools.name",hasItems("sales_get_schema","sales_list","sales_aggregate","sales_by_product","sales_quantity_by_product_in_period","sales_by_seller","sales_get_imports","sales_audit_stock"));
+    }
+
+    @Test void salesImportAggregatesSellerAndServiceChargeForMcpAndAdminQueries(){
+        String token=adminToken(),dataset="sales-seller-"+UUID.randomUUID();
+        String csv="""
+            Data;Produto;Local;Garçom;Quantidade;Valor
+            14/07/2026;HEINEKEN 600ML;Beco da Praia;João Rodrigues;2;40,00
+            14/07/2026;CAIPIRINHA;Beco da Praia;João Rodrigues;1;30,00
+            14/07/2026;AGUA;Beco da Praia;Maria Souza;3;24,00
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-garcom.csv","csv",csv,"datasetId",dataset))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("suggestedMapping.seller",is("Garçom"))
+            .extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","location","Local","seller","Garçom","quantity","Quantidade","totalInCents","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200)
+            .body("importedRows",is(3));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-07-14","to","2026-07-14","sellers",List.of("João Rodrigues"),"pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(2))
+            .body("totalInCents",is(7000))
+            .body("serviceChargeInCents",is(700))
+            .body("items.seller",everyItem(is("João Rodrigues")));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-07-14","to","2026-07-14","groupBy","seller"))
+            .when().post("/api/sales/aggregate?datasetId="+dataset).then().statusCode(200)
+            .body("totalInCents",is(9400))
+            .body("serviceChargeInCents",is(940))
+            .body("groups.find { it.key == 'João Rodrigues' }.totalInCents",is(7000))
+            .body("groups.find { it.key == 'João Rodrigues' }.serviceChargeInCents",is(700));
+
+        Map<String,Object> bySellerRequest=Map.of(
+            "jsonrpc","2.0",
+            "id",5,
+            "method","tools/call",
+            "params",Map.of(
+                "name","sales_by_seller",
+                "arguments",Map.of("datasetId",dataset,"seller","João Rodrigues","from","2026-07-14","to","2026-07-14")
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(bySellerRequest).when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.totalItems",is(2))
+            .body("result.structuredContent.totalInCents",is(7000))
+            .body("result.structuredContent.serviceChargeInCents",is(700))
+            .body("result.structuredContent.items[0].seller",is("João Rodrigues"));
     }
 
     @Test void salesCsvWithoutDateAndLocationUsesDynamicMappingAndDefaults(){

@@ -102,12 +102,13 @@
           <div class="section-title"><div><p class="eyebrow">CONSULTA</p><h2>Relatório de vendas</h2></div><button id="refreshSales" type="button">Atualizar</button></div>
           <form id="salesFilters" class="purchase-filters">
             <label>De<input id="salesFrom" type="date" required></label><label>Até<input id="salesTo" type="date" required></label>
-            <label>Categoria<input id="salesCategory" placeholder="Todas"></label><label>Local<input id="salesLocation" placeholder="Todos"></label>
+            <label>Categoria<input id="salesCategory" placeholder="Todas"></label><label>Local<input id="salesLocation" placeholder="Todos"></label><label>Usuário/Vendedor<input id="salesSeller" placeholder="Todos"></label>
             <label>Valor mínimo<input id="salesMinTotal" inputmode="decimal" placeholder="0,00"></label><label>Valor máximo<input id="salesMaxTotal" inputmode="decimal" placeholder="Sem limite"></label>
             <label>Busca livre<input id="salesText" placeholder="Pesquisar nos campos"></label><button>Filtrar</button><button id="clearSalesFilters" type="button" class="secondary">Limpar filtros</button>
           </form>
           <div id="salesFilterMessage" class="message"></div>
           <div id="salesMetrics" class="purchase-metrics"></div>
+          <div class="table-wrap"><table><thead><tr><th>Usuário/Vendedor</th><th>Local</th><th>Registros</th><th>Total vendido</th><th>10%</th></tr></thead><tbody id="salesSellerBody"></tbody></table></div>
           <div class="table-wrap"><table><thead id="salesHead"></thead><tbody id="salesBody"></tbody></table></div>
           <div id="salesEmpty" class="empty-state">Importe um CSV de vendas para começar.</div>
         </article>

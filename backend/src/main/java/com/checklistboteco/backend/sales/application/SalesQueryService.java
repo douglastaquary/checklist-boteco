@@ -13,15 +13,15 @@ import java.util.function.Function;
 
 @ApplicationScoped
 public class SalesQueryService {
-    private static final Set<String> NORMALIZED=Set.of("saleDate","description","category","location","documentNumber","quantity","unit","unitPriceInCents","totalInCents");
+    private static final Set<String> NORMALIZED=Set.of("saleDate","description","category","location","seller","documentNumber","quantity","unit","unitPriceInCents","totalInCents","serviceChargeInCents");
     @Inject SalesRepository repository;
 
     public ImportSchema schema(String datasetId){
         String dataset=dataset(datasetId); List<Sale> values=repository.sales(dataset); ImportSchema schema=new ImportSchema(); schema.datasetId=dataset; schema.saleCount=values.size();
         schema.fields.add(new SchemaField("saleDate","Data","DATE",true)); schema.fields.add(new SchemaField("description","Produto","TEXT",true));
-        schema.fields.add(new SchemaField("category","Categoria","TEXT",true)); schema.fields.add(new SchemaField("location","Local","TEXT",true)); schema.fields.add(new SchemaField("documentNumber","Documento","TEXT",true));
+        schema.fields.add(new SchemaField("category","Categoria","TEXT",true)); schema.fields.add(new SchemaField("location","Local","TEXT",true)); schema.fields.add(new SchemaField("seller","Usuário/Vendedor","TEXT",true)); schema.fields.add(new SchemaField("documentNumber","Documento","TEXT",true));
         schema.fields.add(new SchemaField("quantity","Quantidade","NUMBER",true)); schema.fields.add(new SchemaField("unit","Unidade","TEXT",true)); schema.fields.add(new SchemaField("unitPriceInCents","Valor unitário","MONEY",true));
-        schema.fields.add(new SchemaField("totalInCents","Total","MONEY",true));
+        schema.fields.add(new SchemaField("totalInCents","Total","MONEY",true)); schema.fields.add(new SchemaField("serviceChargeInCents","10% serviço","MONEY",true));
         Map<String,String> dynamic=new TreeMap<>();
         for(Sale sale:values){ if(sale.saleDate!=null&&(schema.coverageFrom==null||sale.saleDate.isBefore(schema.coverageFrom))) schema.coverageFrom=sale.saleDate; if(sale.saleDate!=null&&(schema.coverageTo==null||sale.saleDate.isAfter(schema.coverageTo))) schema.coverageTo=sale.saleDate;
             sale.attributes.forEach((key,value)->dynamic.merge(key,type(value),(a,b)->a.equals(b)?a:"TEXT")); }
@@ -31,7 +31,7 @@ public class SalesQueryService {
     public SalePage query(String datasetId,SaleQuery request){
         SaleQuery query=request==null?new SaleQuery():request; validate(query,datasetId); List<Sale> filtered=new ArrayList<>(filtered(datasetId,query));
         Comparator<Sale> comparator=comparator(query); filtered.sort(comparator); SalePage result=new SalePage(); result.page=Math.max(0,query.page); result.pageSize=Math.max(1,Math.min(200,query.pageSize));
-        result.totalItems=filtered.size(); result.totalInCents=filtered.stream().mapToLong(sale->sale.totalInCents).sum(); result.totalQuantity=filtered.stream().map(sale->sale.quantity==null?BigDecimal.ZERO:sale.quantity).reduce(BigDecimal.ZERO,BigDecimal::add); result.totalPages=(int)Math.ceil(result.totalItems/(double)result.pageSize);
+        result.totalItems=filtered.size(); result.totalInCents=filtered.stream().mapToLong(sale->sale.totalInCents).sum(); result.serviceChargeInCents=filtered.stream().mapToLong(sale->sale.serviceChargeInCents).sum(); result.totalQuantity=filtered.stream().map(sale->sale.quantity==null?BigDecimal.ZERO:sale.quantity).reduce(BigDecimal.ZERO,BigDecimal::add); result.totalPages=(int)Math.ceil(result.totalItems/(double)result.pageSize);
         int from=Math.min(filtered.size(),result.page*result.pageSize),to=Math.min(filtered.size(),from+result.pageSize); result.items=new ArrayList<>(filtered.subList(from,to)); result.filtersApplied=filters(query); return result;
     }
 
@@ -40,8 +40,8 @@ public class SalesQueryService {
         boolean valid=NORMALIZED.contains(request.groupBy)||schema.fields.stream().anyMatch(field->!field.normalized&&Objects.equals(field.key,request.groupBy));
         if(!valid) throw new IllegalArgumentException("Campo de agrupamento inválido: "+request.groupBy);
         List<Sale> values=filtered(datasetId,request); Map<String,AggregateBucket> groups=new LinkedHashMap<>();
-        for(Sale sale:values){ String key=Objects.toString(field(sale,request.groupBy),"Sem valor"); AggregateBucket bucket=groups.computeIfAbsent(key,current->{ var created=new AggregateBucket(); created.key=current; return created; }); bucket.count++; bucket.totalInCents+=sale.totalInCents; bucket.quantity=bucket.quantity.add(sale.quantity==null?BigDecimal.ZERO:sale.quantity); }
-        AggregateResponse result=new AggregateResponse(); result.groupBy=request.groupBy; result.totalItems=values.size(); result.totalInCents=values.stream().mapToLong(sale->sale.totalInCents).sum(); result.totalQuantity=values.stream().map(sale->sale.quantity==null?BigDecimal.ZERO:sale.quantity).reduce(BigDecimal.ZERO,BigDecimal::add);
+        for(Sale sale:values){ String key=groupKey(field(sale,request.groupBy)); AggregateBucket bucket=groups.computeIfAbsent(key,current->{ var created=new AggregateBucket(); created.key=current; return created; }); bucket.count++; bucket.totalInCents+=sale.totalInCents; bucket.serviceChargeInCents+=sale.serviceChargeInCents; bucket.quantity=bucket.quantity.add(sale.quantity==null?BigDecimal.ZERO:sale.quantity); }
+        AggregateResponse result=new AggregateResponse(); result.groupBy=request.groupBy; result.totalItems=values.size(); result.totalInCents=values.stream().mapToLong(sale->sale.totalInCents).sum(); result.serviceChargeInCents=values.stream().mapToLong(sale->sale.serviceChargeInCents).sum(); result.totalQuantity=values.stream().map(sale->sale.quantity==null?BigDecimal.ZERO:sale.quantity).reduce(BigDecimal.ZERO,BigDecimal::add);
         result.groups=groups.values().stream().sorted(Comparator.comparing((AggregateBucket bucket)->bucket.quantity,Comparator.reverseOrder()).thenComparingLong(bucket->-bucket.totalInCents)).limit(100).toList(); return result;
     }
 
@@ -78,6 +78,41 @@ public class SalesQueryService {
         return response;
     }
 
+    public SellerSalesResponse bySeller(String datasetId,SellerSearchRequest request){
+        SellerSearchRequest query=request==null?new SellerSearchRequest():request;
+        if(query.seller!=null&&!query.seller.isBlank()) query.sellers=List.of(query.seller.trim());
+        validate(query,datasetId);
+        List<Sale> values=filtered(datasetId,query);
+        Map<String,SellerSalesMatch> groups=new LinkedHashMap<>();
+        for(Sale sale:values){
+            String seller=sellerLabel(sale.seller);
+            String key=seller+"|"+Objects.toString(sale.location,"Sem local");
+            SellerSalesMatch match=groups.computeIfAbsent(key,current->{
+                SellerSalesMatch created=new SellerSalesMatch();
+                created.seller=seller;
+                created.location=sale.location;
+                return created;
+            });
+            match.salesCount++;
+            match.totalInCents+=sale.totalInCents;
+            match.serviceChargeInCents+=sale.serviceChargeInCents;
+            match.quantity=match.quantity.add(sale.quantity==null?BigDecimal.ZERO:sale.quantity);
+        }
+        SellerSalesResponse response=new SellerSalesResponse();
+        response.datasetId=dataset(datasetId);
+        response.seller=query.seller;
+        response.from=query.from;
+        response.to=query.to;
+        response.locations=query.locations==null?List.of():new ArrayList<>(query.locations);
+        response.filtersApplied=filters(query);
+        response.totalItems=values.size();
+        response.totalInCents=values.stream().mapToLong(sale->sale.totalInCents).sum();
+        response.serviceChargeInCents=values.stream().mapToLong(sale->sale.serviceChargeInCents).sum();
+        response.totalQuantity=values.stream().map(sale->sale.quantity==null?BigDecimal.ZERO:sale.quantity).reduce(BigDecimal.ZERO,BigDecimal::add);
+        response.items=groups.values().stream().sorted(Comparator.comparingLong((SellerSalesMatch item)->item.totalInCents).reversed()).limit(Math.max(1,Math.min(100,query.limit))).toList();
+        return response;
+    }
+
     public List<Sale> filteredSales(String datasetId,SaleQuery query){ return filtered(datasetId,query); }
 
     private List<Sale> filtered(String datasetId,SaleQuery query){
@@ -85,8 +120,9 @@ public class SalesQueryService {
         return repository.sales(dataset(datasetId)).stream().filter(sale->query.from==null||query.to==null||(sale.saleDate!=null&&!sale.saleDate.isBefore(query.from)&&!sale.saleDate.isAfter(query.to)))
             .filter(sale->query.categories==null||query.categories.isEmpty()||query.categories.stream().anyMatch(value->equalsIgnoreCase(value,sale.category)))
             .filter(sale->query.locations==null||query.locations.isEmpty()||query.locations.stream().anyMatch(value->equalsIgnoreCase(value,sale.location)))
+            .filter(sale->query.sellers==null||query.sellers.isEmpty()||query.sellers.stream().anyMatch(value->contains(sale.seller,value.toLowerCase(Locale.ROOT))))
             .filter(sale->query.minTotalInCents==null||sale.totalInCents>=query.minTotalInCents).filter(sale->query.maxTotalInCents==null||sale.totalInCents<=query.maxTotalInCents)
-            .filter(sale->search==null||search.isBlank()||contains(sale.description,search)||contains(sale.category,search)||contains(sale.location,search)||sale.attributes.values().stream().anyMatch(value->contains(Objects.toString(value,""),search)))
+            .filter(sale->search==null||search.isBlank()||contains(sale.description,search)||contains(sale.category,search)||contains(sale.location,search)||contains(sale.seller,search)||sale.attributes.values().stream().anyMatch(value->contains(Objects.toString(value,""),search)))
             .filter(sale->matchesAttributes(sale,query.attributes)).toList();
     }
     private void validate(SaleQuery query,String datasetId){
@@ -114,11 +150,13 @@ public class SalesQueryService {
         SortField sort=query.sort==null||query.sort.isEmpty()?new SortField():query.sort.get(0); Function<Sale,Comparable> getter=sale->{ Object value=field(sale,sort.field); return value instanceof Comparable<?> comparable?(Comparable)comparable:Objects.toString(value,""); };
         Comparator<Sale> comparator=Comparator.comparing(getter,Comparator.nullsLast(Comparator.naturalOrder())); return "ASC".equalsIgnoreCase(sort.direction)?comparator:comparator.reversed();
     }
-    private static Object field(Sale sale,String name){ return switch(Objects.toString(name,"")){ case "saleDate"->sale.saleDate; case "description"->sale.description; case "category"->sale.category; case "location"->sale.location; case "documentNumber"->sale.documentNumber; case "quantity"->sale.quantity; case "unit"->sale.unit; case "unitPriceInCents"->sale.unitPriceInCents; case "totalInCents"->sale.totalInCents; case "importedAt"->sale.importedAt; default->sale.attributes.get(name); }; }
-    private static List<String> filters(SaleQuery query){ List<String> values=new ArrayList<>(); if(query.from!=null){ values.add("from="+query.from); values.add("to="+query.to); } if(query.categories!=null&&!query.categories.isEmpty()) values.add("categories="+query.categories); if(query.locations!=null&&!query.locations.isEmpty()) values.add("locations="+query.locations); if(query.minTotalInCents!=null) values.add("minTotalInCents="+query.minTotalInCents); if(query.maxTotalInCents!=null) values.add("maxTotalInCents="+query.maxTotalInCents); if(query.text!=null&&!query.text.isBlank()) values.add("text="+query.text); if(query.attributes!=null&&!query.attributes.isEmpty()) values.add("attributes="+query.attributes.keySet()); return values; }
+    private static Object field(Sale sale,String name){ return switch(Objects.toString(name,"")){ case "saleDate"->sale.saleDate; case "description"->sale.description; case "category"->sale.category; case "location"->sale.location; case "seller"->sale.seller; case "documentNumber"->sale.documentNumber; case "quantity"->sale.quantity; case "unit"->sale.unit; case "unitPriceInCents"->sale.unitPriceInCents; case "totalInCents"->sale.totalInCents; case "serviceChargeInCents"->sale.serviceChargeInCents; case "importedAt"->sale.importedAt; default->sale.attributes.get(name); }; }
+    private static List<String> filters(SaleQuery query){ List<String> values=new ArrayList<>(); if(query.from!=null){ values.add("from="+query.from); values.add("to="+query.to); } if(query.categories!=null&&!query.categories.isEmpty()) values.add("categories="+query.categories); if(query.locations!=null&&!query.locations.isEmpty()) values.add("locations="+query.locations); if(query.sellers!=null&&!query.sellers.isEmpty()) values.add("sellers="+query.sellers); if(query.minTotalInCents!=null) values.add("minTotalInCents="+query.minTotalInCents); if(query.maxTotalInCents!=null) values.add("maxTotalInCents="+query.maxTotalInCents); if(query.text!=null&&!query.text.isBlank()) values.add("text="+query.text); if(query.attributes!=null&&!query.attributes.isEmpty()) values.add("attributes="+query.attributes.keySet()); return values; }
     private static String dataset(String value){ return value==null||value.isBlank()?"sales":value.trim(); }
     private static boolean equalsIgnoreCase(String a,String b){ return a!=null&&b!=null&&a.equalsIgnoreCase(b); }
     private static boolean contains(String value,String search){ return value!=null&&value.toLowerCase(Locale.ROOT).contains(search); }
+    private static String sellerLabel(String value){ return value==null||value.isBlank()?"Sem usuário":value; }
+    private static String groupKey(Object value){ String key=Objects.toString(value,"").trim(); return key.isBlank()?"Sem valor":key; }
     private static BigDecimal decimal(String value){ try { return new BigDecimal(value.replace(',','.')); } catch(Exception e){ return BigDecimal.ZERO; } }
     private static String type(Object value){ return value instanceof Number?"NUMBER":value instanceof LocalDate?"DATE":"TEXT"; }
     private static String label(String key){ if(key==null||key.isBlank()) return "Atributo"; String words=key.replaceAll("([a-z])([A-Z])","$1 $2").replace('_',' '); return words.substring(0,1).toUpperCase(Locale.ROOT)+words.substring(1); }

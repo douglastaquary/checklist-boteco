@@ -27,8 +27,8 @@ public class SalesResource {
     @GET @Path("/imports") public List<ImportBatch> importList(@HeaderParam("Authorization") String auth){ guard.requireAdmin(auth); return imports.list(); }
     @GET @Path("/schema") public ImportSchema schema(@HeaderParam("Authorization") String auth,@QueryParam("datasetId") String dataset){ guard.requireAdmin(auth); return queries.schema(dataset); }
     @GET public SalePage list(@HeaderParam("Authorization") String auth,@QueryParam("datasetId") String dataset,@QueryParam("from") LocalDate from,@QueryParam("to") LocalDate to,
-        @QueryParam("category") List<String> categories,@QueryParam("location") List<String> locations,@QueryParam("text") String text,@QueryParam("page") @DefaultValue("0") int page,@QueryParam("size") @DefaultValue("50") int size){
-        guard.requireAdmin(auth); SaleQuery query=new SaleQuery(); query.from=from; query.to=to; query.categories=categories; query.locations=locations; query.text=text; query.page=page; query.pageSize=size; return queries.query(dataset,query);
+        @QueryParam("category") List<String> categories,@QueryParam("location") List<String> locations,@QueryParam("seller") List<String> sellers,@QueryParam("text") String text,@QueryParam("page") @DefaultValue("0") int page,@QueryParam("size") @DefaultValue("50") int size){
+        guard.requireAdmin(auth); SaleQuery query=new SaleQuery(); query.from=from; query.to=to; query.categories=categories; query.locations=locations; query.sellers=sellers; query.text=text; query.page=page; query.pageSize=size; return queries.query(dataset,query);
     }
     @POST @Path("/query") public SalePage query(@HeaderParam("Authorization") String auth,@QueryParam("datasetId") String dataset,SaleQuery request){ guard.requireAdmin(auth); return queries.query(dataset,request); }
     @POST @Path("/aggregate") public AggregateResponse aggregate(@HeaderParam("Authorization") String auth,@QueryParam("datasetId") String dataset,AggregateRequest request){ guard.requireAdmin(auth); return queries.aggregate(dataset,request); }

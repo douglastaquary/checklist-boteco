@@ -20,6 +20,7 @@ Criar um fluxo administrativo para importar relatórios CSV de vendas, normaliza
 - importação idempotente para uploads diários, semanais e mensais sobrepostos;
 - persistência em tabela DynamoDB separada;
 - consulta web com filtros por período, categoria, local, texto e valor;
+- consulta web por usuário/vendedor/garçom, com total vendido e soma dos 10% de serviço;
 - auditoria `vendido x abastecido`;
 - exposição somente leitura via MCP para agentes como Codex e Cursor.
 
@@ -32,7 +33,9 @@ Criar um fluxo administrativo para importar relatórios CSV de vendas, normaliza
 | `location` | Sim | `local`, `loja`, `pdv` |
 | `quantity` | Sim | `quantidade`, `qtd`, `qtde` |
 | `category` | Não | `categoria`, `grupo` |
+| `seller` | Não | `usuario`, `vendedor`, `garçom`, `atendente`, `operador` |
 | `totalInCents` | Não | `total`, `valor`, `receita` |
+| `serviceChargeInCents` | Não | `10%`, `taxa_servico`, `servico`, `gorjeta` |
 | `documentNumber` | Não | `cupom`, `pedido`, `documento` |
 | `unit` | Não | `unidade`, `un` |
 | `unitPriceInCents` | Não | `valor_unitario`, `preco_unitario` |
@@ -50,6 +53,14 @@ Criar um fluxo administrativo para importar relatórios CSV de vendas, normaliza
 ## Regras da auditoria
 
 O backend cruza compras e vendas pelo produto normalizado e local.
+
+## Vendas por usuário e 10%
+
+- O campo `seller` representa o usuário/vendedor/garçom informado pelo relatório de vendas, não necessariamente o usuário autenticado no sistema.
+- Quando o CSV não possui coluna explícita de taxa de serviço, o backend calcula `serviceChargeInCents` como 10% de `totalInCents`.
+- Quando o CSV possui coluna de `10%`, `taxa_servico`, `servico` ou `gorjeta`, ela pode ser mapeada e prevalece sobre o cálculo automático.
+- A consulta web exibe o vendedor, o total vendido, o total de 10% e um ranking por usuário no período filtrado.
+- As agregações aceitam `groupBy=seller`.
 
 - `CRITICO`: existe venda, mas não há abastecimento correspondente;
 - `ALERTA`: quantidade vendida é maior que a quantidade abastecida;
@@ -91,6 +102,7 @@ Ferramentas disponíveis:
 - `sales_get_schema`
 - `sales_list`
 - `sales_aggregate`
+- `sales_by_seller`
 - `sales_get_imports`
 - `sales_audit_stock`
 - além das ferramentas já existentes de compras

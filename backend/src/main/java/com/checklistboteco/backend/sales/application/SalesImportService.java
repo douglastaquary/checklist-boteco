@@ -21,16 +21,18 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class SalesImportService {
     private static final String DEFAULT_LOCATION="Beco da Praia";
-    private static final Map<String,List<String>> ALIASES=Map.of(
-        "saleDate",List.of("data","data_venda","dt_venda","emissao","date","data_movimento","dia","dt","data_do_item","data_item","data_da_venda"),
-        "description",List.of("produto","item","mercadoria","descricao","description","nome"),
-        "category",List.of("categoria","grupo","departamento","category"),
-        "location",List.of("local","loja","unidade","pdv","location"),
-        "quantity",List.of("quantidade","qtd","qtde","quantity"),
-        "totalInCents",List.of("total","valor_total","valor","receita","faturamento","total_venda","valor_venda"),
-        "documentNumber",List.of("cupom","pedido","documento","numero_documento","cod_produto","codigo_produto"),
-        "unit",List.of("unidade","un","unit","tipo","tipo_preco"),
-        "unitPriceInCents",List.of("valor_unitario","preco_unitario","ticket_medio","unit_price","val_unit","vl_unit","val_unitario")
+    private static final Map<String,List<String>> ALIASES=Map.ofEntries(
+        Map.entry("saleDate",List.of("data","data_venda","dt_venda","emissao","date","data_movimento","dia","dt","data_do_item","data_item","data_da_venda")),
+        Map.entry("description",List.of("produto","item","mercadoria","descricao","description","nome")),
+        Map.entry("category",List.of("categoria","grupo","departamento","category")),
+        Map.entry("location",List.of("local","loja","unidade","pdv","location")),
+        Map.entry("quantity",List.of("quantidade","qtd","qtde","quantity")),
+        Map.entry("totalInCents",List.of("total","valor_total","valor","receita","faturamento","total_venda","valor_venda")),
+        Map.entry("serviceChargeInCents",List.of("10","10_por_cento","dez_por_cento","taxa_10","taxa_servico","taxa_de_servico","servico","gorjeta","valor_servico","valor_10")),
+        Map.entry("seller",List.of("usuario","user","vendedor","garcom","atendente","operador","funcionario","colaborador","responsavel","login","caixa")),
+        Map.entry("documentNumber",List.of("cupom","pedido","documento","numero_documento","cod_produto","codigo_produto")),
+        Map.entry("unit",List.of("unidade","un","unit","tipo","tipo_preco")),
+        Map.entry("unitPriceInCents",List.of("valor_unitario","preco_unitario","ticket_medio","unit_price","val_unit","vl_unit","val_unitario"))
     );
     @Inject SalesRepository repository;
 
@@ -97,6 +99,7 @@ public class SalesImportService {
         sale.description=required(value(source,mapping,"description"),"Produto vendido vazio");
         sale.location=defaultLocation(value(source,mapping,"location"));
         sale.category=nullable(value(source,mapping,"category"));
+        sale.seller=nullable(value(source,mapping,"seller"));
         sale.documentNumber=nullable(value(source,mapping,"documentNumber"));
         sale.unit=nullable(value(source,mapping,"unit"));
         sale.quantity=parseDecimal(required(value(source,mapping,"quantity"),"Quantidade vazia"));
@@ -106,6 +109,8 @@ public class SalesImportService {
         if(sale.unitPriceInCents==0&&sale.totalInCents>0&&sale.quantity!=null&&sale.quantity.compareTo(BigDecimal.ZERO)>0){
             sale.unitPriceInCents=toCents(BigDecimal.valueOf(sale.totalInCents,2).divide(sale.quantity,4,RoundingMode.HALF_UP));
         }
+        String serviceCharge=value(source,mapping,"serviceChargeInCents");
+        sale.serviceChargeInCents=serviceCharge.isBlank()?calculateServiceCharge(sale.totalInCents):parseMoney(serviceCharge);
         for(String header:preserve){ String raw=source.getOrDefault(header,""); if(!raw.isBlank()) sale.attributes.put(uniqueAttributeKey(sale.attributes,CsvSupport.key(header)),infer(raw)); }
         sale.saleFingerprint=SalesFingerprint.of(sale);
         sale.rowHash=sale.saleFingerprint;
@@ -285,6 +290,7 @@ public class SalesImportService {
     }
     private static long parseMoney(String raw){ try { return parseDecimal(raw).movePointRight(2).setScale(0,RoundingMode.HALF_UP).longValueExact(); } catch(ArithmeticException e){ throw new IllegalArgumentException("Valor monetário inválido: "+raw); } }
     private static long toCents(BigDecimal value){ return value.movePointRight(2).setScale(0,RoundingMode.HALF_UP).longValue(); }
+    private static long calculateServiceCharge(long totalInCents){ return BigDecimal.valueOf(totalInCents).multiply(BigDecimal.valueOf(0.10)).setScale(0,RoundingMode.HALF_UP).longValue(); }
     private static Object infer(String raw){ try { return parseDecimal(raw); } catch(Exception ignored) {} try { return parseDate(raw,null).toString(); } catch(Exception ignored) {} return raw.trim(); }
     private static String defaultLocation(String value){
         String normalized=value==null?"":value.trim();
