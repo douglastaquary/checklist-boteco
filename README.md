@@ -1,268 +1,322 @@
 # Checklist Boteco
 
-Documentação do módulo de contagem e auditoria diária: [docs/inventory-counting-module.md](docs/inventory-counting-module.md).
+Sistema operacional leve para bares, restaurantes e botecos pequenos que querem sair da planilha e aproximar o dono dos dados reais da operação.
 
-Plano de uniformização visual Android/iOS: [docs/mobile-design-system-migration-plan.md](docs/mobile-design-system-migration-plan.md).
+O projeto nasceu para o **Beco da Praia**, mas a proposta é clara: atender negócios pequenos, com 3 a 5 pessoas na operação, onde o dono ainda está perto do balcão, da equipe, do estoque e das vendas — só que sem precisar cruzar CSV, planilha, grupo de WhatsApp e caderno manual para entender o que está acontecendo.
 
-Checklist de publicação da primeira versão: [docs/release-v1-checklist.md](docs/release-v1-checklist.md).
+Aqui, a ideia é que a IA consiga consultar os dados do negócio e responder em linguagem simples:
 
-Sincronização mobile (offline-first + API): [docs/mobile-api-sync.md](docs/mobile-api-sync.md).
+- “Quantas Heinekens vendemos em março?”
+- “Quanto o João Rodrigues vendeu ontem no forró e quanto deu de 10%?”
+- “Quem teve falta este mês?”
+- “Houve extravio ou perda no estoque?”
+- “O que ainda está pendente antes de abrir a casa?”
 
-Aplicativo de checklist para bares e restaurantes com app **Kotlin Multiplatform**, backend **Quarkus serverless** e administração web em **Qute + JavaScript vanilla**.
+O dono continua no controle. A diferença é que ele pergunta para o sistema como perguntaria para uma pessoa da equipe.
 
-## Direcionamento backend/web (Cursor)
+## Visão do produto
 
-Para features de API, painel admin, persistência ou deploy AWS, use a skill de projeto:
+O Checklist Boteco combina operação diária, dados importados e IA para transformar um bar pequeno em uma operação mais observável.
 
-**[`.cursor/skills/quarkus-serverless-qute/SKILL.md`](.cursor/skills/quarkus-serverless-qute/SKILL.md)**
+- **Apps mobile para a equipe:** checklist, ponto, contagem e rotinas do dia.
+- **Painel web administrativo:** usuários, permissões, atividades, vendas, compras, auditoria e dashboards.
+- **Backend serverless:** API REST, admin web, persistência e MCP no mesmo projeto Quarkus.
+- **IA e MCP:** dados operacionais expostos de forma segura para chat e agentes de IA.
+- **CSV sem sofrimento:** importação de relatórios de vendas/compras com mapeamento dinâmico e proteção contra duplicidade.
 
-Roadmap de alinhamento: [`docs/architecture-serverless.md`](docs/architecture-serverless.md)
+O objetivo não é criar um ERP pesado. É criar uma camada prática para o dono perguntar, auditar e decidir rápido.
 
-## Funcionalidades
+## O que o sistema faz hoje
 
-- **Login**: Autenticação por usuário e senha
-- **Checklist por área**: Tabs para Atendimento, Cozinha, Estoque e Limpeza
-- **Lista de atividades**: Nome, área e toggle para marcar conclusão
-- **Captura de imagem**: Ao ativar o toggle, abre a câmera para registrar a conclusão
-- **Confirmação**: Ao confirmar a foto, dados são salvos no banco local e o item fica desabilitado
-- **Permissões**: Cada usuário acessa apenas suas áreas configuradas
-- **Admin**: Gráficos de atividades realizadas e pendentes por área
-- **Cadastro de atividades**: Admins podem adicionar novas atividades (nome, área, frequência)
-- **Gestão de usuários no Web Admin**: Aba Equipe com criação, edição, remoção e reset de senha
-- **Setores de trabalho**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente e Barman
-- **Permissões por funcionalidade**: Módulo apartado para admin configurar cadastro de novos funcionários, criação de atividades e edição de usuários
-- **Administração de permissões**: Admin pode delegar cadastro de usuários, gestão de atividades e edição de usuários para perfis não-admin
-- **Ponto de colaboradores**: Usuários comuns podem registrar entrada, almoço, descanso e saída com cálculo de horas trabalhadas, descanso e horas devidas
-- **Compras**: Importação CSV com mapeamento dinâmico, consulta e exposição via MCP somente leitura
-- **Vendas e auditoria**: Importação CSV de vendas, cruzamento vendido x abastecido e exposição via MCP somente leitura para agentes
+### Operação diária
 
-## Credenciais padrão
+- Checklist por área e setor, com permissões por usuário.
+- Checklist inteligente com prazo, duração estimada e feedback visual:
+  - verde: dentro do prazo;
+  - amarelo: próximo do limite;
+  - vermelho: atrasado.
+- Registro de conclusão com usuário, horário, data de serviço e atraso.
+- Dashboard administrativo para acompanhar pendências, responsáveis e execução.
 
-- **Usuário**: admin@checklistboteco.com
-- **Senha**: admin123
+### Equipe e acesso
 
-## Plataformas suportadas
+- Login com usuário e senha.
+- Gestão de usuários no web admin.
+- Criação, edição, remoção e reset de senha.
+- Troca obrigatória de senha no primeiro acesso ou após reset.
+- Permissões granulares para módulos administrativos.
+- Tabs e módulos mobile liberados conforme permissões do usuário autenticado.
 
-- **Android** (API 26+)
-- **Desktop** (JVM)
-- **iOS** (app nativo SwiftUI — ver [docs/ios-app.md](docs/ios-app.md))
+### Ponto de colaboradores
 
-## Tecnologias
+- Registro de entrada, almoço, descanso e saída.
+- Botão de ponto habilitado somente com usuário logado, GPS permitido e dentro do raio configurado.
+- Cálculo de jornada, saldo semanal, horas extras, descanso e faltas.
+- Relatórios administrativos e exposição via MCP para consultas por IA.
 
-- Kotlin Multiplatform
-- Compose Multiplatform (UI compartilhada)
-- SQLDelight (banco de dados local)
-- MVVM
-- Coroutines & Flow
-- Quarkus REST + Qute (API e web no mesmo JAR)
-- JavaScript vanilla (sem Node.js ou bundler)
-- AWS Lambda + API Gateway HTTP API
-- DynamoDB on-demand em produção
+### Compras, vendas e auditoria
 
-## Estrutura do projeto
+- Importação CSV de compras/abastecimento.
+- Importação CSV de vendas com mapeamento dinâmico.
+- Deduplicação para uploads diários, semanais ou mensais sobrepostos.
+- Preservação da data real da venda.
+- Consulta por produto, período, local, vendedor/garçom e taxa de serviço de 10%.
+- Auditoria de vendido × abastecido para identificar possíveis perdas, consumo sem registro, venda sem entrada correspondente ou extravio.
 
-```
-composeApp/
-├── src/
-│   ├── commonMain/          # Código compartilhado
-│   │   ├── kotlin/          # Lógica, ViewModels, UI
-│   │   └── sqldelight/      # Schema do banco
-│   ├── androidMain/         # Implementações Android (câmera, etc)
-│   ├── desktopMain/         # Implementações Desktop
-│   └── iosMain/             # Implementações iOS
-backend/
-├── src/main/java/            # API, segurança e stores
-├── src/main/resources/       # Qute, CSS, JS e configuração
-├── pom.xml                    # Build único do backend + web
-└── template.yaml              # Lambda, HTTP API e DynamoDB (SAM)
+### Contagem e abastecimento
+
+- Registro de contagem diária de bebidas, frutas porcionadas e mercadorias.
+- Rascunho local antes do envio.
+- Envio em lote para o backend com confirmação explícita.
+- Sessões enviadas ficam imutáveis; exclusão apenas por admin.
+- Auditoria diária com saldo teórico:
+
+```text
+saldo teórico = contagem de abertura - vendas do dia
 ```
 
-## Como executar
+### Chat IA
 
-### Pré-requisitos
+- Chat administrativo no iOS para consultar dados operacionais.
+- A chave da OpenAI fica somente no backend.
+- O app mobile não recebe chave da OpenAI nem token MCP.
+- O backend limita contexto, tokens e ferramentas para reduzir custo.
+- As ferramentas internas são somente leitura.
 
-- JDK 17+
-- Android Studio ou IntelliJ IDEA com plugin KMP
-- (Opcional) Xcode para iOS
+Mais detalhes: [docs/ai-chat.md](docs/ai-chat.md).
+
+## IA e MCP: dados do Beco em linguagem natural
+
+O servidor MCP `checklist-boteco-analytics` expõe os dados importados e operacionais para agentes como Codex, Cursor e outros clientes MCP.
+
+Contexto fixo do projeto:
+
+- `beco` significa **Beco da Praia**.
+- Se o usuário não informar local, o sistema assume **Beco da Praia**.
+- O MCP é somente leitura.
+- O token MCP é separado do JWT de login.
+
+Ferramentas disponíveis incluem:
+
+- vendas por produto e período;
+- vendas por vendedor/garçom e total de 10%;
+- compras e abastecimento;
+- auditoria vendido × abastecido;
+- contagem e saldo teórico diário;
+- resumo de ponto, horas extras, faltas e escala.
+
+Configuração local pronta:
+
+- Cursor: [.cursor/mcp.json](.cursor/mcp.json)
+- Codex: [.codex/mcp.json](.codex/mcp.json)
+- Guia completo: [docs/mcp-local-test.md](docs/mcp-local-test.md)
+- Regras canônicas para agentes: [AGENTS.md](AGENTS.md)
+
+## Arquitetura
+
+```text
+Android / iOS ──────────────┐
+                            ├── REST API ── Quarkus ── LocalStore/DynamoDB
+Web Admin Qute + JS ────────┤                 │
+                            │                 ├── MCP analytics somente leitura
+Cursor / Codex / agentes ───┘                 └── OpenAI Responses API
+```
+
+Em desenvolvimento, o backend roda localmente e persiste uploads confirmados de compras e vendas em arquivos JSON dentro de `backend/.data/`, mantendo os dados disponíveis após reiniciar o processo.
+
+Em produção, o mesmo backend é publicado como Lambda com API Gateway HTTP API e DynamoDB.
+
+## Stack técnica
+
+### Backend e web admin
+
+- Java 17
+- Quarkus 3
+- REST API
+- Qute templates
+- CSS e JavaScript vanilla, sem Node.js ou bundler
+- Maven Wrapper
+- AWS SAM
+- AWS Lambda
+- API Gateway HTTP API
+- DynamoDB com billing `PAY_PER_REQUEST`
+- MCP Streamable HTTP
+- OpenAI Responses API
 
 ### Android
 
-```bash
-./gradlew :composeApp:installDebug
+- Kotlin Multiplatform
+- Compose / Material 3
+- SQLDelight
+- Coroutines e Flow
+- Sincronização offline-first com backend Quarkus
+- Permissões e navegação por perfil de usuário
+
+### iOS
+
+- SwiftUI nativo
+- Swift Packages em `Packages/`
+- GRDB / SQLite local
+- Keychain
+- UI própria alinhada ao design system mobile do projeto
+- Chat IA administrativo
+
+### Agentes de IA
+
+- MCP local para Cursor/Codex
+- Instruções centralizadas em [AGENTS.md](AGENTS.md)
+- Regras de linguagem natural para vendas, compras, ponto, contagem e auditoria
+- Acesso somente leitura aos dados operacionais
+
+## Estrutura do projeto
+
+```text
+backend/
+├── src/main/java/           # API, domínio, stores, segurança e MCP
+├── src/main/resources/      # Qute, CSS, JS e configurações
+├── pom.xml                  # Build do backend/admin web
+└── template.yaml            # Lambda, HTTP API e DynamoDB via SAM
+
+composeApp/
+├── src/commonMain/          # Código compartilhado Android/Desktop
+├── src/androidMain/         # Integrações Android
+└── src/commonMain/sqldelight/
+
+iosApp/
+└── ChecklistBoteco/         # Shell SwiftUI nativo
+
+Packages/
+└── */                       # Features e módulos Swift Package
+
+docs/
+└── *.md                     # Guias técnicos por módulo
 ```
 
-Ou execute pela IDE: Run > composeApp (Android)
+## Como rodar localmente
 
-### Desktop
+### Backend e web admin
 
-```bash
-./gradlew :composeApp:runDesktop
-```
-
-### Backend local
+Pré-requisito: JDK 17+.
 
 ```bash
 cd backend
 ./mvnw quarkus:dev
 ```
 
-Admin web: `http://localhost:8080`
+Admin web local:
 
-Guia completo de backend e deploy: [docs/backend-deploy.md](docs/backend-deploy.md)
+```text
+http://localhost:8181
+```
 
-Plano do módulo de compras com importação CSV e MCP: [docs/finance-module-plan.md](docs/finance-module-plan.md)
+Credencial seed de desenvolvimento:
 
-Plano de sincronização Android offline-first com o backend Quarkus: [docs/android-quarkus-sync-plan.md](docs/android-quarkus-sync-plan.md)
+```text
+admin@checklistboteco.com / admin123
+```
 
-Guia do módulo de auditoria de vendas x abastecimento: [docs/sales-audit-module.md](docs/sales-audit-module.md)
+Documentação completa: [docs/backend-deploy.md](docs/backend-deploy.md).
 
-O perfil local usa memória e não precisa de Docker ou AWS. Em produção, o template SAM publica o mesmo artefato em Lambda com DynamoDB.
-
-Em desenvolvimento, os uploads confirmados de `Compras` e `Vendas` passam a ser persistidos em arquivos locais estáveis:
-
-- [backend/.data/purchases-local.json](/Users/douglastaquary/ChecklistBoteco/backend/.data/purchases-local.json)
-- [backend/.data/sales-local.json](/Users/douglastaquary/ChecklistBoteco/backend/.data/sales-local.json)
-
-Assim, os dados importados continuam disponíveis após reiniciar o backend local e seguem acessíveis via MCP.
-
-Para apontar o app Android para o backend, informe a URL da API no build:
+### Android
 
 ```bash
 ./gradlew :composeApp:installDebug -PCHECKLIST_API_BASE_URL=http://10.0.2.2:8181
 ```
 
-`10.0.2.2` aponta o Android Emulator para o backend da máquina. Para AWS, troque pela URL HTTPS exibida no output `ApiUrl` do SAM. O app rejeita HTTP fora dos hosts locais de desenvolvimento.
+`10.0.2.2` aponta o emulador Android para o backend rodando na máquina host. Builds fora dos hosts locais de desenvolvimento devem usar HTTPS.
 
-No Android, o build `debug` libera tráfego HTTP claro apenas para `10.0.2.2`, `127.0.0.1` e `localhost`, facilitando testes locais. Builds destinados à AWS continuam usando HTTPS.
+Guia de sincronização: [docs/mobile-api-sync.md](docs/mobile-api-sync.md).
 
 ### iOS
 
-App nativo SwiftUI — ver [docs/ios-app.md](docs/ios-app.md).
+Abra o projeto em Xcode:
 
-Padrões de UI e checklist de PR: [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md) · Skill: [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md)
-
-Abra o projeto no Xcode e execute no simulador ou dispositivo.
-
-## Direcionamento para agentes de IA
-
-**Fonte canônica (agnóstica ao modelo):** [AGENTS.md](AGENTS.md)
-
-| Domínio | Referência |
-|---------|------------|
-| Regras gerais, MCP, roteamento | [AGENTS.md](AGENTS.md) |
-| Backend / admin Quarkus | [.cursor/skills/quarkus-serverless-qute/SKILL.md](.cursor/skills/quarkus-serverless-qute/SKILL.md) |
-| iOS / SwiftUI | [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md) + [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md) |
-| MCP local (setup e testes) | [docs/mcp-local-test.md](docs/mcp-local-test.md) |
-
-Atalhos por ferramenta (stubs que apontam para `AGENTS.md`):
-
-- Cursor: [.cursor/checklist-boteco-agent-instructions.md](.cursor/checklist-boteco-agent-instructions.md)
-- Codex: [.codex/checklist-boteco-agent-instructions.md](.codex/checklist-boteco-agent-instructions.md)
-- Colagem opcional: [docs/ai-agent-instructions.md](docs/ai-agent-instructions.md)
-
-
-- **Áreas**: Atendimento, Cozinha, Estoque, Limpeza
-- **Setores**: Atendimento, Cozinha, Serviços Gerais, Garçon, Cumim, Chefe de Cozinha, Gerente, Ajudante de Cozinha, Atendente, Barman
-- **Frequências**: Diário, Quinzenal, Mensal
-- **Permissões**: Admin (acesso total), User (área derivada do setor) e permissões gerenciais por funcionalidade
-
-## Cadastro e permissões
-
-O gerenciamento de acessos acontece na aba **Equipe** do painel web.
-
-- `ADMIN` tem acesso total ao sistema e aos checkboxes de permissões
-- `canRegisterUsers` permite visualizar a aba Equipe e criar novos usuários
-- `canEditUsers` permite editar usuários existentes, remover usuários e resetar senha
-- `canCreateActivities` permite acessar a aba **Atividades** e cadastrar novas atividades
-
-No cadastro e edição de usuários, os campos obrigatórios são:
-
-- Nome
-- Email válido
-- Setor de trabalho
-- Perfil (`USER` ou `ADMIN`)
-
-Na criação, a senha também é obrigatória e deve ter no mínimo 8 caracteres. No reset de senha, os dispositivos confiáveis e desafios pendentes do usuário são invalidados, forçando um novo fluxo de confirmação no próximo acesso.
-
-Usuários comuns recebem acesso às atividades vinculadas à área derivada do seu setor. Usuários `ADMIN` recebem acesso total às áreas e permissões gerenciais.
-
-## Módulos administrativos de compras e vendas
-
-Os módulos `Compras` e `Vendas` ficam disponíveis apenas para usuários `ADMIN`.
-
-- `Compras`: importa CSV de abastecimento/compras, normaliza campos principais, preserva colunas dinâmicas e expõe consultas por REST e MCP.
-- `Vendas`: importa CSV de relatório de vendas, exige mapeamento mínimo de `produto` e `quantidade`, preenche data/local automaticamente quando o relatório não trouxer esses campos, preserva colunas dinâmicas e expõe consultas por REST e MCP.
-- `Auditoria vendido x abastecido`: cruza os datasets de compras e vendas para destacar itens com venda sem entrada correspondente, venda acima do abastecido e abastecimento sem saída registrada.
-
-Ferramentas MCP disponíveis localmente em `http://localhost:8080/mcp`:
-
-- `purchases_get_schema`
-- `purchases_list`
-- `purchases_aggregate`
-- `purchases_get_imports`
-- `sales_get_schema`
-- `sales_list`
-- `sales_aggregate`
-- `sales_by_product`
-- `sales_quantity_by_product_in_period`
-- `sales_get_imports`
-- `sales_audit_stock`
-- `inventory_daily_audit`
-- `inventory_count_sessions`
-- `work_clock_summary`
-- `work_clock_entries`
-- `work_clock_schedule`
-- `work_clock_worksite`
-
-Exemplo de configuração MCP para Cursor/Codex em ambiente local:
-
-```json
-{
-  "mcpServers": {
-    "checklist-boteco-analytics": {
-      "url": "http://localhost:8080/mcp",
-      "headers": {
-        "Authorization": "Bearer local-purchases-token"
-      }
-    }
-  }
-}
+```text
+iosApp/ChecklistBoteco.xcodeproj
 ```
 
-Arquivos já prontos no projeto:
+O app iOS é SwiftUI nativo e usa os packages locais em `Packages/`.
 
-- Cursor: [.cursor/mcp.json](/Users/douglastaquary/ChecklistBoteco/.cursor/mcp.json)
-- Codex: [.codex/mcp.json](/Users/douglastaquary/ChecklistBoteco/.codex/mcp.json)
+Guias:
 
-Guia de uso e testes via chat:
+- [docs/ios-app.md](docs/ios-app.md)
+- [docs/ios-swiftui-standards.md](docs/ios-swiftui-standards.md)
+- [docs/mobile-ui-ux-guidelines.md](docs/mobile-ui-ux-guidelines.md)
 
-- [docs/mcp-local-test.md](docs/mcp-local-test.md)
+### MCP local
 
-Regras MCP e heurísticas de linguagem natural estão em [AGENTS.md](AGENTS.md) (seção **Servidor MCP**). Os arquivos abaixo são atalhos que apontam para lá:
+Com o backend rodando, use os arquivos prontos:
+
+- [.cursor/mcp.json](.cursor/mcp.json)
+- [.codex/mcp.json](.codex/mcp.json)
+
+Guia de setup e perguntas de teste: [docs/mcp-local-test.md](docs/mcp-local-test.md).
+
+## Deploy AWS
+
+O backend é preparado para serverless:
+
+- API Gateway HTTP API, com URLs limpas sem prefixo `/Prod`;
+- Lambda Java 17 ARM64;
+- DynamoDB criado automaticamente pelo SAM;
+- billing `PAY_PER_REQUEST`;
+- sem VPC, subnets ou security groups;
+- tabelas separadas para operação, compras e vendas.
+
+Fluxo base:
+
+```bash
+cd backend
+./build-lambda.sh
+sam build --template-file template.yaml
+sam deploy --guided
+```
+
+Detalhes de parâmetros, segredos e produção: [docs/backend-deploy.md](docs/backend-deploy.md).
+
+## Documentação principal
+
+- [AGENTS.md](AGENTS.md) — regras canônicas para agentes de IA.
+- [docs/ai-chat.md](docs/ai-chat.md) — chat IA, custos, segurança e OpenAI.
+- [docs/mcp-local-test.md](docs/mcp-local-test.md) — configuração MCP para Cursor/Codex.
+- [docs/backend-deploy.md](docs/backend-deploy.md) — backend, web admin e AWS.
+- [docs/intelligent-checklist.md](docs/intelligent-checklist.md) — checklist com prazos e feedback visual.
+- [docs/inventory-counting-module.md](docs/inventory-counting-module.md) — contagem e auditoria diária.
+- [docs/sales-audit-module.md](docs/sales-audit-module.md) — vendas, CSV e auditoria.
+- [docs/work-clock-module.md](docs/work-clock-module.md) — ponto, geofence, horas e faltas.
+- [docs/mobile-api-sync.md](docs/mobile-api-sync.md) — sync mobile offline-first.
+- [docs/mobile-design-system-migration-plan.md](docs/mobile-design-system-migration-plan.md) — UI unificada Android/iOS.
+- [docs/release-v1-checklist.md](docs/release-v1-checklist.md) — checklist da primeira versão.
+
+## Direcionamento para desenvolvimento com IA
+
+Antes de implementar mudanças, siga [AGENTS.md](AGENTS.md).
+
+Referências rápidas por domínio:
+
+| Domínio | Referência |
+| --- | --- |
+| Backend, API, admin web e AWS | [.cursor/skills/quarkus-serverless-qute/SKILL.md](.cursor/skills/quarkus-serverless-qute/SKILL.md) |
+| Arquitetura serverless | [docs/architecture-serverless.md](docs/architecture-serverless.md) |
+| Android / Compose | [.cursor/skills/compose-ui-patterns/SKILL.md](.cursor/skills/compose-ui-patterns/SKILL.md) |
+| iOS / SwiftUI | [.cursor/skills/swiftui-ui-patterns/SKILL.md](.cursor/skills/swiftui-ui-patterns/SKILL.md) |
+| MCP e analytics | [docs/mcp-local-test.md](docs/mcp-local-test.md) |
+
+Atalhos:
 
 - Cursor: [.cursor/checklist-boteco-agent-instructions.md](.cursor/checklist-boteco-agent-instructions.md)
 - Codex: [.codex/checklist-boteco-agent-instructions.md](.codex/checklist-boteco-agent-instructions.md)
 
-## Ponto de colaboradores
+## Segurança e dados sensíveis
 
-O módulo **Ponto** aparece para colaboradores comuns e não aparece para usuários admin. A tela principal mostra um mapa operacional do local de trabalho, dados da próxima marcação, dia e hora, distância do local configurado e botão para confirmar a marcação.
+- Não commitar `OPENAI_API_KEY`.
+- Não commitar segredos AWS, JWT ou tokens de produção.
+- Usar `backend/.env.local` apenas localmente.
+- O Chat IA chama OpenAI pelo backend; apps mobile nunca recebem a chave.
+- MCP local usa token próprio e acesso somente leitura.
 
-Regras do MVP:
+## Estado do produto
 
-- Não existe escala fixa diária; o app calcula a partir das marcações realizadas no dia
-- A jornada esperada é de 8h trabalhadas por dia e 40h por semana
-- O descanso esperado é de 1h por dia
-- Jornadas de 12h trabalhadas exigem 2h de descanso
-- A tela de detalhes mostra marcações do dia, horas trabalhadas, descanso, descanso devido/excedente e horas devidas
-- Marcações não podem ser editadas após confirmação
-- O local de trabalho configurado é `Av. Vicente de Carvalho, 761 Centro - Bertioga (Beco da Praia)`, com raio permitido de 5 metros
+Este é um MVP avançado orientado ao Beco da Praia, com arquitetura pensada para reaproveitamento em outros bares e restaurantes pequenos.
 
-## Desenvolvimento assistido por IA e PDD
-
-Esta funcionalidade foi conduzida por **PDD (Prompt Driven Development)**: o arquivo `.github/prompts/new-user-feature.md` descreveu o comportamento esperado e orientou a implementação. O desenvolvimento assistido por IA foi usado para transformar o prompt em mudanças de modelo, banco local, telas Compose, viewmodels, validações compartilhadas, testes unitários e documentação.
-
-## Próximos passos sugeridos
-
-- Implementação completa da câmera no iOS
-- Sincronização com servidor (opcional)
-- Notificações para atividades pendentes
+O foco é pragmático: menos sistema pesado, mais dado útil; menos planilha chata, mais pergunta direta; menos achismo na operação, mais decisão baseada no que realmente aconteceu no dia.
