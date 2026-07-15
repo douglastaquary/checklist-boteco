@@ -20,17 +20,22 @@ O app iOS referencia **este diretório inteiro** via `ChecklistBoteco.xcodeproj`
 | `DashboardFeature` | Resumo local |
 | `AdminFeatures` | Atividades e permissões |
 
-## Testes
+## Validação
+
+Este package é **iOS-only** (`platforms: [.iOS(.v16)]`). Não há target macOS suportado.
+
+Não use `swift test` neste diretório: a CLI do SwiftPM compila para o host macOS e ignora o fato de o produto ser validado pelo app iOS, gerando erros falsos de disponibilidade (`ObservableObject`, `Task`, `URLSession.data(for:)`, etc.).
+
+Valide alterações dos packages pelo build do app iOS:
 
 ```bash
-cd Packages
-swift test
-```
-
-Ou por módulo (desenvolvimento isolado):
-
-```bash
-cd Packages/Models && swift test
+cd ..
+xcodebuild -project iosApp/ChecklistBoteco.xcodeproj -scheme ChecklistBoteco \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  ONLY_ACTIVE_ARCH=YES \
+  build
 ```
 
 > Após editar código aqui, commitar **no repositório principal** (`ChecklistBoteco/`), junto com `iosApp/` e o restante do projeto — como no [IceCubesApp](https://github.com/Dimillian/IceCubesApp/tree/main/Packages).
