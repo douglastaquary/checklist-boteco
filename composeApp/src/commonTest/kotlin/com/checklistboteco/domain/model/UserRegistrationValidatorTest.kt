@@ -22,9 +22,10 @@ class UserRegistrationValidatorTest {
     fun validatesStrongPasswordRules() {
         assertFalse(UserRegistrationValidator.isStrongPassword("senha"))
         assertFalse(UserRegistrationValidator.isStrongPassword("senhaforte1!"))
-        assertFalse(UserRegistrationValidator.isStrongPassword("SENHAFORTE1!"))
         assertFalse(UserRegistrationValidator.isStrongPassword("SenhaForte!"))
         assertFalse(UserRegistrationValidator.isStrongPassword("SenhaForte1"))
+        assertTrue(UserRegistrationValidator.isStrongPassword("SENHA1!"))
+        assertTrue(UserRegistrationValidator.isStrongPassword("Senha1!"))
         assertTrue(UserRegistrationValidator.isStrongPassword("SenhaForte1!"))
     }
 

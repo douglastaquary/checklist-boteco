@@ -43,7 +43,10 @@ public class DynamoDbStore extends LocalStore {
         dynamo.scan(ScanRequest.builder().tableName(table).build()).items().forEach(this::hydrate);
         deletedUsers.forEach(users::remove);
         hydrated=true;
-        if (users.isEmpty()) seed();
+        if (users.isEmpty()) {
+            seed();
+            users.values().forEach(user->put("USER",user.id,user));
+        }
     }
 
     @Override public User authenticate(String email,String password){ ensureHydrated(); return super.authenticate(email,password); }
@@ -61,6 +64,7 @@ public class DynamoDbStore extends LocalStore {
     @Override public synchronized PublicUser updateUser(String id,UpdateUserRequest request){ ensureHydrated(); PublicUser result=super.updateUser(id,request); put("USER",id,users.get(id)); return result; }
     @Override public synchronized void deleteUser(String id){ ensureHydrated(); super.deleteUser(id); putRaw("USER_DELETED",id,"deleted"); }
     @Override public synchronized PublicUser resetUserPassword(String id,String newPassword){ ensureHydrated(); PublicUser result=super.resetUserPassword(id,newPassword); put("USER",id,users.get(id)); return result; }
+    @Override public synchronized PublicUser changeOwnPassword(String id,String currentPassword,String newPassword){ ensureHydrated(); PublicUser result=super.changeOwnPassword(id,currentPassword,newPassword); put("USER",id,users.get(id)); return result; }
     @Override public synchronized PublicUser updatePermissions(String id,FeaturePermissions permissions){ ensureHydrated(); PublicUser result=super.updatePermissions(id,permissions); put("USER",id,users.get(id)); return result; }
     @Override public synchronized Activity createActivity(CreateActivityRequest request){ ensureHydrated(); Activity result=super.createActivity(request); put("ACTIVITY",result.id,result); return result; }
     @Override public synchronized Activity updateActivity(String id,CreateActivityRequest request){ ensureHydrated(); Activity result=super.updateActivity(id,request); put("ACTIVITY",result.id,result); return result; }

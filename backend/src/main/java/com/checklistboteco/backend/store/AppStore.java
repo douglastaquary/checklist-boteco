@@ -14,6 +14,7 @@ public interface AppStore {
     PublicUser updateUser(String id,UpdateUserRequest request);
     void deleteUser(String id);
     PublicUser resetUserPassword(String id,String newPassword);
+    PublicUser changeOwnPassword(String id,String currentPassword,String newPassword);
     PublicUser updatePermissions(String id,FeaturePermissions permissions);
     List<Activity> activities();
     Activity createActivity(CreateActivityRequest request);

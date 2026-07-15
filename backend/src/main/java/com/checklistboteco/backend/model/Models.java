@@ -56,6 +56,7 @@ public final class Models {
         public long createdAt, updatedAt;
         public SyncStatus syncStatus = SyncStatus.SYNCED;
         public FeaturePermissions permissions = new FeaturePermissions();
+        public boolean mustChangePassword;
     }
 
     public static class PublicUser {
@@ -67,12 +68,14 @@ public final class Models {
         public long createdAt, updatedAt;
         public SyncStatus syncStatus = SyncStatus.SYNCED;
         public FeaturePermissions permissions = new FeaturePermissions();
+        public boolean mustChangePassword;
         public static PublicUser from(User user) {
             var result = new PublicUser();
             result.id=user.id; result.name=user.name; result.email=user.email; result.area=user.area;
             result.workSector=user.workSector; result.permissionLevel=user.permissionLevel;
             result.allowedAreas=new ArrayList<>(user.allowedAreas); result.createdAt=user.createdAt;
             result.updatedAt=user.updatedAt; result.syncStatus=user.syncStatus; result.permissions=user.permissions;
+            result.mustChangePassword=user.mustChangePassword;
             return result;
         }
     }
@@ -154,6 +157,9 @@ public final class Models {
     }
     public static class ResetPasswordRequest {
         public String newPassword;
+    }
+    public static class ChangePasswordRequest {
+        public String currentPassword, newPassword;
     }
     public static class PermissionUpdateRequest { public FeaturePermissions permissions; }
     public static class CreateActivityRequest {

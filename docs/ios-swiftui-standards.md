@@ -129,6 +129,7 @@ Itens **já implementados** (2026-06):
 - `RootView`: observa `session` localmente; `MainTabContext` sem referência a `AppSession`
 - Inventário: criar/editar rascunho via `.sheet(item:)` — [`InventoryDraftFormSheet.swift`](../Packages/Inventory/Sources/InventoryFeature/InventoryDraftFormSheet.swift), `updateInventoryDraft` no repositório
 - Performance shell: `AppDependenciesHolder` e `SyncController` sem `ObservableObject` desnecessário; `RootView` observa só `AppSession`; sync lifecycle via `let` no `AppDependencyGraphModifier`
+- Primeiro acesso/reset de senha: `RootView` direciona para `ChangePasswordView` quando `User.mustChangePassword == true`; validação visual segue [`docs/mobile-ui-ux-guidelines.md`](mobile-ui-ux-guidelines.md); sessão restaurada com troca pendente exige novo login porque a senha atual não é persistida em memória.
 
 **Backlog fase 2 (iOS UI): concluído** — próximas melhorias entram como demanda de produto ou subida de deployment target (iOS 17+).
 

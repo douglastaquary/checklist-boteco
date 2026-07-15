@@ -54,7 +54,7 @@ public class LocalStore implements AppStore {
         if(!users.isEmpty()) return;
         var request=new CreateUserRequest(); request.name="Administrador"; request.email="admin@checklistboteco.com";
         request.password=initialAdminPassword; request.workSector=WorkSector.GERENTE; request.permissionLevel=PermissionLevel.ADMIN;
-        createUser(request);
+        createUserInternal(request,false,true);
         createSeedActivity("Abrir o salão",Area.ATENDIMENTO,Frequency.DIARIO,2);
         createSeedActivity("Conferir estoque crítico",Area.ESTOQUE,Frequency.DIARIO,3);
         createSeedActivity("Higienizar bancadas",Area.COZINHA,Frequency.DIARIO,2);
@@ -83,9 +83,13 @@ public class LocalStore implements AppStore {
     }
 
     public synchronized PublicUser createUser(CreateUserRequest request) {
+        return createUserInternal(request,true,true);
+    }
+
+    protected synchronized PublicUser createUserInternal(CreateUserRequest request,boolean validatePasswordPolicy,boolean mustChangePassword) {
         require(request!=null&&request.name!=null&&!request.name.isBlank(),"Nome é obrigatório");
         require(request.email!=null&&request.email.contains("@"),"Email inválido");
-        require(request.password!=null&&request.password.length()>=8,"Senha deve ter ao menos 8 caracteres");
+        validatePassword(request.password,validatePasswordPolicy);
         require(request.workSector!=null,"Setor é obrigatório");
         require(users.values().stream().noneMatch(u->u.email.equalsIgnoreCase(request.email.trim())),"Usuário já existe");
         long now=System.currentTimeMillis();
@@ -101,6 +105,7 @@ public class LocalStore implements AppStore {
         user.createdAt=now;
         user.updatedAt=now;
         user.permissions=user.permissionLevel==PermissionLevel.ADMIN?FeaturePermissions.admin():nonNull(request.permissions);
+        user.mustChangePassword=mustChangePassword;
         users.put(user.id,user);
         return PublicUser.from(user);
     }
@@ -145,8 +150,23 @@ public class LocalStore implements AppStore {
     public synchronized PublicUser resetUserPassword(String id,String newPassword) {
         User user=users.get(id);
         require(user!=null,"Usuário não encontrado");
-        require(newPassword!=null&&newPassword.length()>=8,"Senha deve ter ao menos 8 caracteres");
+        validatePassword(newPassword,true);
         user.passwordHash=passwords.hash(newPassword);
+        user.mustChangePassword=true;
+        user.updatedAt=System.currentTimeMillis();
+        trustedDevices.removeIf(value->value.startsWith(id+":"));
+        challenges.values().removeIf(value->Objects.equals(value.userId,id));
+        return PublicUser.from(user);
+    }
+
+    public synchronized PublicUser changeOwnPassword(String id,String currentPassword,String newPassword) {
+        User user=users.get(id);
+        require(user!=null,"Usuário não encontrado");
+        require(currentPassword!=null&&passwords.verify(currentPassword,user.passwordHash),"Senha atual inválida");
+        validatePassword(newPassword,true);
+        require(!passwords.verify(newPassword,user.passwordHash),"A nova senha deve ser diferente da senha atual");
+        user.passwordHash=passwords.hash(newPassword);
+        user.mustChangePassword=false;
         user.updatedAt=System.currentTimeMillis();
         trustedDevices.removeIf(value->value.startsWith(id+":"));
         challenges.values().removeIf(value->Objects.equals(value.userId,id));
@@ -472,6 +492,17 @@ public class LocalStore implements AppStore {
     private static FeaturePermissions nonNull(FeaturePermissions value){ return value==null?new FeaturePermissions():value; }
     private static <T> List<T> safe(List<T> values){ return values==null?List.of():values; }
     private static void require(boolean valid,String message){ if(!valid) throw new IllegalArgumentException(message); }
+    private static void validatePassword(String password,boolean strongPolicy){
+        require(password!=null&&!password.isBlank(),"Senha é obrigatória");
+        if(!strongPolicy){
+            require(password.length()>=6,"Senha deve ter ao menos 6 caracteres");
+            return;
+        }
+        require(password.length()>=6,"Senha deve ter ao menos 6 caracteres");
+        require(password.chars().anyMatch(Character::isUpperCase),"Senha deve conter ao menos uma letra maiúscula");
+        require(password.chars().anyMatch(Character::isDigit),"Senha deve conter ao menos um número");
+        require(password.chars().anyMatch(value->!Character.isLetterOrDigit(value)),"Senha deve conter ao menos um caractere especial");
+    }
 
     private static String stringValue(Map<String,Object> payload,String key){
         if(payload==null) return null;

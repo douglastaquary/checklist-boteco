@@ -74,6 +74,19 @@ class BackendApiClient private constructor(
         )
     }
 
+    suspend fun changeMyPassword(
+        token: String,
+        currentPassword: String,
+        newPassword: String
+    ): User {
+        val user = httpClient.post("$baseUrl/api/me/change-password") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ChangePasswordRequestDto(currentPassword, newPassword))
+        }.body<PublicUserDto>()
+        return user.toDomain().copy(remoteId = user.id)
+    }
+
     suspend fun listUsers(token: String): List<User> {
         return httpClient.get("$baseUrl/api/users") {
             bearerAuth(token)
@@ -306,6 +319,12 @@ private data class VerifyDeviceRequestDto(
 )
 
 @Serializable
+private data class ChangePasswordRequestDto(
+    val currentPassword: String,
+    val newPassword: String
+)
+
+@Serializable
 private data class LoginResponseDto(
     val token: String? = null,
     val user: PublicUserDto? = null,
@@ -337,7 +356,8 @@ private data class PublicUserDto(
     val permissionLevel: String,
     val allowedAreas: List<String>,
     val createdAt: Long,
-    val permissions: FeaturePermissionsDto = FeaturePermissionsDto()
+    val permissions: FeaturePermissionsDto = FeaturePermissionsDto(),
+    val mustChangePassword: Boolean = false
 ) {
     fun toDomain(): User {
         val level = PermissionLevel.fromString(permissionLevel)
@@ -356,7 +376,8 @@ private data class PublicUserDto(
                 if (parsed.isEmpty()) listOf(WorkSector.fromString(workSector).activityArea) else parsed
             },
             createdAt = createdAt,
-            featurePermissions = permissions.toDomain()
+            featurePermissions = permissions.toDomain(),
+            mustChangePassword = mustChangePassword
         )
     }
 }

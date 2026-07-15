@@ -236,7 +236,8 @@ class ChecklistRepository(
         allowedAreas: List<Area>,
         createdAt: Long = Clock.System.now().toEpochMilliseconds(),
         remoteId: String? = null,
-        featurePermissions: FeaturePermissions = FeaturePermissions()
+        featurePermissions: FeaturePermissions = FeaturePermissions(),
+        mustChangePassword: Boolean = false
     ) {
         val areasStr = allowedAreas.joinToString(",") { it.name }
         queries.insertUser(
@@ -254,7 +255,8 @@ class ChecklistRepository(
             featurePermissions.canEditUsers.toLongFlag(),
             featurePermissions.canCreateInventoryCounts.toLongFlag(),
             featurePermissions.canViewInventoryInsights.toLongFlag(),
-            featurePermissions.canManageAdministrativeStock.toLongFlag()
+            featurePermissions.canManageAdministrativeStock.toLongFlag(),
+            mustChangePassword.toLongFlag()
         )
     }
 
@@ -312,6 +314,12 @@ class ChecklistRepository(
     fun syncLocalUserFromRemote(localUserId: Long, remoteUser: User): User? {
         updateUserFeaturePermissions(localUserId, remoteUser.featurePermissions)
         remoteUser.remoteId?.takeIf { it.isNotBlank() }?.let { updateUserRemoteId(localUserId, it) }
+        queries.updateUserMustChangePassword(remoteUser.mustChangePassword.toLongFlag(), localUserId)
+        return getUserById(localUserId)
+    }
+
+    fun updateUserPasswordState(localUserId: Long, password: String, mustChangePassword: Boolean): User? {
+        queries.updateUserPasswordState(password, mustChangePassword.toLongFlag(), localUserId)
         return getUserById(localUserId)
     }
 
@@ -655,7 +663,8 @@ class ChecklistRepository(
                 allowedAreas = remote.allowedAreas,
                 createdAt = remote.createdAt,
                 remoteId = remoteId,
-                featurePermissions = remote.featurePermissions
+                featurePermissions = remote.featurePermissions,
+                mustChangePassword = remote.mustChangePassword
             )
             return
         }
@@ -669,6 +678,7 @@ class ChecklistRepository(
             existing.id
         )
         updateUserRemoteId(existing.id, remoteId)
+        queries.updateUserMustChangePassword(remote.mustChangePassword.toLongFlag(), existing.id)
     }
 
     fun upsertRemoteUsers(users: List<User>) {
@@ -711,7 +721,8 @@ class ChecklistRepository(
                 1L,
                 1L,
                 1L,
-                1L
+                1L,
+                0L
             )
         }
         if (queries.selectAllActivities().executeAsList().isEmpty()) {
@@ -906,7 +917,8 @@ class ChecklistRepository(
                 canCreateInventoryCounts = user.canCreateInventoryCounts == 1L,
                 canViewInventoryInsights = user.canViewInventoryInsights == 1L,
                 canManageAdministrativeStock = user.canManageAdministrativeStock == 1L
-            )
+            ),
+            mustChangePassword = user.mustChangePassword == 1L
         )
     }
 

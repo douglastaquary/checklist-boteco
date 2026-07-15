@@ -42,6 +42,7 @@ import com.checklistboteco.presentation.viewmodel.LoginViewModel
 fun LoginScreen(
     viewModel: LoginViewModel,
     onLoginSuccess: (User) -> Unit,
+    onPasswordChangeRequired: () -> Unit,
     onNewUserClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -193,6 +194,12 @@ fun LoginScreen(
     LaunchedEffect(state.isLoggedIn, state.currentUser) {
         if (state.isLoggedIn && state.currentUser != null) {
             onLoginSuccess(state.currentUser!!)
+        }
+    }
+
+    LaunchedEffect(state.requiresPasswordChange) {
+        if (state.requiresPasswordChange) {
+            onPasswordChangeRequired()
         }
     }
 }

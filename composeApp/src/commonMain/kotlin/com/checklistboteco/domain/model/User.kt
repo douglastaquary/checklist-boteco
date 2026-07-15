@@ -11,7 +11,8 @@ data class User(
     val allowedAreas: List<Area>,
     val createdAt: Long = 0L,
     val remoteId: String? = null,
-    val featurePermissions: FeaturePermissions = FeaturePermissions()
+    val featurePermissions: FeaturePermissions = FeaturePermissions(),
+    val mustChangePassword: Boolean = false
 ) {
     fun canAccessArea(area: Area): Boolean {
         return permissionLevel == PermissionLevel.ADMIN || area in allowedAreas

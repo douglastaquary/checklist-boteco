@@ -24,6 +24,7 @@ import com.checklistboteco.domain.model.PermissionLevel
 import com.checklistboteco.domain.model.User
 import com.checklistboteco.domain.model.WorkSector
 import com.checklistboteco.presentation.navigation.Screen
+import com.checklistboteco.presentation.screen.ChangePasswordScreen
 import com.checklistboteco.presentation.screen.LoginScreen
 import com.checklistboteco.presentation.screen.MainScreen
 import com.checklistboteco.presentation.screen.UserRegistrationScreen
@@ -81,6 +82,7 @@ fun App(
                 when (screen) {
                     is Screen.Login -> listOf("Login")
                     is Screen.RegisterUser -> listOf("RegisterUser")
+                    is Screen.ChangePassword -> listOf("ChangePassword")
                     is Screen.Main -> listOf(
                         "Main",
                         screen.user.id,
@@ -108,6 +110,7 @@ fun App(
                 val type = list[0] as String
                 if (type == "Login") Screen.Login
                 else if (type == "RegisterUser") Screen.RegisterUser
+                else if (type == "ChangePassword") Screen.ChangePassword
                 else {
                     val user = User(
                         id = list[1] as Long,
@@ -166,7 +169,20 @@ fun App(
                         val state = loginViewModel.uiState.value
                         currentScreen = Screen.Main(user, state.authToken, state.remoteUserId)
                     },
+                    onPasswordChangeRequired = {
+                        currentScreen = Screen.ChangePassword
+                    },
                     onNewUserClick = { currentScreen = Screen.RegisterUser }
+                )
+            }
+
+            is Screen.ChangePassword -> {
+                ChangePasswordScreen(
+                    viewModel = loginViewModel,
+                    onPasswordChanged = { user ->
+                        val state = loginViewModel.uiState.value
+                        currentScreen = Screen.Main(user, state.authToken, state.remoteUserId)
+                    }
                 )
             }
 

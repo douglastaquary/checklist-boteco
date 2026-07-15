@@ -18,9 +18,9 @@ Antes de implementar, leia a skill ou doc indicada para o domínio da tarefa.
 |---------|-------------|----------------------|
 | Backend, API, admin web, deploy AWS | Endpoints, Qute, DynamoDB, SAM | [`.cursor/skills/quarkus-serverless-qute/SKILL.md`](.cursor/skills/quarkus-serverless-qute/SKILL.md) |
 | Arquitetura serverless | Contratos e decisões | [`docs/architecture-serverless.md`](docs/architecture-serverless.md) |
-| **iOS / SwiftUI** | Telas, layout, estado, navegação, sheets | [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](.cursor/skills/swiftui-ui-patterns/SKILL.md) + [`docs/ios-swiftui-standards.md`](docs/ios-swiftui-standards.md) |
+| **iOS / SwiftUI** | Telas, layout, estado, navegação, sheets | [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](.cursor/skills/swiftui-ui-patterns/SKILL.md) + [`docs/ios-swiftui-standards.md`](docs/ios-swiftui-standards.md) + [`docs/mobile-ui-ux-guidelines.md`](docs/mobile-ui-ux-guidelines.md) |
 | Setup iOS (Xcode, SPM, API local) | Build, simulador, troubleshooting | [`docs/ios-app.md`](docs/ios-app.md) |
-| Android / KMP / Compose | Telas, navegação, Material 3, abas | [`.cursor/skills/compose-ui-patterns/SKILL.md`](.cursor/skills/compose-ui-patterns/SKILL.md) + [`docs/android-compose-navigation.md`](docs/android-compose-navigation.md) |
+| Android / KMP / Compose | Telas, navegação, Material 3, abas | [`.cursor/skills/compose-ui-patterns/SKILL.md`](.cursor/skills/compose-ui-patterns/SKILL.md) + [`docs/android-compose-navigation.md`](docs/android-compose-navigation.md) + [`docs/mobile-ui-ux-guidelines.md`](docs/mobile-ui-ux-guidelines.md) |
 | Analytics (vendas, compras, ponto, estoque) | Perguntas sobre dados importados | Seção MCP abaixo + [`docs/mcp-local-test.md`](docs/mcp-local-test.md) |
 
 ### iOS — regras resumidas
