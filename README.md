@@ -26,6 +26,30 @@ O Checklist Boteco combina operação diária, dados importados e IA para transf
 
 O objetivo não é criar um ERP pesado. É criar uma camada prática para o dono perguntar, auditar e decidir rápido.
 
+## Produto em telas
+
+Prints atuais dos apps mobile com o design system novo aplicado em iOS e Android.
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-ai-chat.png" alt="Chat IA no app iOS" width="260"><br>
+      <strong>iOS · Chat IA</strong><br>
+      Perguntas em linguagem natural sobre vendas, compras, estoque, perdas e ponto.
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/android-checklist.png" alt="Checklist operacional no app Android" width="260"><br>
+      <strong>Android · Checklist</strong><br>
+      Rotina operacional por perfil, filtros rápidos e navegação inferior atualizada.
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/android-inventory.png" alt="Contagem de mercadorias no app Android" width="260"><br>
+      <strong>Android · Contagem</strong><br>
+      Lançamento de contagens antes da abertura para cruzar abastecimento e vendas.
+    </td>
+  </tr>
+</table>
+
 ## O que o sistema faz hoje
 
 ### Operação diária
