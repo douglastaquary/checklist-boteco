@@ -30,6 +30,7 @@ Antes de implementar, leia a skill ou doc indicada para o domínio da tarefa.
 - Sem ViewModels dedicados; views pequenas + serviços injetados.
 - Bootstrap: `AppDependencies` com `init() throws` — proibido `try!` no launch.
 - Formatação: [`.swiftformat`](.swiftformat) (2 espaços).
+- Validação iOS: usar `xcodebuild` do app. Não usar `swift test` em `Packages/`, pois a CLI compila para macOS host e o projeto não suporta macOS.
 - Antes de criar/refatorar UI: ler o skill + entrada em [`references/components-index.md`](.cursor/skills/swiftui-ui-patterns/references/components-index.md).
 
 ## Servidor MCP `checklist-boteco-analytics`

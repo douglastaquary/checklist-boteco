@@ -110,23 +110,19 @@ SwiftData só faria sentido após subir deployment target para iOS 17+ e aceitar
 
 ## Testes unitários
 
-Via umbrella (recomendado):
+O app iOS e os packages SwiftUI são **iOS-only**. Não há build macOS suportado.
 
-```bash
-cd Packages && swift test
-```
+Não use `swift test` em `Packages/`: esse comando sempre compila para o host macOS pela CLI do SwiftPM. Como o projeto não declara suporte macOS, ele pode falhar com erros de disponibilidade de `ObservableObject`, `Task` e `URLSession.data(for:)` mesmo quando o build iOS está correto.
 
-Ou por módulo:
-
-```bash
-cd Packages/Models && swift test
-```
-
-Build do app:
+Validação suportada para alterações em `Packages/` e `iosApp/`:
 
 ```bash
 xcodebuild -project iosApp/ChecklistBoteco.xcodeproj -scheme ChecklistBoteco \
-  -destination 'platform=iOS Simulator,name=iPhone 14' build
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  ONLY_ACTIVE_ARCH=YES \
+  build
 ```
 
 ## Troubleshooting
