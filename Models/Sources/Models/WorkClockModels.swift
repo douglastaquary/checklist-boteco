@@ -81,6 +81,28 @@ public struct WorkClockSummary: Equatable, Sendable {
   public let requiresTwoHoursRest: Bool
 }
 
+public struct WorkClockAbsenceDetail: Equatable, Codable, Sendable {
+  public let date: String
+  public let reason: String
+
+  public init(date: String, reason: String) {
+    self.date = date
+    self.reason = reason
+  }
+}
+
+public struct RemoteWorkClockSummary: Equatable, Sendable {
+  public let absenceDays: Int
+  public let absenceDates: [String]
+  public let absenceDetails: [WorkClockAbsenceDetail]
+
+  public init(absenceDays: Int, absenceDates: [String], absenceDetails: [WorkClockAbsenceDetail]) {
+    self.absenceDays = absenceDays
+    self.absenceDates = absenceDates
+    self.absenceDetails = absenceDetails
+  }
+}
+
 public struct WorksiteInfo: Equatable, Sendable {
   public let name: String
   public let latitude: Double

@@ -4,6 +4,7 @@ import Models
 import Persistence
 import Env
 import DesignSystem
+import Network
 
 public final class LocationTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
   @Published public var location: CLLocation?
@@ -52,6 +53,7 @@ public struct WorkClockRootView: View {
   private let authToken: String?
   private let remoteUserId: String?
   private let repository: ChecklistRepository
+  private let workClockClient: WorkClockClient?
   private let syncController: SyncController
   private let deviceId: String
   private let onShowDayEntries: (() -> Void)?
@@ -61,6 +63,8 @@ public struct WorkClockRootView: View {
   @StateObject private var tracker = LocationTracker()
   @State private var entries: [WorkClockEntry] = []
   @State private var weeklyWorkedMillis: Int64 = 0
+  @State private var monthlyAbsences: [WorkClockAbsenceDetail] = []
+  @State private var monthlyAbsenceStatus = "Buscando faltas do mês…"
   @State private var feedbackAlert: WorkClockFeedbackAlert?
   @State private var isRegistering = false
 
@@ -70,6 +74,7 @@ public struct WorkClockRootView: View {
     authToken: String?,
     remoteUserId: String?,
     repository: ChecklistRepository,
+    workClockClient: WorkClockClient? = nil,
     syncController: SyncController,
     deviceId: String,
     onShowDayEntries: (() -> Void)? = nil,
@@ -80,6 +85,7 @@ public struct WorkClockRootView: View {
     self.authToken = authToken
     self.remoteUserId = remoteUserId
     self.repository = repository
+    self.workClockClient = workClockClient
     self.syncController = syncController
     self.deviceId = deviceId
     self.onShowDayEntries = onShowDayEntries
@@ -111,6 +117,7 @@ public struct WorkClockRootView: View {
           authorizationDenied: tracker.authorizationDenied
         )
         WorkClockSummarySection(summary: summary)
+        WorkClockAbsenceSection(absences: monthlyAbsences, status: monthlyAbsenceStatus)
         if let onShowDayEntries, !entries.isEmpty {
           Button("Ver marcações do dia", action: onShowDayEntries)
             .buttonStyle(.bordered)
@@ -241,6 +248,26 @@ public struct WorkClockRootView: View {
     .reduce(0) { total, dayEntries in
       total + WorkClockCalculator.summarizeDay(entries: dayEntries).workedMillis
     }
+    await loadMonthlyAbsences()
+  }
+
+  @MainActor
+  private func loadMonthlyAbsences() async {
+    guard let token = authToken, let workClockClient else {
+      monthlyAbsenceStatus = "Faltas indisponíveis offline."
+      return
+    }
+    let range = Calendar.current.dateInterval(of: .month, for: Date()) ?? DateInterval(start: Date(), duration: 0)
+    let from = Self.isoDateFormatter.string(from: range.start)
+    let endDate = Calendar.current.date(byAdding: DateComponents(day: -1), to: range.end) ?? range.start
+    let to = Self.isoDateFormatter.string(from: endDate)
+    do {
+      let summary = try await workClockClient.fetchMySummary(token: token, from: from, to: to)
+      monthlyAbsences = summary.absenceDetails
+      monthlyAbsenceStatus = summary.absenceDays == 0 ? "Sem faltas no mês." : "\(summary.absenceDays) falta(s) no mês."
+    } catch {
+      monthlyAbsenceStatus = "Faltas indisponíveis offline."
+    }
   }
 
   @MainActor
@@ -302,6 +329,14 @@ public struct WorkClockRootView: View {
     timestamp: Date()
   )
   #endif
+
+  private static let isoDateFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter
+  }()
 }
 
 private struct WorkClockFeedbackAlert: Identifiable {
@@ -372,6 +407,37 @@ private struct WorkClockSummarySection: View {
     }
     .padding(BecoTokens.Spacing.md)
     .background(BecoTokens.ColorToken.surface, in: RoundedRectangle(cornerRadius: 16))
+  }
+}
+
+private struct WorkClockAbsenceSection: View {
+  let absences: [WorkClockAbsenceDetail]
+  let status: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
+      Text("Faltas")
+        .font(.headline)
+      BecoValueRow(label: "Faltas no mês", value: "\(absences.count)")
+      if absences.isEmpty {
+        Text(status)
+          .font(.subheadline)
+          .foregroundStyle(BecoTokens.ColorToken.muted)
+      } else {
+        ForEach(absences.prefix(5), id: \.date) { absence in
+          BecoValueRow(label: formatIsoDateBR(absence.date), value: absence.reason)
+        }
+      }
+    }
+    .padding()
+    .background(BecoTokens.ColorToken.surface)
+    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+
+  private func formatIsoDateBR(_ value: String) -> String {
+    let parts = value.split(separator: "-")
+    guard parts.count == 3 else { return value }
+    return "\(parts[2])/\(parts[1])/\(parts[0])"
   }
 }
 

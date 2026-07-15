@@ -10,8 +10,9 @@ let package = Package(
     .package(path: "../Persistence"),
     .package(path: "../Env"),
     .package(path: "../DesignSystem"),
+    .package(path: "../Network"),
   ],
   targets: [
-    .target(name: "WorkClockFeature", dependencies: ["Models", "Persistence", "Env", "DesignSystem"]),
+    .target(name: "WorkClockFeature", dependencies: ["Models", "Persistence", "Env", "DesignSystem", "Network"]),
   ]
 )

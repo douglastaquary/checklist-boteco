@@ -49,7 +49,7 @@ let package = Package(
     ),
     .target(
       name: "WorkClockFeature",
-      dependencies: ["Models", "Persistence", "Env", "DesignSystem"],
+      dependencies: ["Models", "Persistence", "Env", "DesignSystem", "Network"],
       path: "WorkClock/Sources/WorkClockFeature"
     ),
     .target(
