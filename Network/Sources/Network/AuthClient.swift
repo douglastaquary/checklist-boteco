@@ -45,6 +45,16 @@ public final class AuthClient: Sendable {
     let user = dto.toDomain()
     return RemoteLoginResult(token: token, user: user, remoteUserId: dto.id)
   }
+
+  public func changeMyPassword(token: String, currentPassword: String, newPassword: String) async throws -> User {
+    let dto: PublicUserDTO = try await api.request(
+      path: "/api/me/change-password",
+      method: "POST",
+      token: token,
+      body: ChangePasswordRequestDTO(currentPassword: currentPassword, newPassword: newPassword)
+    )
+    return dto.toDomain()
+  }
 }
 
 private struct LoginRequestDTO: Encodable {
@@ -59,6 +69,11 @@ private struct VerifyDeviceRequestDTO: Encodable {
   let code: String
   let deviceId: String
   let deviceName: String
+}
+
+private struct ChangePasswordRequestDTO: Encodable {
+  let currentPassword: String
+  let newPassword: String
 }
 
 private struct LoginResponseDTO: Decodable {
@@ -92,6 +107,7 @@ private struct PublicUserDTO: Decodable {
   let allowedAreas: [String]
   let createdAt: Int64
   let permissions: FeaturePermissionsDTO?
+  let mustChangePassword: Bool?
 
   func toDomain() -> User {
     let level = PermissionLevel.from(permissionLevel)
@@ -116,7 +132,8 @@ private struct PublicUserDTO: Decodable {
       allowedAreas: resolvedAreas,
       createdAt: createdAt,
       remoteId: id,
-      featurePermissions: permissions?.toDomain() ?? .default
+      featurePermissions: permissions?.toDomain() ?? .default,
+      mustChangePassword: mustChangePassword ?? false
     )
   }
 }

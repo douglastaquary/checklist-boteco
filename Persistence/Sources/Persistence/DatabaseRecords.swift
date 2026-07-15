@@ -18,6 +18,7 @@ struct UserRecord: FetchableRecord, Decodable {
   let canCreateInventoryCounts: Bool
   let canViewInventoryInsights: Bool
   let canManageAdministrativeStock: Bool
+  let mustChangePassword: Bool
 
   func toDomain() -> User {
     let level = PermissionLevel.from(permissionLevel)
@@ -52,7 +53,8 @@ struct UserRecord: FetchableRecord, Decodable {
         canCreateInventoryCounts: canCreateInventoryCounts,
         canViewInventoryInsights: canViewInventoryInsights,
         canManageAdministrativeStock: canManageAdministrativeStock
-      )
+      ),
+      mustChangePassword: mustChangePassword
     )
   }
 }

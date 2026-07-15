@@ -115,6 +115,7 @@ public struct User: Identifiable, Equatable, Sendable {
   public var createdAt: Int64
   public var remoteId: String?
   public var featurePermissions: FeaturePermissions
+  public var mustChangePassword: Bool
 
   public init(
     id: Int64,
@@ -127,7 +128,8 @@ public struct User: Identifiable, Equatable, Sendable {
     allowedAreas: [Area],
     createdAt: Int64 = 0,
     remoteId: String? = nil,
-    featurePermissions: FeaturePermissions = .default
+    featurePermissions: FeaturePermissions = .default,
+    mustChangePassword: Bool = false
   ) {
     self.id = id
     self.name = name
@@ -140,6 +142,7 @@ public struct User: Identifiable, Equatable, Sendable {
     self.createdAt = createdAt
     self.remoteId = remoteId
     self.featurePermissions = featurePermissions
+    self.mustChangePassword = mustChangePassword
   }
 
   public func canAccessArea(_ area: Area) -> Bool {

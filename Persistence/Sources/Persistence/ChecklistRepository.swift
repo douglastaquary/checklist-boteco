@@ -26,8 +26,8 @@ public final class ChecklistRepository: Sendable {
         sql: """
         INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt,
           canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts,
-          canViewInventoryInsights, canManageAdministrativeStock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1)
+          canViewInventoryInsights, canManageAdministrativeStock, mustChangePassword)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, 1, 1, 1, 0)
         """,
         arguments: [
           "Admin", "admin@checklistboteco.com", "admin123", Area.atendimento.rawValue,
@@ -39,8 +39,8 @@ public final class ChecklistRepository: Sendable {
         sql: """
         INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt,
           canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts,
-          canViewInventoryInsights, canManageAdministrativeStock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0)
+          canViewInventoryInsights, canManageAdministrativeStock, mustChangePassword)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)
         """,
         arguments: [
           "Colaborador", "colaborador@checklistboteco.com", "colab123", Area.atendimento.rawValue,
@@ -112,7 +112,7 @@ public final class ChecklistRepository: Sendable {
           sql: """
           UPDATE User SET name = ?, email = ?, area = ?, workSector = ?, permissionLevel = ?, allowedAreas = ?,
             canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?,
-            canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
+            canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?, mustChangePassword = ?
           WHERE id = ?
           """,
           arguments: [
@@ -121,6 +121,7 @@ public final class ChecklistRepository: Sendable {
             remote.featurePermissions.canRegisterUsers, remote.featurePermissions.canCreateActivities,
             remote.featurePermissions.canEditUsers, remote.featurePermissions.canCreateInventoryCounts,
             remote.featurePermissions.canViewInventoryInsights, remote.featurePermissions.canManageAdministrativeStock,
+            remote.mustChangePassword,
             existing.id,
           ]
         )
@@ -133,7 +134,7 @@ public final class ChecklistRepository: Sendable {
           sql: """
           UPDATE User SET name = ?, area = ?, workSector = ?, permissionLevel = ?, allowedAreas = ?, remoteId = ?,
             canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?,
-            canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
+            canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?, mustChangePassword = ?
           WHERE id = ?
           """,
           arguments: [
@@ -143,6 +144,7 @@ public final class ChecklistRepository: Sendable {
             remote.featurePermissions.canRegisterUsers, remote.featurePermissions.canCreateActivities,
             remote.featurePermissions.canEditUsers, remote.featurePermissions.canCreateInventoryCounts,
             remote.featurePermissions.canViewInventoryInsights, remote.featurePermissions.canManageAdministrativeStock,
+            remote.mustChangePassword,
             existing.id,
           ]
         )
@@ -151,8 +153,8 @@ public final class ChecklistRepository: Sendable {
           sql: """
           INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId,
             canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts,
-            canViewInventoryInsights, canManageAdministrativeStock)
-          VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            canViewInventoryInsights, canManageAdministrativeStock, mustChangePassword)
+          VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           """,
           arguments: [
             remote.name, remote.email, remote.area.rawValue, remote.workSector.rawValue,
@@ -161,6 +163,7 @@ public final class ChecklistRepository: Sendable {
             remote.featurePermissions.canRegisterUsers, remote.featurePermissions.canCreateActivities,
             remote.featurePermissions.canEditUsers, remote.featurePermissions.canCreateInventoryCounts,
             remote.featurePermissions.canViewInventoryInsights, remote.featurePermissions.canManageAdministrativeStock,
+            remote.mustChangePassword,
           ]
         )
       }
@@ -214,8 +217,8 @@ public final class ChecklistRepository: Sendable {
         sql: """
         INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId,
           canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts,
-          canViewInventoryInsights, canManageAdministrativeStock)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          canViewInventoryInsights, canManageAdministrativeStock, mustChangePassword)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         arguments: [
           user.name, user.email, user.password, user.area.rawValue, user.workSector.rawValue,
@@ -224,6 +227,7 @@ public final class ChecklistRepository: Sendable {
           user.featurePermissions.canRegisterUsers, user.featurePermissions.canCreateActivities,
           user.featurePermissions.canEditUsers, user.featurePermissions.canCreateInventoryCounts,
           user.featurePermissions.canViewInventoryInsights, user.featurePermissions.canManageAdministrativeStock,
+          user.mustChangePassword,
         ]
       )
       let id = db.lastInsertedRowID
@@ -238,7 +242,8 @@ public final class ChecklistRepository: Sendable {
         allowedAreas: user.allowedAreas,
         createdAt: user.createdAt,
         remoteId: user.remoteId,
-        featurePermissions: user.featurePermissions
+        featurePermissions: user.featurePermissions,
+        mustChangePassword: user.mustChangePassword
       )
     }
   }
@@ -249,7 +254,7 @@ public final class ChecklistRepository: Sendable {
         sql: """
         UPDATE User SET name = ?, email = ?, area = ?, workSector = ?, permissionLevel = ?, allowedAreas = ?,
           remoteId = ?, canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?,
-          canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
+          canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?, mustChangePassword = ?
         WHERE id = ?
         """,
         arguments: [
@@ -259,6 +264,7 @@ public final class ChecklistRepository: Sendable {
           remoteUser.featurePermissions.canRegisterUsers, remoteUser.featurePermissions.canCreateActivities,
           remoteUser.featurePermissions.canEditUsers, remoteUser.featurePermissions.canCreateInventoryCounts,
           remoteUser.featurePermissions.canViewInventoryInsights, remoteUser.featurePermissions.canManageAdministrativeStock,
+          remoteUser.mustChangePassword,
           localUserId,
         ]
       )
@@ -271,6 +277,16 @@ public final class ChecklistRepository: Sendable {
       try db.execute(sql: "UPDATE User SET remoteId = ? WHERE id = ?", arguments: [session.remoteUserId, localUserId])
       try upsertMetadata(db, key: MetadataKey.authToken, value: session.authToken)
       try upsertMetadata(db, key: MetadataKey.remoteUserId, value: session.remoteUserId)
+    }
+  }
+
+  public func updateUserPasswordState(localUserId: Int64, password: String, mustChangePassword: Bool) throws -> User {
+    try dbQueue.write { db in
+      try db.execute(
+        sql: "UPDATE User SET password = ?, mustChangePassword = ? WHERE id = ?",
+        arguments: [password, mustChangePassword, localUserId]
+      )
+      return try UserRecord.fetchOne(db, sql: "SELECT * FROM User WHERE id = ?", arguments: [localUserId])!.toDomain()
     }
   }
 

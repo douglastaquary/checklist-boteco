@@ -210,11 +210,13 @@ public struct LoginView: View {
           return
         }
       }
-      do {
-        try credentialStore.save(username: username, password: password, remember: rememberLogin)
-      } catch {
-        rememberLogin = false
-        localError = "Login concluído, mas não foi salvo neste aparelho: \(error.localizedDescription)"
+      if session.currentUser?.mustChangePassword != true {
+        do {
+          try credentialStore.save(username: username, password: password, remember: rememberLogin)
+        } catch {
+          rememberLogin = false
+          localError = "Login concluído, mas não foi salvo neste aparelho: \(error.localizedDescription)"
+        }
       }
       onLoginSuccess()
     } catch {
@@ -279,6 +281,10 @@ public struct RegisterUserView: View {
   }
 
   private func register() async {
+    guard PasswordPolicy.isValid(password) else {
+      message = "A senha deve ter ao menos 6 caracteres, maiúscula, número e caractere especial"
+      return
+    }
     guard password == confirmPassword else {
       message = "Senhas não conferem"
       return

@@ -17,6 +17,7 @@ public final class AppSession: ObservableObject {
   private let workClockClient: WorkClockClient?
   private let deviceId: String
   private var pendingDeviceVerification: PendingDeviceVerification?
+  private var pendingPasswordChangeCurrentPassword: String?
   private var didAttemptSessionRestore = false
 
   public init(
@@ -55,11 +56,17 @@ public final class AppSession: ObservableObject {
         return
       }
       let synced = try repository.syncLocalUserFromRemote(localUserId: localUser.id, remoteUser: profile)
+      if synced.mustChangePassword {
+        try? repository.clearSyncSession()
+        return
+      }
       currentUser = synced
       authToken = session.authToken
       self.remoteUserId = remoteUserId
       await refreshWorksite(token: session.authToken)
-      await onRemoteLoginCompleted?()
+      if !synced.mustChangePassword {
+        await onRemoteLoginCompleted?()
+      }
     } catch {
       if isUnauthorized(error) {
         try? repository.clearSyncSession()
@@ -180,7 +187,8 @@ public final class AppSession: ObservableObject {
       allowedAreas: remoteUser.allowedAreas,
       createdAt: remoteUser.createdAt,
       remoteId: remoteUserId,
-      featurePermissions: remoteUser.featurePermissions
+      featurePermissions: remoteUser.featurePermissions,
+      mustChangePassword: remoteUser.mustChangePassword
     )
     let localUser = try repository.getUserByRemoteId(remoteUserId)
       ?? repository.getUserByEmail(profile.email)
@@ -194,8 +202,37 @@ public final class AppSession: ObservableObject {
     currentUser = synced
     authToken = token
     self.remoteUserId = remoteUserId
+    pendingPasswordChangeCurrentPassword = synced.mustChangePassword ? password : nil
     await refreshWorksite(token: token)
+    if !synced.mustChangePassword {
+      await onRemoteLoginCompleted?()
+    }
+  }
+
+  public func changeRequiredPassword(newPassword: String) async throws -> User {
+    guard let authClient, let token = authToken else {
+      throw NSError(domain: "Auth", code: 6, userInfo: [NSLocalizedDescriptionKey: "Faça login novamente para trocar a senha."])
+    }
+    guard let user = currentUser else {
+      throw NSError(domain: "Auth", code: 7, userInfo: [NSLocalizedDescriptionKey: "Usuário não encontrado na sessão."])
+    }
+    guard let currentPassword = pendingPasswordChangeCurrentPassword, !currentPassword.isEmpty else {
+      throw NSError(domain: "Auth", code: 8, userInfo: [NSLocalizedDescriptionKey: "Faça login novamente para trocar a senha."])
+    }
+    let remote = try await authClient.changeMyPassword(token: token, currentPassword: currentPassword, newPassword: newPassword)
+    let updated = try repository.updateUserPasswordState(
+      localUserId: user.id,
+      password: newPassword,
+      mustChangePassword: false
+    )
+    var remoteProfile = remote
+    remoteProfile.password = newPassword
+    remoteProfile.mustChangePassword = false
+    let synced = try repository.syncLocalUserFromRemote(localUserId: updated.id, remoteUser: remoteProfile)
+    currentUser = synced
+    pendingPasswordChangeCurrentPassword = nil
     await onRemoteLoginCompleted?()
+    return synced
   }
 
   public func logout() throws {
@@ -208,6 +245,7 @@ public final class AppSession: ObservableObject {
     authToken = nil
     remoteUserId = nil
     pendingDeviceVerification = nil
+    pendingPasswordChangeCurrentPassword = nil
     _ = reason
   }
 

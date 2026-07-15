@@ -76,6 +76,7 @@ private struct PublicUserDTO: Decodable {
   let allowedAreas: [String]
   let createdAt: Int64
   let permissions: FeaturePermissionsDTO?
+  let mustChangePassword: Bool?
 
   func toDomain() -> User {
     let level = PermissionLevel.from(permissionLevel)
@@ -100,7 +101,8 @@ private struct PublicUserDTO: Decodable {
       allowedAreas: resolvedAreas,
       createdAt: createdAt,
       remoteId: id,
-      featurePermissions: permissions?.toDomain() ?? .default
+      featurePermissions: permissions?.toDomain() ?? .default,
+      mustChangePassword: mustChangePassword ?? false
     )
   }
 }

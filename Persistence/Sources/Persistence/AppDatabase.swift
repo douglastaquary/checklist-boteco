@@ -19,7 +19,8 @@ enum DatabaseSchema {
     canEditUsers INTEGER NOT NULL DEFAULT 0,
     canCreateInventoryCounts INTEGER NOT NULL DEFAULT 0,
     canViewInventoryInsights INTEGER NOT NULL DEFAULT 0,
-    canManageAdministrativeStock INTEGER NOT NULL DEFAULT 0
+    canManageAdministrativeStock INTEGER NOT NULL DEFAULT 0,
+    mustChangePassword INTEGER NOT NULL DEFAULT 0
   );
   CREATE TABLE IF NOT EXISTS Activity (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,6 +133,12 @@ public enum AppDatabase {
       if !activityColumns.contains("recurrenceAnchorDate") { try db.execute(sql: "ALTER TABLE Activity ADD COLUMN recurrenceAnchorDate TEXT") }
       let completionColumns = try db.columns(in: "ActivityCompletion").map(\.name)
       if !completionColumns.contains("serviceDate") { try db.execute(sql: "ALTER TABLE ActivityCompletion ADD COLUMN serviceDate TEXT NOT NULL DEFAULT ''") }
+    }
+    migrator.registerMigration("v3-user-password-state") { db in
+      let userColumns = try db.columns(in: "User").map(\.name)
+      if !userColumns.contains("mustChangePassword") {
+        try db.execute(sql: "ALTER TABLE User ADD COLUMN mustChangePassword INTEGER NOT NULL DEFAULT 0")
+      }
     }
     return migrator
   }
