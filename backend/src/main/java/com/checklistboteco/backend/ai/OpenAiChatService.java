@@ -15,6 +15,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.YearMonth;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -75,7 +77,7 @@ public class OpenAiChatService {
         catch(Exception e){ throw new IllegalStateException("Não foi possível concluir a consulta de IA",e); }
     }
     private ObjectNode baseRequest(ChatRequest request){
-        ObjectNode body=mapper.createObjectNode(); body.put("model",model); body.put("instructions",INSTRUCTIONS); body.put("store",false); body.put("max_output_tokens",usageService.budget().maxOutputTokens); body.put("prompt_cache_key","checklist-boteco-ai-v1");
+        ObjectNode body=mapper.createObjectNode(); body.put("model",model); body.put("instructions",INSTRUCTIONS+"\nData atual em America/Fortaleza: "+LocalDate.now(ZoneId.of("America/Fortaleza"))+". Resolva datas relativas como ontem antes de chamar ferramentas."); body.put("store",false); body.put("max_output_tokens",usageService.budget().maxOutputTokens); body.put("prompt_cache_key","checklist-boteco-ai-v1");
         ArrayNode input=body.putArray("input"); request.messages.stream().skip(Math.max(0,request.messages.size()-4)).forEach(message->{ ObjectNode item=input.addObject(); item.put("role",safeRole(message.role)); item.put("content",message.text.trim()); });
         ArrayNode tools=body.putArray("tools"); Set<String> allowed=allowedTools(request);
         analytics.tools().stream().filter(tool->allowed.contains(tool.get("name"))).forEach(tool->{ ObjectNode value=tools.addObject(); value.put("type","function"); value.put("name",tool.get("name").toString()); value.put("description",tool.get("description").toString()); value.set("parameters",mapper.valueToTree(tool.get("inputSchema"))); value.put("strict",false); });
@@ -85,6 +87,7 @@ public class OpenAiChatService {
     private Set<String> allowedTools(ChatRequest request){
         String text=request.messages.get(request.messages.size()-1).text.toLowerCase(Locale.ROOT); LinkedHashSet<String> names=new LinkedHashSet<>();
         if(has(text,"venda","vendeu","vendemos","vendida","vendidas","vendido","vendidos","fatur","produto","quantas","quanto","heineken","cerveja")) names.addAll(List.of("sales_by_product","sales_quantity_by_product_in_period","sales_aggregate","sales_get_imports"));
+        if(has(text,"usuario","usuário","vendedor","garçom","garcom","atendente","operador","funcionario","funcionário","joão","joao","10%","gorjeta","serviço","servico","forró","forro")) names.addAll(List.of("sales_by_seller","sales_aggregate","sales_get_imports"));
         if(has(text,"compra","gasto","fornecedor","mercadoria","custo")) names.addAll(List.of("purchases_aggregate","purchases_list","purchases_get_imports"));
         if(has(text,"estoque","contagem","extravio","perda","abastec")) names.addAll(List.of("inventory_daily_audit","inventory_count_sessions","sales_audit_stock"));
         if(has(text,"ponto","hora extra","jornada","falta","escala")) names.addAll(List.of("work_clock_summary","work_clock_entries","work_clock_schedule"));

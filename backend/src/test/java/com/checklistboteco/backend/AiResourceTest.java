@@ -42,6 +42,15 @@ class AiResourceTest {
         assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_quantity_by_product_in_period"));
     }
 
+    @Test void sellerSalesQuestionAllowsSellerTool(){
+        AiModels.ChatMessage message=new AiModels.ChatMessage();
+        message.role="user";
+        message.text="Quanto o João Rodrigues vendeu ontem no forró e quanto deu de 10%?";
+        AiModels.ChatRequest request=new AiModels.ChatRequest();
+        request.messages=List.of(message);
+        assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_by_seller"));
+    }
+
     private String login(){
         String first=given().contentType("application/json").body("""
             {"email":"admin@checklistboteco.com","password":"admin123","deviceId":"ai-tests","deviceName":"AI Tests"}
