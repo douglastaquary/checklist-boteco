@@ -15,6 +15,8 @@ Para setup de Xcode, SPM e API local, veja [`ios-app.md`](ios-app.md).
 | Persistência | **GRDB** (não SwiftData) |
 | Formatação | [`.swiftformat`](../.swiftformat) — indentação 2 espaços |
 
+Validação de `Packages/`: use `xcodebuild` do app iOS. Não use `swift test` no umbrella ou subpackages, pois a CLI do SwiftPM compila para macOS host e esse projeto não suporta macOS.
+
 ### Estado e arquitetura de UI
 
 Siga a tabela do skill (seção *State ownership summary*) com fallback iOS 16:
@@ -77,6 +79,7 @@ Antes de abrir PR com mudanças SwiftUI:
 - [ ] Sheets/modals usam enum identificável quando representam um modelo selecionado.
 - [ ] Nenhum `try!` / force unwrap novo no bootstrap ou fluxos críticos.
 - [ ] `xcodebuild` compila para simulador iOS 16 sem erros.
+- [ ] Não usei `swift test` em `Packages/` como validação iOS.
 - [ ] Sem artefatos `.build/` ou `DerivedData/` no commit.
 - [ ] Formatação consistente com `.swiftformat`.
 

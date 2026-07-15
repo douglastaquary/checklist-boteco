@@ -9,6 +9,7 @@ import com.checklistboteco.domain.model.WorkClockCalculator
 import com.checklistboteco.domain.model.WorkClockEntry
 import com.checklistboteco.domain.model.WorkClockSummary
 import com.checklistboteco.domain.model.WorkClockType
+import com.checklistboteco.domain.model.WorkClockAbsenceDetail
 import com.checklistboteco.domain.model.WorksiteLocation
 import com.checklistboteco.platform.DeviceIdentity
 import com.checklistboteco.platform.requireRemoteToken
@@ -21,7 +22,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 
 data class WorkClockUiState(
@@ -38,7 +41,10 @@ data class WorkClockUiState(
     val deviceId: String = "",
     val deviceName: String = "",
     val showDetails: Boolean = false,
-    val feedback: String? = null
+    val feedback: String? = null,
+    val monthlyAbsenceDays: Int = 0,
+    val monthlyAbsences: List<WorkClockAbsenceDetail> = emptyList(),
+    val absenceStatus: String = "Buscando faltas do mês…"
 )
 
 class WorkClockViewModel(
@@ -61,6 +67,7 @@ class WorkClockViewModel(
 
     init {
         loadTodayEntries()
+        loadMonthlyAbsences()
         retryPendingEntries()
     }
 
@@ -186,6 +193,33 @@ class WorkClockViewModel(
                     token = token,
                     api = api
                 )
+            }
+        }
+    }
+
+    private fun loadMonthlyAbsences() {
+        val api = backendApiClient ?: run {
+            _uiState.update { it.copy(absenceStatus = "Faltas indisponíveis offline.") }
+            return
+        }
+        scope.launch {
+            runCatching {
+                val token = requireRemoteToken(api, authToken)
+                val today = Clock.System.now().toLocalDateTime(timeZone).date
+                val from = LocalDate(today.year, today.monthNumber, 1)
+                val nextMonth = if (today.monthNumber == 12) LocalDate(today.year + 1, 1, 1) else LocalDate(today.year, today.monthNumber + 1, 1)
+                val to = nextMonth.minus(kotlinx.datetime.DatePeriod(days = 1))
+                api.fetchMyWorkClockSummary(token, from.toString(), to.toString())
+            }.onSuccess { summary ->
+                _uiState.update {
+                    it.copy(
+                        monthlyAbsenceDays = summary.absenceDays,
+                        monthlyAbsences = summary.absenceDetails,
+                        absenceStatus = if (summary.absenceDays == 0) "Sem faltas no mês." else "${summary.absenceDays} falta(s) no mês."
+                    )
+                }
+            }.onFailure {
+                _uiState.update { current -> current.copy(absenceStatus = "Faltas indisponíveis offline.") }
             }
         }
     }

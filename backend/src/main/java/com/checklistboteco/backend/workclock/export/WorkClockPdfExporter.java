@@ -28,9 +28,9 @@ public class WorkClockPdfExporter {
             document.add(new Paragraph("Relatório mensal de ponto — " + month + "/" + year, titleFont));
             document.add(new Paragraph(" "));
 
-            PdfPTable table = new PdfPTable(7);
+            PdfPTable table = new PdfPTable(8);
             table.setWidthPercentage(100);
-            addHeader(table, headerFont, "Colaborador", "Horas", "Extras", "Faltantes", "Almoço", "Descanso", "Faltas");
+            addHeader(table, headerFont, "Colaborador", "Horas", "Extras", "Faltantes", "Almoço", "Descanso", "Faltas", "Dias");
             for (WorkClockMonthlyExportRow row : rows) {
                 addRow(table, bodyFont,
                     row.name,
@@ -39,7 +39,8 @@ public class WorkClockPdfExporter {
                     format(row.missingHours),
                     format(row.lunchHours),
                     format(row.restHours),
-                    Integer.toString(row.absenceDays)
+                    Integer.toString(row.absenceDays),
+                    row.absenceDates == null || row.absenceDates.isEmpty() ? "—" : String.join(", ", row.absenceDates)
                 );
             }
             document.add(table);

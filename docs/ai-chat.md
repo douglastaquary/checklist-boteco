@@ -115,6 +115,8 @@ Para reduzir consumo, o servidor:
 - “Quais foram os maiores gastos com mercadorias este mês?”
 - “Houve perda ou extravio no estoque hoje?”
 - “Quem fez horas extras nesta semana?”
+- “Quais dias João faltou em junho?”
+- “Quantas faltas cada colaborador teve este mês?”
 
 Se não houver dados ou período suficiente, o chat informa o que falta em vez de estimar números.
 

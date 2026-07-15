@@ -1,6 +1,7 @@
 package com.checklistboteco.backend.workclock.domain;
 
 import com.checklistboteco.backend.model.Models.WorkClockEntry;
+import com.checklistboteco.backend.workclock.domain.WorkClockModels.WorkClockAbsenceDetail;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -93,19 +94,28 @@ public final class WorkClockCalculator {
         LocalDate from,
         LocalDate to
     ) {
+        return absenceDetails(entries, schedule, from, to).size();
+    }
+
+    public static List<WorkClockAbsenceDetail> absenceDetails(
+        List<WorkClockEntry> entries,
+        WorkClockModels.UserWorkSchedule schedule,
+        LocalDate from,
+        LocalDate to
+    ) {
         Map<LocalDate, List<WorkClockEntry>> byDate = groupByDate(entries);
-        int absences = 0;
+        List<WorkClockAbsenceDetail> absences = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
             if (!isScheduledWorkDay(date, schedule)) continue;
             List<WorkClockEntry> dayEntries = byDate.getOrDefault(date, List.of());
             boolean hasEntrada = dayEntries.stream().anyMatch(e -> WorkClockType.ENTRADA.name().equals(e.type));
             if (!hasEntrada) {
-                absences++;
+                absences.add(new WorkClockAbsenceDetail(date.toString(), "Sem entrada registrada"));
                 continue;
             }
             boolean hasSaida = dayEntries.stream().anyMatch(e -> WorkClockType.SAIDA.name().equals(e.type));
             if (!hasSaida && date.isBefore(LocalDate.now(ZONE))) {
-                absences++;
+                absences.add(new WorkClockAbsenceDetail(date.toString(), "Entrada sem saída registrada"));
             }
         }
         return absences;

@@ -21,6 +21,8 @@ public final class WorkClockModels {
         public double missingHours;
         public double breakHours;
         public int absenceDays;
+        public List<String> absenceDates = new ArrayList<>();
+        public List<WorkClockAbsenceDetail> absenceDetails = new ArrayList<>();
     }
 
     public static class WorkClockMonthlyExportRow {
@@ -32,6 +34,18 @@ public final class WorkClockModels {
         public double lunchHours;
         public double restHours;
         public int absenceDays;
+        public List<String> absenceDates = new ArrayList<>();
+        public List<WorkClockAbsenceDetail> absenceDetails = new ArrayList<>();
+    }
+
+    public static class WorkClockAbsenceDetail {
+        public String date;
+        public String reason;
+        public WorkClockAbsenceDetail() {}
+        public WorkClockAbsenceDetail(String date, String reason) {
+            this.date = date;
+            this.reason = reason;
+        }
     }
 
     public static class WorksiteInfo {

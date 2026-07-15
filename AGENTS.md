@@ -30,6 +30,7 @@ Antes de implementar, leia a skill ou doc indicada para o domínio da tarefa.
 - Sem ViewModels dedicados; views pequenas + serviços injetados.
 - Bootstrap: `AppDependencies` com `init() throws` — proibido `try!` no launch.
 - Formatação: [`.swiftformat`](.swiftformat) (2 espaços).
+- Validação iOS: usar `xcodebuild` do app. Não usar `swift test` em `Packages/`, pois a CLI compila para macOS host e o projeto não suporta macOS.
 - Antes de criar/refatorar UI: ler o skill + entrada em [`references/components-index.md`](.cursor/skills/swiftui-ui-patterns/references/components-index.md).
 
 ## Servidor MCP `checklist-boteco-analytics`
@@ -57,6 +58,7 @@ Use o MCP **antes de responder por memória** quando a conversa mencionar:
 | Compras (listagem, agregação, schema) | `purchases_list`, `purchases_aggregate`, `purchases_get_schema`, `purchases_get_imports` |
 | Contagem / saldo teórico diário | `inventory_daily_audit`, `inventory_count_sessions` |
 | Resumo de ponto (horas, extras, faltas) | `work_clock_summary` |
+| Datas e quantidade de faltas | `work_clock_absences` |
 | Marcações detalhadas | `work_clock_entries` |
 | Escala 4x3 | `work_clock_schedule` |
 | Local do ponto (coordenadas) | `work_clock_worksite` |
@@ -68,6 +70,8 @@ Use o MCP **antes de responder por memória** quando a conversa mencionar:
 - `quanto o João Rodrigues vendeu ontem no forró?` → `sales_by_seller` com período resolvido e local Beco da Praia
 - `quanto deu de 10% por garçom?` → `sales_aggregate` com `groupBy=seller`
 - `houve extravio de água com gás?` → `sales_audit_stock` com filtro textual
+- `quais dias João faltou em junho?` → `work_clock_absences` com período
+- `quantas faltas cada colaborador teve este mês?` → `work_clock_absences`
 
 ### Configuração local do MCP
 

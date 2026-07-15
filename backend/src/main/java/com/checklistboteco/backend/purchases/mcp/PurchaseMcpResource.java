@@ -83,6 +83,10 @@ public class PurchaseMcpResource {
                 parseDate(args.get("from"), java.time.LocalDate.now().with(java.time.DayOfWeek.MONDAY)),
                 parseDate(args.get("to"), java.time.LocalDate.now()),
                 optionalText(args.get("userId")));
+            case "work_clock_absences" -> workClock.summary(
+                parseDate(args.get("from"), java.time.LocalDate.now().with(java.time.temporal.TemporalAdjusters.firstDayOfMonth())),
+                parseDate(args.get("to"), java.time.LocalDate.now()),
+                optionalText(args.get("userId"))).stream().filter(row -> row.absenceDays > 0).toList();
             case "work_clock_entries" -> workClockEntries(args);
             case "work_clock_schedule" -> workClockSchedule(args);
             case "work_clock_worksite" -> workClock.worksite();
@@ -116,6 +120,7 @@ public class PurchaseMcpResource {
             tool("inventory_daily_audit","Auditoria diária do Beco da Praia: cruza a contagem feita antes da abertura com as vendas do dia e calcula o saldo teórico por produto.",Map.of("type","object","properties",Map.of("date",Map.of("type","string","format","date"),"location",Map.of("type","string"),"text",Map.of("type","string")),"required",List.of("date"))),
             tool("inventory_count_sessions","Lista sessões imutáveis de contagem enviadas em um período.",Map.of("type","object","properties",Map.of("from",Map.of("type","string","format","date"),"to",Map.of("type","string","format","date")))),
             tool("work_clock_summary","Resumo de ponto por colaborador: horas trabalhadas, extras acima de 40 h/semana, faltas e descansos. Use para perguntas sobre jornada, horas extras ou faltas no período.",Map.of("type","object","properties",workClockPeriodProps,"required",List.of("from","to"))),
+            tool("work_clock_absences","Lista faltas por colaborador com quantidade e datas.",Map.of("type","object","properties",workClockPeriodProps,"required",List.of("from","to"))),
             tool("work_clock_entries","Histórico detalhado de marcações de ponto (entrada, almoço, saída etc.) de um colaborador no período.",Map.of("type","object","properties",workClockPeriodProps,"required",List.of("userId","from","to"))),
             tool("work_clock_schedule","Consulta a escala 4x3 de um colaborador (dias da semana configurados como trabalho).",Map.of("type","object","properties",Map.of("userId",Map.of("type","string")),"required",List.of("userId"))),
             tool("work_clock_worksite","Retorna coordenadas e raio do local de trabalho (Beco da Praia) usado na geofence de ponto.",Map.of("type","object","properties",Map.of()))

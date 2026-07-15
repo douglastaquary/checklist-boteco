@@ -90,7 +90,8 @@ public class OpenAiChatService {
         if(has(text,"usuario","usuário","vendedor","garçom","garcom","atendente","operador","funcionario","funcionário","joão","joao","10%","gorjeta","serviço","servico","forró","forro")) names.addAll(List.of("sales_by_seller","sales_aggregate","sales_get_imports"));
         if(has(text,"compra","gasto","fornecedor","mercadoria","custo")) names.addAll(List.of("purchases_aggregate","purchases_list","purchases_get_imports"));
         if(has(text,"estoque","contagem","extravio","perda","abastec")) names.addAll(List.of("inventory_daily_audit","inventory_count_sessions","sales_audit_stock"));
-        if(has(text,"ponto","hora extra","jornada","falta","escala")) names.addAll(List.of("work_clock_summary","work_clock_entries","work_clock_schedule"));
+        if(has(text,"ponto","hora extra","jornada","escala")) names.addAll(List.of("work_clock_summary","work_clock_entries","work_clock_schedule"));
+        if(has(text,"falta","faltas","ausência","ausencias","ausência","ausências","nao veio","não veio")) names.addAll(List.of("work_clock_absences","work_clock_summary","work_clock_entries","work_clock_schedule"));
         if(names.isEmpty()) names.addAll(List.of("sales_aggregate","purchases_aggregate","inventory_daily_audit","work_clock_summary"));
         return names;
     }

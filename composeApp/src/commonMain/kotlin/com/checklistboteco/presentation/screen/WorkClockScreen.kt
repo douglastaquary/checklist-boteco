@@ -132,6 +132,8 @@ fun WorkClockScreen(
                     InfoRow("Extras na semana", WorkClockCalculator.formatDuration(state.summary.overtimeMillis))
                     InfoRow("Descanso devido", WorkClockCalculator.formatDuration(state.summary.missingBreakMillis))
                     InfoRow("Horas devidas hoje", WorkClockCalculator.formatDuration(state.summary.missingDailyMillis))
+                    InfoRow("Faltas no mês", state.monthlyAbsenceDays.toString())
+                    InfoRow("Dias de falta", state.monthlyAbsences.take(5).joinToString { formatIsoDateBR(it.date) }.ifBlank { state.absenceStatus })
                 }
             }
             if (state.isAdmin || !state.canClockIn) {
@@ -331,4 +333,9 @@ private fun formatDateTime(timestamp: Long): String {
     val time = dateTime.time
     return "${date.dayOfMonth.toString().padStart(2, '0')}/${date.monthNumber.toString().padStart(2, '0')}/${date.year} " +
         "${time.hour.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}:${time.second.toString().padStart(2, '0')}"
+}
+
+private fun formatIsoDateBR(value: String): String {
+    val parts = value.split("-")
+    return if (parts.size == 3) "${parts[2]}/${parts[1]}/${parts[0]}" else value
 }

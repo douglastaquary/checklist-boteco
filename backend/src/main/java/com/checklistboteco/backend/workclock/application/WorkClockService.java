@@ -94,6 +94,8 @@ public class WorkClockService {
             row.overtimeHours = summary.overtimeHours;
             row.missingHours = summary.missingHours;
             row.absenceDays = summary.absenceDays;
+            row.absenceDates = new ArrayList<>(summary.absenceDates);
+            row.absenceDetails = new ArrayList<>(summary.absenceDetails);
             long lunch = 0L;
             long rest = 0L;
             for (List<WorkClockEntry> dayEntries : WorkClockCalculator.groupByDate(entries).values()) {
@@ -131,7 +133,9 @@ public class WorkClockService {
         row.overtimeHours = WorkClockCalculator.toHours(WorkClockCalculator.overtimeMillis(weeklyWorked));
         row.missingHours = WorkClockCalculator.toHours(WorkClockCalculator.weeklyMissingMillis(weeklyWorked));
         row.breakHours = WorkClockCalculator.toHours(breakMillis);
-        row.absenceDays = WorkClockCalculator.countAbsenceDays(entries, schedule, from, to);
+        row.absenceDetails = WorkClockCalculator.absenceDetails(entries, schedule, from, to);
+        row.absenceDates = row.absenceDetails.stream().map(detail -> detail.date).toList();
+        row.absenceDays = row.absenceDetails.size();
         return row;
     }
 

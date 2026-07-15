@@ -20,6 +20,7 @@ class WorkClockResourceTest {
             .post("/mcp").then().statusCode(200)
             .body("result.tools.name", hasItems(
                 "work_clock_summary",
+                "work_clock_absences",
                 "work_clock_entries",
                 "work_clock_schedule",
                 "work_clock_worksite"
@@ -113,11 +114,22 @@ class WorkClockResourceTest {
 
         given().header("Authorization", "Bearer " + admin)
             .queryParam("from", "2026-06-16")
-            .queryParam("to", "2026-06-16")
+            .queryParam("to", "2026-06-17")
             .queryParam("userId", userId)
             .get("/api/work-clock/summary").then().statusCode(200)
             .body("[0].userId", is(userId))
-            .body("[0].workedHours", greaterThan(0f));
+            .body("[0].workedHours", greaterThan(0f))
+            .body("[0].absenceDays", is(1))
+            .body("[0].absenceDates", hasItem("2026-06-17"))
+            .body("[0].absenceDetails[0].reason", is("Sem entrada registrada"));
+
+        given().header("Authorization", "Bearer " + token)
+            .queryParam("from", "2026-06-16")
+            .queryParam("to", "2026-06-17")
+            .get("/api/work-clock/me/summary").then().statusCode(200)
+            .body("userId", is(userId))
+            .body("absenceDays", is(1))
+            .body("absenceDates", hasItem("2026-06-17"));
 
         given().header("Authorization", "Bearer " + admin)
             .queryParam("userId", userId)
@@ -130,13 +142,29 @@ class WorkClockResourceTest {
             .queryParam("year", 2026)
             .queryParam("month", 6)
             .get("/api/work-clock/export.csv").then().statusCode(200)
-            .header("Content-Disposition", containsString("ponto-2026-6.csv"));
+            .header("Content-Disposition", containsString("ponto-2026-6.csv"))
+            .body(containsString("Dias de falta"))
+            .body(containsString("2026-06-17"));
 
         given().header("Authorization", "Bearer " + admin)
             .queryParam("year", 2026)
             .queryParam("month", 6)
             .get("/api/work-clock/export.pdf").then().statusCode(200)
             .contentType("application/pdf");
+
+        given().header("Authorization", "Bearer local-purchases-token").contentType("application/json")
+            .body(Map.of(
+                "jsonrpc", "2.0",
+                "id", 4,
+                "method", "tools/call",
+                "params", Map.of(
+                    "name", "work_clock_absences",
+                    "arguments", Map.of("from", "2026-06-16", "to", "2026-06-17", "userId", userId)
+                )
+            ))
+            .post("/mcp").then().statusCode(200)
+            .body("result.structuredContent[0].absenceDays", is(1))
+            .body("result.structuredContent[0].absenceDates", hasItem("2026-06-17"));
 
         given().header("Authorization", "Bearer " + admin).delete("/api/users/" + userId).then().statusCode(204);
     }
