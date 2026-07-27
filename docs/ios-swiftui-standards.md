@@ -61,7 +61,7 @@ Arquivo: [`iosApp/ChecklistBoteco/AppDependencies.swift`](../iosApp/ChecklistBot
 
 ## Backlog MV por feature
 
-Refatorar telas grandes (Inventory, AIChat, Admin) para subviews MV **feature a feature**, sempre passando pela skill `swiftui-view-refactor`. Pilotos: Compras (`PurchasesRootView`), Ponto (`WorkClockRootView` + `BecoButton`).
+Refatorar telas grandes (AIChat, Admin) para subviews MV **feature a feature**, sempre passando pela skill `swiftui-view-refactor`. Pilotos: Compras, Ponto, Inventário (`InventoryRootView` + `BecoButton`).
 
 ## Mapeamento skill → código atual
 

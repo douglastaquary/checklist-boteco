@@ -47,6 +47,34 @@ public struct InventoryRootView: View {
   @State private var auditImportFileName: String?
   @State private var auditResult: ApplyDailyAuditResponse?
 
+  private var canCreateInMode: Bool {
+    administrativeMode ? canManageAdministrativeStock : canCreate
+  }
+
+  private var canOpenAudit: Bool {
+    canViewInsights || canManageAdministrativeStock
+  }
+
+  private var canApplyAudit: Bool {
+    canManageAdministrativeStock || canViewInsights
+  }
+
+  private var navigationSubtitle: String {
+    if administrativeMode { return "Contagem administrativa" }
+    if canCreateInMode { return "Abertura" }
+    return "Somente insights"
+  }
+
+  private var helperText: String {
+    if canCreateInMode && administrativeMode {
+      return "Soma ao saldo acumulado de estoque. Após a auditoria diária, as vendas são abatidas."
+    }
+    if canCreateInMode {
+      return "Itens ficam no aparelho até o envio em lote."
+    }
+    return "Acesso somente aos insights e à auditoria."
+  }
+
   public init(
     user: User,
     onLogout: @escaping () -> Void = {},
@@ -96,50 +124,15 @@ public struct InventoryRootView: View {
   }
   #endif
 
-  private var canCreateInMode: Bool {
-    administrativeMode ? canManageAdministrativeStock : canCreate
-  }
-
-  private var canOpenAudit: Bool {
-    canViewInsights || canManageAdministrativeStock
-  }
-
-  private var canApplyAudit: Bool {
-    canManageAdministrativeStock || canViewInsights
-  }
-
-  private var navigationTitle: String {
-    administrativeMode ? "Estoque admin" : "Contagem"
-  }
-
-  private var navigationSubtitle: String {
-    if administrativeMode { return "Contagem administrativa" }
-    if canCreateInMode { return "Abertura" }
-    return "Somente insights"
-  }
-
   public var body: some View {
     List {
       if canManageAdministrativeStock && canCreate {
-        Section {
-          BecoSegmentedFilter(
-            options: [(false, "Abertura", nil), (true, "Estoque admin", nil)],
-            selected: $administrativeMode
-          )
-          .onChange(of: administrativeMode) { _ in reload() }
-          .themedListRowBackground()
+        InventoryModeFilterSection(administrativeMode: $administrativeMode) {
+          reload()
         }
       }
 
-      Section {
-        Text(navigationSubtitle)
-          .font(.subheadline.weight(.semibold))
-          .themedListRowBackground()
-        Text(helperText)
-          .font(.footnote)
-          .foregroundColor(.secondary)
-          .themedListRowBackground()
-      }
+      InventoryIntroSection(subtitle: navigationSubtitle, helperText: helperText)
 
       if canCreateInMode {
         InventoryDraftSection(
@@ -150,11 +143,7 @@ public struct InventoryRootView: View {
       }
 
       if let banner {
-        Section {
-          Text(banner.message)
-            .foregroundColor(banner.textColor)
-            .themedListRowBackground()
-        }
+        InventoryBannerSection(banner: banner)
       }
     }
     .themedListStyle()
@@ -172,31 +161,24 @@ public struct InventoryRootView: View {
     .toolbar {
       if canOpenAudit {
         ToolbarItem(placement: .primaryAction) {
-          Menu {
-            Button("Gerar auditoria") {
-              openAuditSheet()
-            }
-          } label: {
-            Image(systemName: "ellipsis.circle")
-          }
+          InventoryAuditMenuButton(onGenerateAudit: openAuditSheet)
         }
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       if canCreateInMode {
-        bottomBar
+        InventorySubmitBar(
+          isSending: sending,
+          isDisabled: drafts.isEmpty || sending,
+          onReviewAndSend: { showSubmitConfirm = true }
+        )
       }
     }
     .overlay(alignment: .bottomTrailing) {
       if canCreateInMode {
-        Button {
+        InventoryAddDraftButton(lifted: canCreateInMode) {
           draftSheet = .create
-        } label: {
-          Label("Adicionar", systemImage: "plus")
         }
-        .buttonStyle(.borderedProminent)
-        .padding(.trailing, 16)
-        .padding(.bottom, canCreateInMode ? 88 : 16)
       }
     }
     .task { reload() }
@@ -253,30 +235,6 @@ public struct InventoryRootView: View {
           ? "Confirma o envio da contagem administrativa? O saldo acumulado será atualizado."
           : "Os valores estão corretos? Após o envio, a contagem não poderá ser editada."
       )
-    }
-  }
-
-  private var helperText: String {
-    if canCreateInMode && administrativeMode {
-      return "Soma ao saldo acumulado de estoque. Após a auditoria diária, as vendas são abatidas."
-    }
-    if canCreateInMode {
-      return "Itens ficam no aparelho até o envio em lote."
-    }
-    return "Acesso somente aos insights e à auditoria."
-  }
-
-  private var bottomBar: some View {
-    VStack(spacing: 0) {
-      Divider()
-      Button(sending ? "Enviando…" : "Revisar e enviar") {
-        showSubmitConfirm = true
-      }
-      .buttonStyle(PrimaryButtonStyle())
-      .disabled(drafts.isEmpty || sending)
-      .padding(.horizontal, 16)
-      .padding(.vertical, 12)
-      .background(.bar)
     }
   }
 
@@ -495,33 +453,97 @@ public struct InventoryRootView: View {
   }
 }
 
-enum InventoryBanner: Equatable {
-  case info(String)
-  case success(String)
-  case validation(String)
-  case networkError(String)
+// MARK: - Subviews (MV)
 
-  var message: String {
-    switch self {
-    case .info(let text), .success(let text), .validation(let text), .networkError(let text):
-      return text
-    }
-  }
+private struct InventoryModeFilterSection: View {
+  @Binding var administrativeMode: Bool
+  let onModeChange: () -> Void
 
-  var textColor: Color {
-    switch self {
-    case .success: return .green
-    case .validation, .networkError: return .red
-    case .info: return .primary
+  var body: some View {
+    Section {
+      BecoSegmentedFilter(
+        options: [(false, "Abertura", nil), (true, "Estoque admin", nil)],
+        selected: $administrativeMode
+      )
+      .onChange(of: administrativeMode) { _ in onModeChange() }
+      .themedListRowBackground()
     }
   }
 }
 
-private enum InventoryDate {
-  static var today: String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    return formatter.string(from: Date())
+private struct InventoryIntroSection: View {
+  let subtitle: String
+  let helperText: String
+
+  var body: some View {
+    Section {
+      Text(subtitle)
+        .font(.subheadline.weight(.semibold))
+        .themedListRowBackground()
+      Text(helperText)
+        .font(.footnote)
+        .foregroundColor(.secondary)
+        .themedListRowBackground()
+    }
+  }
+}
+
+private struct InventoryBannerSection: View {
+  let banner: InventoryBanner
+
+  var body: some View {
+    Section {
+      Text(banner.message)
+        .foregroundColor(banner.textColor)
+        .themedListRowBackground()
+    }
+  }
+}
+
+private struct InventorySubmitBar: View {
+  let isSending: Bool
+  let isDisabled: Bool
+  let onReviewAndSend: () -> Void
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Divider()
+      BecoButton(
+        isSending ? "Enviando…" : "Revisar e enviar",
+        isLoading: isSending,
+        action: onReviewAndSend
+      )
+      .disabled(isDisabled)
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .background(.bar)
+    }
+  }
+}
+
+private struct InventoryAddDraftButton: View {
+  let lifted: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Label("Adicionar", systemImage: "plus")
+    }
+    .buttonStyle(.borderedProminent)
+    .padding(.trailing, 16)
+    .padding(.bottom, lifted ? 88 : 16)
+  }
+}
+
+private struct InventoryAuditMenuButton: View {
+  let onGenerateAudit: () -> Void
+
+  var body: some View {
+    Menu {
+      Button("Gerar auditoria", action: onGenerateAudit)
+    } label: {
+      Image(systemName: "ellipsis.circle")
+    }
   }
 }
 
@@ -559,5 +581,35 @@ private struct InventoryDraftSection: View {
     } header: {
       themedSectionHeader("Rascunho")
     }
+  }
+}
+
+enum InventoryBanner: Equatable {
+  case info(String)
+  case success(String)
+  case validation(String)
+  case networkError(String)
+
+  var message: String {
+    switch self {
+    case .info(let text), .success(let text), .validation(let text), .networkError(let text):
+      return text
+    }
+  }
+
+  var textColor: Color {
+    switch self {
+    case .success: return .green
+    case .validation, .networkError: return .red
+    case .info: return .primary
+    }
+  }
+}
+
+private enum InventoryDate {
+  static var today: String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
   }
 }
