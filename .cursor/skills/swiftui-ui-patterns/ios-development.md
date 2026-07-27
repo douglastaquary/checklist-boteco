@@ -8,12 +8,14 @@ description: Overlay Checklist Boteco para desenvolvimento iOS nativo (iOS 16, X
 Este arquivo complementa [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](SKILL.md). **Em caso de conflito**, prevalecem:
 
 1. [`docs/ios-swiftui-standards.md`](../../../docs/ios-swiftui-standards.md)
-2. [`SKILL.md`](SKILL.md) (skill SwiftUI)
+2. [`swiftui-view-refactor/SKILL.md`](swiftui-view-refactor/SKILL.md) (estrutura de views / MV)
+3. [`SKILL.md`](SKILL.md) (skill SwiftUI)
 
 ## Quando usar
 
 - Editar `iosApp/` ou `Packages/*` (SwiftUI, GRDB, sync, auth).
 - Adicionar telas, tabs, forms, sheets ou componentes de layout iOS.
+- **Antes de qualquer UI nova ou refatoração:** ler [`swiftui-view-refactor/SKILL.md`](swiftui-view-refactor/SKILL.md).
 
 ## Constraints Checklist Boteco
 
@@ -23,9 +25,10 @@ Este arquivo complementa [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](SKILL.m
 | Xcode | **14.2+** |
 | Swift | **5.7+** |
 | UI state | `ObservableObject` + `@StateObject` / `@ObservedObject` / `@EnvironmentObject` |
-| ViewModels | **Não** — views + serviços injetados |
+| ViewModels | **Não** — arquitetura **MV** ([mv-patterns.md](swiftui-view-refactor/references/mv-patterns.md)) |
 | Persistência | **GRDB** em `Packages/Persistence/` |
-| Packages | Monorepo em [`Packages/`](../../../Packages/) — umbrella `Package.swift` |
+| Packages | Monorepo in-tree [`Packages/`](../../../Packages/) — umbrella `Package.swift` (não submodule) |
+| CTAs | [`BecoButton`](../../../Packages/DesignSystem/Sources/DesignSystem/BecoButton.swift) — mín. 44pt HIG |
 
 **Não usar** `@Observable`, `@Environment(Type.self)` iOS 17+ ou SwiftData neste target.
 

@@ -36,6 +36,7 @@ kotlin {
                 implementation(libs.sqldelight.runtime)
                 implementation(libs.sqldelight.coroutines)
                 implementation(libs.navigation.compose)
+                implementation(project(":receipt-processor"))
             }
         }
         
@@ -49,6 +50,7 @@ kotlin {
                 implementation(libs.sqldelight.android)
                 implementation("androidx.biometric:biometric:1.1.0")
                 implementation("com.google.android.gms:play-services-location:21.3.0")
+                implementation("com.google.mlkit:text-recognition:16.0.1")
             }
         }
         

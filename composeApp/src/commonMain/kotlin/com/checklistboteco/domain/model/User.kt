@@ -44,6 +44,8 @@ data class User(
     fun canViewInventoryInsights() = permissionLevel == PermissionLevel.ADMIN || featurePermissions.canViewInventoryInsights
     fun canManageAdministrativeStock() = permissionLevel == PermissionLevel.ADMIN || featurePermissions.canManageAdministrativeStock
 
+    fun canImportPurchases() = permissionLevel == PermissionLevel.ADMIN || featurePermissions.canImportPurchases
+
     fun canManagePermissions(): Boolean {
         return permissionLevel == PermissionLevel.ADMIN
     }
@@ -53,6 +55,8 @@ data class User(
     fun canUseInventoryModule(): Boolean {
         return canCreateInventoryCounts() || canViewInventoryInsights() || canManageAdministrativeStock()
     }
+
+    fun canUsePurchasesModule(): Boolean = canImportPurchases()
 
     fun canUseDashboardModule(): Boolean {
         return canCreateActivities() || canEditUsers() || canRegisterUsers()

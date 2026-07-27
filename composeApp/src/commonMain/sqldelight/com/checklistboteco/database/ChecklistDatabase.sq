@@ -15,6 +15,7 @@ CREATE TABLE User (
     canCreateInventoryCounts INTEGER NOT NULL DEFAULT 0,
     canViewInventoryInsights INTEGER NOT NULL DEFAULT 0,
     canManageAdministrativeStock INTEGER NOT NULL DEFAULT 0,
+    canImportPurchases INTEGER NOT NULL DEFAULT 0,
     mustChangePassword INTEGER NOT NULL DEFAULT 0
 );
 
@@ -97,8 +98,8 @@ CREATE TABLE InventoryCountDraft (
 );
 
 insertUser:
-INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId, canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts, canViewInventoryInsights, canManageAdministrativeStock, mustChangePassword)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO User(name, email, password, area, workSector, permissionLevel, allowedAreas, createdAt, remoteId, canRegisterUsers, canCreateActivities, canEditUsers, canCreateInventoryCounts, canViewInventoryInsights, canManageAdministrativeStock, canImportPurchases, mustChangePassword)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertActivity:
 INSERT INTO Activity(syncId, name, area, frequency, effort, assigneeIds, estimatedDurationMinutes, executionPhase, activeWeekdays, recurrenceAnchorDate, serverRevision, syncState, deletedAt)
@@ -147,7 +148,7 @@ UPDATE User SET remoteId = ? WHERE id = ?;
 
 updateUserFeaturePermissions:
 UPDATE User
-SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?, canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?
+SET canRegisterUsers = ?, canCreateActivities = ?, canEditUsers = ?, canCreateInventoryCounts = ?, canViewInventoryInsights = ?, canManageAdministrativeStock = ?, canImportPurchases = ?
 WHERE id = ?;
 
 updateUserPasswordState:

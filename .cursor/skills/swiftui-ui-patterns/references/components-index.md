@@ -15,7 +15,7 @@ Use this file to find component and cross-cutting guidance. Each entry lists whe
 - Scroll-reveal detail surfaces: `references/scroll-reveal.md` — Use when a detail screen reveals secondary content or actions as the user scrolls or swipes between full-screen sections.
 - Grids: `references/grids.md` — Use for icon pickers, media galleries, and tiled layouts.
 - Theming and dynamic type: `references/theming.md` — Use for app-wide theme tokens, colors, and type scaling.
-- Controls (toggles, pickers, sliders): `references/controls.md` — Use for settings controls and input selection.
+- Controls (toggles, pickers, sliders, **BecoButton**): `references/controls.md` — Use for settings controls, input selection, and HIG primary/secondary CTAs.
 - Input toolbar (bottom anchored): `references/input-toolbar.md` — Use for chat/composer screens with a sticky input bar.
 - Top bar overlays (iOS 26+ and fallback): `references/top-bar.md` — Use for pinned selectors or pills above scroll content.
 - Overlay and toasts: `references/overlay.md` — Use for transient UI like banners or toasts.

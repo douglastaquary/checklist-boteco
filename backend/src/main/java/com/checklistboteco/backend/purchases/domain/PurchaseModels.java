@@ -63,6 +63,27 @@ public final class PurchaseModels {
         public List<String> preserveColumns=new ArrayList<>();
     }
 
+    public static class ReceiptSessionItem {
+        public String description,category;
+        public BigDecimal quantity=BigDecimal.ONE;
+        public long unitPriceInCents,totalInCents;
+    }
+
+    public static class ReceiptSessionSubmitRequest {
+        public String datasetId="purchases";
+        public LocalDate purchaseDate;
+        public String location="Beco da Praia";
+        public String supplier,paymentMethod,documentNumber;
+        public List<ReceiptSessionItem> items=new ArrayList<>();
+    }
+
+    public static class ReceiptSessionSubmitResponse {
+        public String sessionId,status="COMMITTED";
+        public int importedRows,duplicateRows,rejectedRows;
+        public long totalInCents;
+        public List<ImportError> errors=new ArrayList<>();
+    }
+
     public static class AttributeCondition { public String operator="EQUALS"; public Object value,to; }
     public static class SortField { public String field="purchaseDate",direction="DESC"; }
     public static class PurchaseQuery {

@@ -82,6 +82,13 @@ public class AdminGuard {
         return user;
     }
 
+    public User requirePurchaseImportAccess(String authorization) {
+        User user=requireUser(authorization);
+        if(user.permissionLevel==PermissionLevel.ADMIN || (user.permissions!=null&&user.permissions.canImportPurchases)) return user;
+        fail(Response.Status.FORBIDDEN,"Permissão para importar compras necessária");
+        return user;
+    }
+
     public User requireApplyDailyAuditAccess(String authorization) {
         User user=requireUser(authorization);
         if(user.permissionLevel==PermissionLevel.ADMIN) return user;

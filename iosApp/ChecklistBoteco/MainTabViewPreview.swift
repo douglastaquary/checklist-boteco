@@ -31,6 +31,7 @@ struct MainTabView_Previews: PreviewProvider {
       repository: previewRepository,
       syncController: previewSyncController,
       inventoryClient: nil,
+      purchaseClient: nil,
       workClockClient: nil,
       userClient: nil,
       dashboardClient: nil,

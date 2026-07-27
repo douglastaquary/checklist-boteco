@@ -64,6 +64,20 @@ Implementação:
 
 Sync em background (`SyncCoordinator` / `SyncEngine`) também interrompe fila em 401 e dispara o mesmo fluxo.
 
+## Compras mobile (OCR + CSV)
+
+Tab **Compras** (liquid glass, referência visual do Chat IA) para quem tem `canImportPurchases` (ou `ADMIN`).
+
+| Ação | Fluxo |
+|------|--------|
+| Escanear comprovante | Câmera / Fotos / Arquivos → OCR (Vision iOS / ML Kit Android) → parser KMP `:receipt-processor` → lista por categoria |
+| Salvar dados | `POST /api/purchases/receipt-sessions/submit` |
+| Enviar CSV | Menu `···` → preview/commit em `/api/purchases/imports/*` |
+
+Classificação de categorias por palavras-chave no KMP (fallback `Outros`). Local padrão: `Beco da Praia`. Fixture OCR de referência: `receipt-processor/.../omerc_receipt_ocr.txt`.
+
+Lacunas conhecidas: OCR em imagem ruim; PDF só 1ª página; sem edição inline de itens no MVP.
+
 ## Limitações conhecidas
 
 - Fotos de conclusão usam path local; upload de imagem é fase futura.

@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.checklistboteco.domain.model.User
@@ -34,6 +35,12 @@ enum class AppDestination(
         icon = Icons.Default.Inventory2,
         contentDescription = "Contagem de estoque"
     ),
+    Purchases(
+        route = "purchases",
+        title = "Compras",
+        icon = Icons.Default.ReceiptLong,
+        contentDescription = "Compras e comprovantes"
+    ),
     Dashboard(
         route = "dashboard",
         title = "Dashboard",
@@ -58,6 +65,7 @@ enum class AppDestination(
             add(Checklist)
             if (user.canUseWorkClock()) add(WorkClock)
             if (user.canUseInventoryModule()) add(Inventory)
+            if (user.canUsePurchasesModule()) add(Purchases)
             if (user.canUseDashboardModule()) add(Dashboard)
             if (user.canUseActivitiesModule()) add(Activities)
             if (user.canManagePermissions()) add(Permissions)

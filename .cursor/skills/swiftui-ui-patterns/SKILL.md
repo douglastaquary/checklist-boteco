@@ -5,6 +5,14 @@ description: Best practices and example-driven guidance for building SwiftUI vie
 
 # SwiftUI UI Patterns
 
+For **Checklist Boteco** work in `iosApp/` or `Packages/`, **always** also read and apply:
+
+1. [`ios-development.md`](ios-development.md)
+2. [`swiftui-view-refactor/SKILL.md`](swiftui-view-refactor/SKILL.md) (mandatory before creating or changing SwiftUI UI)
+3. [`swiftui-view-refactor/references/mv-patterns.md`](swiftui-view-refactor/references/mv-patterns.md)
+
+Default architecture is **MV** (no per-screen ViewModels on iOS 16).
+
 ## Quick start
 
 Choose a track based on your goal:
@@ -35,6 +43,7 @@ Choose a track based on your goal:
 - Prefer the newest SwiftUI API that fits the deployment target and call out the minimum OS whenever a pattern depends on it.
 - Maintain existing legacy patterns only when editing legacy files.
 - Follow the project's formatter and style guide.
+- **Checklist Boteco iOS:** visual UI must be native SwiftUI/UIKit only. Never import or mirror Compose/KMP UI into iOS. Prefer system controls (`TabView`, `NavigationStack`, `Form`). Tab bar: one native `UITabBar` only — never hide the system bar and draw a custom bar on top (Android keeps Compose `BecoBottomNavigation` separately). Remove unused custom chrome instead of leaving dead code.
 - **Sheets**: Prefer `.sheet(item:)` over `.sheet(isPresented:)` when state represents a selected model. Avoid `if let` inside a sheet body. Sheets should own their actions and call `dismiss()` internally instead of forwarding `onCancel`/`onConfirm` closures.
 - **Scroll-driven reveals**: Prefer deriving a normalized progress value from scroll offset and driving the visual state from that single source of truth. Avoid parallel gesture state machines unless scroll alone cannot express the interaction.
 

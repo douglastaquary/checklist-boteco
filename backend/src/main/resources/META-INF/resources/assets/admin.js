@@ -148,6 +148,7 @@ function buildUserPermissions(user, key, value) {
     canCreateInventoryCounts: Boolean(base.canCreateInventoryCounts),
     canViewInventoryInsights: Boolean(base.canViewInventoryInsights),
     canManageAdministrativeStock: Boolean(base.canManageAdministrativeStock),
+    canImportPurchases: Boolean(base.canImportPurchases),
     [key]: value
   };
 }
@@ -324,7 +325,7 @@ function renderUsers(users) {
         <small>${escapeHtml(user.workSector || '')}</small>
       </td>
       <td>${user.permissionLevel}</td>
-      ${['canRegisterUsers', 'canCreateActivities', 'canEditUsers', 'canCreateInventoryCounts', 'canViewInventoryInsights', 'canManageAdministrativeStock'].map(key => `
+      ${['canRegisterUsers', 'canCreateActivities', 'canEditUsers', 'canCreateInventoryCounts', 'canViewInventoryInsights', 'canManageAdministrativeStock', 'canImportPurchases'].map(key => `
         <td><input type="checkbox" data-user="${user.id}" data-key="${key}" ${user.permissions?.[key] ? 'checked' : ''} ${!allowPermissionEdit || user.permissionLevel === 'ADMIN' ? 'disabled' : ''}></td>
       `).join('')}
       <td class="user-actions">
@@ -430,7 +431,7 @@ async function saveUser(event) {
     } else {
       await api('/api/users', {
         method: 'POST',
-        body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false, canCreateInventoryCounts: false, canViewInventoryInsights: false, canManageAdministrativeStock: false } })
+        body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false, canCreateInventoryCounts: false, canViewInventoryInsights: false, canManageAdministrativeStock: false, canImportPurchases: false } })
       });
       userMessage('Usuário criado com sucesso. No primeiro acesso mobile, a senha deverá ser trocada.', true);
     }

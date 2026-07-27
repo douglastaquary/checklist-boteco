@@ -29,6 +29,16 @@ Siga a tabela do skill (seção *State ownership summary*) com fallback iOS 16:
 | Serviços app-wide | `@EnvironmentObject` ou injeção explícita no init |
 | **Proibido neste target** | `@Observable`, `@Environment(Type.self)` (iOS 17+) |
 | **Proibido** | ViewModels dedicados por tela |
+| **Proibido** | UI Compose/KMP no iOS; tab bar custom sobreposta à nativa |
+| **Arquitetura UI** | **MV** — views + serviços; ver [mv-patterns.md](../.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/references/mv-patterns.md) |
+
+### Shell e tabs
+
+- [`MainTabView.swift`](../iosApp/ChecklistBoteco/MainTabView.swift): **uma** `TabView` + `UITabBar` nativa (`NativeTabBarAppearance`, `TabBarVisibilityController`).
+- **Não** usar `BecoTabBar` nem `.toolbar(.hidden, for: .tabBar)` + inset custom.
+- Android permanece com `BecoBottomNavigation` em Compose — sem espelhar isso no iOS.
+- Hide/show da tab no scroll: `tracksTabBarOnScroll()` / `tabBarScrollAnchor()` (DesignSystem).
+- CTAs: [`BecoButton`](../Packages/DesignSystem/Sources/DesignSystem/BecoButton.swift) (mín. 44pt HIG).
 
 ### Bootstrap do app
 
@@ -40,12 +50,18 @@ Arquivo: [`iosApp/ChecklistBoteco/AppDependencies.swift`](../iosApp/ChecklistBot
 
 ## Workflow antes de editar UI
 
-1. Ler [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](../.cursor/skills/swiftui-ui-patterns/SKILL.md) (regras gerais e anti-patterns).
-2. Identificar o componente em [`references/components-index.md`](../.cursor/skills/swiftui-ui-patterns/references/components-index.md).
-3. Ler a referência específica (ex.: `form.md`, `tabview.md`, `sheets.md`).
-4. Buscar exemplo próximo no repo (`rg "NavigationStack"` em `Packages/`).
-5. Implementar view pequena; validar build antes de seguir para a próxima tela.
-6. Adicionar `#Preview` quando a tela tiver estados distintos (backlog fase 2).
+1. Ler [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](../.cursor/skills/swiftui-ui-patterns/SKILL.md).
+2. **Obrigatório:** ler e aplicar [swiftui-view-refactor/SKILL.md](../.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md) (MV, subviews dedicadas, body estável, ações fora do `body`).
+3. Confirmar overlay [ios-development.md](../.cursor/skills/swiftui-ui-patterns/ios-development.md) e [mv-patterns.md](../.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/references/mv-patterns.md).
+4. Identificar o componente em [`references/components-index.md`](../.cursor/skills/swiftui-ui-patterns/references/components-index.md).
+5. Ler a referência específica (ex.: `form.md`, `tabview.md`, `controls.md`, `sheets.md`).
+6. Buscar exemplo próximo no repo (`rg "NavigationStack"` em `Packages/`).
+7. Implementar view pequena; validar build antes de seguir para a próxima tela.
+8. Adicionar `#Preview` quando a tela tiver estados distintos (backlog fase 2).
+
+## Backlog MV por feature
+
+Refatorar telas grandes (Inventory, WorkClock, AIChat, Admin) para subviews MV **feature a feature**, sempre passando pela skill `swiftui-view-refactor`. Piloto: Compras (`PurchasesRootView`).
 
 ## Mapeamento skill → código atual
 
@@ -53,7 +69,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 
 | Área | Referência do skill | Arquivos atuais | Backlog fase 2 |
 |------|-------------------|-----------------|----------------|
-| App shell / tabs | [`navigationstack.md`](../.cursor/skills/swiftui-ui-patterns/references/navigationstack.md) | [`AppTabRoute.swift`](../iosApp/ChecklistBoteco/AppTabRoute.swift), [`AppDeepLink.swift`](../iosApp/ChecklistBoteco/AppDeepLink.swift) | — |
+| App shell / tabs | [`tabview.md`](../.cursor/skills/swiftui-ui-patterns/references/tabview.md), [`navigationstack.md`](../.cursor/skills/swiftui-ui-patterns/references/navigationstack.md) | [`MainTabView.swift`](../iosApp/ChecklistBoteco/MainTabView.swift), [`TabBarChrome.swift`](../Packages/DesignSystem/Sources/DesignSystem/TabBarChrome.swift), [`AppTabRoute.swift`](../iosApp/ChecklistBoteco/AppTabRoute.swift) | — |
 | Auth / forms | [`form.md`](../.cursor/skills/swiftui-ui-patterns/references/form.md), [`async-state.md`](../.cursor/skills/swiftui-ui-patterns/references/async-state.md) | [`LoginView.swift`](../Packages/Auth/Sources/Auth/LoginView.swift) | Previews 2FA/biometria |
 | Sheets / modals | [`sheets.md`](../.cursor/skills/swiftui-ui-patterns/references/sheets.md) | Permissões (Admin), Checklist (câmera), Inventário (rascunho) | — |
 | Feedback global | [`overlay.md`](../.cursor/skills/swiftui-ui-patterns/references/overlay.md) | [`DesignSystem.swift`](../Packages/DesignSystem/Sources/DesignSystem/DesignSystem.swift) | Cores de linha via `AppTheme` |
@@ -73,6 +89,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 
 Antes de abrir PR com mudanças SwiftUI:
 
+- [ ] Li e apliquei [swiftui-view-refactor/SKILL.md](../.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md) (MV, subviews dedicadas, body estável).
 - [ ] Li a referência do componente em `references/`.
 - [ ] Ownership de state está na camada correta (`@State` local vs `@EnvironmentObject` compartilhado).
 - [ ] Async work usa `.task` ou `.task(id:)` com estados loading/error visíveis quando aplicável.

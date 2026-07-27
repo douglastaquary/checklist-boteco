@@ -1,8 +1,24 @@
-# Controls (Toggle, Slider, Picker)
+# Controls (Toggle, Slider, Picker, Buttons)
 
 ## Intent
 
-Use native controls for settings and configuration screens, keeping labels accessible and state bindings clear.
+Use native controls for settings and configuration screens, keeping labels accessible and state bindings clear. For primary/secondary CTAs in Checklist Boteco, use `BecoButton`.
+
+## Checklist Boteco — `BecoButton`
+
+- Path: `Packages/DesignSystem/Sources/DesignSystem/BecoButton.swift`
+- HIG: minimum **44pt** height, `.body.weight(.semibold)`, variants `.primary` / `.secondary`
+- Requires `@EnvironmentObject AppTheme`
+- Examples: `PurchasesRootView` (Salvar dados), `LoginView` (Entrar), Admin permissions save
+
+```swift
+BecoButton("Salvar dados", isLoading: isUploading) {
+  Task { await save() }
+}
+.disabled(session.isEmpty)
+```
+
+Prefer `BecoButton` over ad-hoc `.borderedProminent` + large vertical padding.
 
 ## Core patterns
 

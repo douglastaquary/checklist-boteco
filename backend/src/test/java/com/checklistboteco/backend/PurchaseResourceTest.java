@@ -82,6 +82,47 @@ class PurchaseResourceTest {
             .body("coverageFrom",notNullValue()).body("fields.key",hasItems("codigo","cor","quando","grupo","onde","montante"));
     }
 
+    @Test void receiptSessionSubmitPersistsItems(){
+        String token=adminToken(),dataset="receipt-"+UUID.randomUUID();
+        Map<String,Object> payload=new LinkedHashMap<>();
+        payload.put("datasetId",dataset);
+        payload.put("purchaseDate","2026-06-15");
+        payload.put("location","Beco da Praia");
+        payload.put("supplier","OMERC LTDA");
+        payload.put("paymentMethod","Cartão Débito");
+        payload.put("items",List.of(
+            Map.of("description","CERVEJA HEINEKEN","category","Bebidas","quantity",24,"unitPriceInCents",450,"totalInCents",10800),
+            Map.of("description","DETERGENTE NEUTRO","category","Limpeza","quantity",6,"unitPriceInCents",349,"totalInCents",2094)
+        ));
+        given().auth().oauth2(token).contentType("application/json").body(payload)
+            .when().post("/api/purchases/receipt-sessions/submit")
+            .then().statusCode(200).body("status",is("COMMITTED")).body("importedRows",is(2)).body("totalInCents",is(12894));
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-06-01","to","2026-06-30","pageSize",50))
+            .when().post("/api/purchases/query?datasetId="+dataset)
+            .then().statusCode(200).body("totalItems",is(2)).body("items.category",hasItems("Bebidas","Limpeza"));
+    }
+
+    @Test void purchaseImportRequiresCanImportPurchasesPermission(){
+        String device="purchases-user-"+UUID.randomUUID();
+        String admin=adminToken();
+        String create=given().auth().oauth2(admin).contentType("application/json").body(Map.of(
+            "name","Compras User","email","compras-"+UUID.randomUUID()+"@test.com","password","Senha@123",
+            "area","ATENDIMENTO","workSector","ATENDENTE","permissionLevel","USER",
+            "permissions",Map.of("canImportPurchases",true)
+        )).when().post("/api/users").then().statusCode(201).extract().asString();
+        String email=JsonPath.from(create).getString("email");
+        String first=given().contentType("application/json").body(Map.of("email",email,"password","Senha@123","deviceId",device,"deviceName","JUnit"))
+            .when().post("/api/auth/login").then().statusCode(200).extract().asString();
+        JsonPath login=JsonPath.from(first);
+        String token=login.getBoolean("requiresTwoFactor")
+            ? given().contentType("application/json").body(Map.of("challengeId",login.getString("challengeId"),"code",login.getString("developmentCode"),"deviceId",device,"deviceName","JUnit"))
+                .when().post("/api/auth/verify-device").then().statusCode(200).extract().path("token")
+            : login.getString("token");
+        String csv="Data;Mercadoria;Categoria;Local;Valor Total\n15/06/2026;Item Teste;Bebidas;Beco da Praia;10,00\n";
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","ok.csv","csv",csv))
+            .when().post("/api/purchases/imports/preview").then().statusCode(200).body("totalRows",is(1));
+    }
+
     private static String adminToken(){
         String device="purchases-test-"+UUID.randomUUID();
         String first=given().contentType("application/json").body(Map.of("email","admin@checklistboteco.com","password","admin123","deviceId",device,"deviceName","JUnit purchases"))

@@ -4,6 +4,7 @@ import Network
 import Persistence
 import Env
 import InventoryFeature
+import PurchasesFeature
 
 @MainActor
 public final class AppDependencies {
@@ -17,6 +18,7 @@ public final class AppDependencies {
   public let workClockClient: WorkClockClient?
   public let dashboardClient: DashboardClient?
   public let inventoryClient: InventoryClient?
+  public let purchaseClient: PurchaseClient?
   public let aiChatClient: AIChatClient?
   public let deviceId: String
 
@@ -37,6 +39,7 @@ public final class AppDependencies {
     let workClockClient = apiClient.map(WorkClockClient.init)
     let dashboardClient = apiClient.map(DashboardClient.init)
     let inventoryClient = apiClient.map(InventoryClient.init)
+    let purchaseClient = apiClient.map(PurchaseClient.init)
     let aiChatClient = apiClient.map(AIChatClient.init)
     let deviceId = DeviceIdentity.current
     let session = AppSession(
@@ -66,6 +69,7 @@ public final class AppDependencies {
     self.workClockClient = workClockClient
     self.dashboardClient = dashboardClient
     self.inventoryClient = inventoryClient
+    self.purchaseClient = purchaseClient
     self.aiChatClient = aiChatClient
     self.deviceId = deviceId
   }

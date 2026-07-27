@@ -6,7 +6,8 @@ data class FeaturePermissions(
     val canEditUsers: Boolean = false,
     val canCreateInventoryCounts: Boolean = false,
     val canViewInventoryInsights: Boolean = false,
-    val canManageAdministrativeStock: Boolean = false
+    val canManageAdministrativeStock: Boolean = false,
+    val canImportPurchases: Boolean = false
 ) {
     companion object {
         val Admin = FeaturePermissions(
@@ -15,7 +16,8 @@ data class FeaturePermissions(
             canEditUsers = true,
             canCreateInventoryCounts = true,
             canViewInventoryInsights = true,
-            canManageAdministrativeStock = true
+            canManageAdministrativeStock = true,
+            canImportPurchases = true
         )
 
         /** Novos usuários: somente Checklist e Ponto até o admin conceder permissões. */
@@ -24,6 +26,7 @@ data class FeaturePermissions(
 
     fun hasAnyDelegatedPermission(): Boolean {
         return canRegisterUsers || canCreateActivities || canEditUsers ||
-            canCreateInventoryCounts || canViewInventoryInsights || canManageAdministrativeStock
+            canCreateInventoryCounts || canViewInventoryInsights || canManageAdministrativeStock ||
+            canImportPurchases
     }
 }

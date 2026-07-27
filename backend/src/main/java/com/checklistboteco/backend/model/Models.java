@@ -34,6 +34,7 @@ public final class Models {
         public boolean canCreateInventoryCounts;
         public boolean canViewInventoryInsights;
         public boolean canManageAdministrativeStock;
+        public boolean canImportPurchases;
         public FeaturePermissions() {}
         public FeaturePermissions(boolean register, boolean activities, boolean edit) {
             canRegisterUsers = register; canCreateActivities = activities; canEditUsers = edit;
@@ -43,6 +44,7 @@ public final class Models {
             value.canCreateInventoryCounts=true;
             value.canViewInventoryInsights=true;
             value.canManageAdministrativeStock=true;
+            value.canImportPurchases=true;
             return value;
         }
     }

@@ -2,7 +2,7 @@
 
 Aplicativo **100% SwiftUI nativo** (sem Kotlin Multiplatform/Compose), organizado em Swift Packages em [`Packages/`](../Packages/) e shell em [`iosApp/`](../iosApp/).
 
-Integração SPM usa um package umbrella em `Packages/`, mantido como submódulo na branch dedicada `ios-packages`. O Xcode resolve uma revisão publicada e reproduzível desse package.
+`Packages/` faz parte do **monorepo** (mesma árvore do GitHub): Auth, DesignSystem, Network, etc. são pastas versionadas junto com `iosApp/`. O Xcode resolve o umbrella local via `../Packages` (`Package.swift`).
 
 ## Requisitos
 
@@ -44,11 +44,7 @@ Com API configurada: **sem seed local** — dados vêm do pull pós-login. Detal
 
 ## Abrir no Xcode
 
-1. Inicialize o submódulo após clonar ou trocar de branch:
-
-```bash
-git submodule update --init --recursive
-```
+1. Clone o repositório (não há submódulo de `Packages/` — as fontes já estão na árvore).
 
 2. Gere o projeto (se necessário):
 
@@ -57,24 +53,17 @@ python3 iosApp/generate_xcodeproj.py
 ```
 
 3. Abra `iosApp/ChecklistBoteco.xcodeproj`.
-4. O Xcode resolve **um** package source-control local em `Packages/`, fixado pelo `Package.resolved`.
+4. O Xcode resolve o package local em `Packages/` (`Package.resolved` com `localSourceControl`).
 5. Selecione simulador iPhone e **Run** (⌘R).
 
-### Atualizar código em `Packages/`
+### Alterar código em `Packages/`
 
-As alterações do submódulo precisam ser publicadas antes de atualizar o ponteiro no projeto principal:
+Edite e faça commit **no mesmo branch do monorepo** (ex. `main`). Não use mais a branch `ios-packages` como submodule.
 
 ```bash
-cd Packages
-git switch ios-packages
-git add -A
-git commit -m "Descreva a alteração dos packages"
-git push origin ios-packages
-cd ..
-git add Packages iosApp/ChecklistBoteco.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+git add Packages iosApp
+git commit -m "Descreva a alteração dos packages / app"
 ```
-
-O commit do repositório principal registra o novo gitlink. Não edite a revisão manualmente sem publicar o commit do submódulo.
 
 ## Estrutura de pacotes (umbrella)
 

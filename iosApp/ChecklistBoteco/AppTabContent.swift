@@ -5,6 +5,7 @@ import Auth
 import ChecklistFeature
 import WorkClockFeature
 import InventoryFeature
+import PurchasesFeature
 import DashboardFeature
 import AdminFeatures
 import Env
@@ -16,6 +17,7 @@ struct MainTabContext {
   let repository: ChecklistRepository
   let syncController: SyncController
   let inventoryClient: InventoryClient?
+  let purchaseClient: PurchaseClient?
   let workClockClient: WorkClockClient?
   let userClient: UserClient?
   let dashboardClient: DashboardClient?
@@ -37,6 +39,7 @@ extension AppTab {
     case .checklist: return "checklist"
     case .workClock: return "clock"
     case .inventory: return "shippingbox"
+    case .purchases: return "cart"
     case .dashboard: return "chart.bar"
     case .activities: return "slider.horizontal.3"
     case .permissions: return "person.badge.key"
@@ -97,6 +100,8 @@ extension AppTab {
           }
         }
       )
+    case .purchases:
+      PurchasesRootView(purchaseClient: context.purchaseClient, token: context.authToken)
     case .dashboard:
       SyncRefreshingContainer(syncController: context.syncController) {
         DashboardRootView(
