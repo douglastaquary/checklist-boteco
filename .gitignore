@@ -38,3 +38,6 @@ env.local
 *.db
 *.db-shm
 *.db-wal
+
+# Xcode 14.2 SPM: .git local em Packages/ (não submodule; fontes no monorepo)
+Packages/.git/

@@ -76,6 +76,16 @@ CHECKLIST_API_BASE_URL = http:/$()/localhost:8181
 
 Em `.xcconfig`, `//` inicia comentário — use `http:/$()/…` para URLs com barras duplas.
 
+## Build (Xcode 14.2 SPM)
+
+Após clone (ou se o Xcode falhar com `does not appear to be a git repository`):
+
+```bash
+./scripts/ensure-packages-spm-git.sh
+./scripts/build-ios.sh
+```
+
+`Packages/.git` é local/gitignored; as fontes continuam no monorepo.
 ## Testes
 
 ```bash

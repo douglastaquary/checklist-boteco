@@ -30,16 +30,13 @@ Valide alterações dos packages pelo build do app iOS:
 
 ```bash
 cd ..
-xcodebuild -project iosApp/ChecklistBoteco.xcodeproj -scheme ChecklistBoteco \
-  -sdk iphonesimulator \
-  -destination 'generic/platform=iOS Simulator' \
-  CODE_SIGNING_ALLOWED=NO \
-  ONLY_ACTIVE_ARCH=YES \
-  build
+./scripts/ensure-packages-spm-git.sh   # Xcode 14.2 SPM precisa de Packages/.git local
+./scripts/build-ios.sh
 ```
 
 > Após editar código aqui, commitar **no repositório principal** (`ChecklistBoteco/`), junto com `iosApp/` e o restante do projeto — como no [IceCubesApp](https://github.com/Dimillian/IceCubesApp/tree/main/Packages).
-
+>
+> O `.git` dentro de `Packages/` é só para o SPM (ignorado pelo monorepo). Use `./scripts/ensure-packages-spm-git.sh` após clone ou quando o Xcode não refletir mudanças.
 ## Subpastas `*/Package.swift`
 
 Mantidas para desenvolvimento isolado; o **umbrella** em `Package.swift` é a fonte usada pelo Xcode.

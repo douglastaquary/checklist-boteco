@@ -1,51 +1,11 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 import Models
 import Persistence
 import Env
 import DesignSystem
 import Network
-
-public final class LocationTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
-  @Published public var location: CLLocation?
-  @Published public var authorizationDenied = false
-  @Published public var locationError: String?
-  private let manager = CLLocationManager()
-
-  public override init() {
-    super.init()
-    manager.delegate = self
-    manager.desiredAccuracy = kCLLocationAccuracyBest
-  }
-
-  public func start() {
-    manager.requestWhenInUseAuthorization()
-    manager.startUpdatingLocation()
-  }
-
-  public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-    guard let latest = locations.last, latest.horizontalAccuracy >= 0 else { return }
-    location = latest
-    authorizationDenied = false
-    locationError = nil
-  }
-
-  public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-    locationError = error.localizedDescription
-  }
-
-  public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-    switch manager.authorizationStatus {
-    case .denied, .restricted:
-      authorizationDenied = true
-    case .authorizedAlways, .authorizedWhenInUse:
-      authorizationDenied = false
-      manager.startUpdatingLocation()
-    default:
-      break
-    }
-  }
-}
 
 public struct WorkClockRootView: View {
   private let user: User
@@ -59,7 +19,6 @@ public struct WorkClockRootView: View {
   private let onShowDayEntries: (() -> Void)?
   private let onLogout: () -> Void
 
-  @EnvironmentObject private var theme: AppTheme
   @StateObject private var tracker = LocationTracker()
   @State private var entries: [WorkClockEntry] = []
   @State private var weeklyWorkedMillis: Int64 = 0
@@ -90,85 +49,6 @@ public struct WorkClockRootView: View {
     self.deviceId = deviceId
     self.onShowDayEntries = onShowDayEntries
     self.onLogout = onLogout
-  }
-
-  public var body: some View {
-    let nextType = WorkClockCalculator.nextType(entries: entries)
-    let summary = WorkClockCalculator.summarizeDay(
-      entries: entries,
-      weeklyWorkedMillis: weeklyWorkedMillis
-    )
-    let distance = currentDistance
-    let canRegister = canUseClock(distance: distance)
-
-    ScrollView {
-      LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.lg) {
-        VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
-          Text("Ponto").font(.largeTitle.bold())
-          Text("Próxima marcação: \(nextType.displayName)")
-            .foregroundStyle(BecoTokens.ColorToken.muted)
-        }
-        WorkClockStatusSection(
-          nextType: nextType,
-          distance: distance,
-          accuracy: effectiveAccuracy,
-          locationStatus: locationStatus,
-          isWithinRadius: canRegister,
-          authorizationDenied: tracker.authorizationDenied
-        )
-        WorkClockSummarySection(summary: summary)
-        WorkClockAbsenceSection(absences: monthlyAbsences, status: monthlyAbsenceStatus)
-        if let onShowDayEntries, !entries.isEmpty {
-          Button("Ver marcações do dia", action: onShowDayEntries)
-            .buttonStyle(.bordered)
-        }
-      }
-      .padding(.horizontal, BecoTokens.Spacing.md)
-      .padding(.bottom, BecoTokens.Spacing.xxl)
-    }
-    .background(BecoTokens.ColorToken.background)
-    .toolbar(.hidden, for: .navigationBar)
-    .safeAreaInset(edge: .top, spacing: 0) {
-      BecoUserHeader(
-        name: user.name,
-        role: user.workSector.displayName,
-        date: Date.now.formatted(date: .abbreviated, time: .omitted),
-        onLogout: onLogout
-      )
-      .background(BecoTokens.ColorToken.background)
-    }
-    .safeAreaInset(edge: .bottom) {
-      VStack(spacing: 12) {
-        Button {
-          handleRegisterTap(type: nextType, distance: distance ?? 0, canRegister: canRegister)
-        } label: {
-          Group {
-            if isRegistering {
-              ProgressView()
-                .tint(.white)
-            } else {
-              Text("Registrar \(nextType.displayName)")
-            }
-          }
-          .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(theme.tint)
-        .disabled(isRegistering || !canRegister)
-      }
-      .padding(.horizontal)
-      .padding(.vertical, 12)
-      .background(Color(uiColor: .systemBackground))
-    }
-    .onAppear { tracker.start() }
-    .task { await reload() }
-    .alert(item: $feedbackAlert) { alert in
-      Alert(
-        title: Text(alert.title),
-        message: Text(alert.message),
-        dismissButton: .default(Text("OK"))
-      )
-    }
   }
 
   private var effectiveLocation: CLLocation? {
@@ -209,6 +89,64 @@ public struct WorkClockRootView: View {
       return "Fora do raio de \(Int(WorksiteLocation.allowedRadiusMeters)) m (\(Int(distance)) m)."
     }
     return "Dentro do raio permitido."
+  }
+
+  public var body: some View {
+    let nextType = WorkClockCalculator.nextType(entries: entries)
+    let summary = WorkClockCalculator.summarizeDay(
+      entries: entries,
+      weeklyWorkedMillis: weeklyWorkedMillis
+    )
+    let distance = currentDistance
+    let canRegister = canUseClock(distance: distance)
+
+    ScrollView {
+      LazyVStack(alignment: .leading, spacing: BecoTokens.Spacing.lg) {
+        WorkClockTitleSection(nextType: nextType)
+        WorkClockStatusSection(
+          distance: distance,
+          accuracy: effectiveAccuracy,
+          locationStatus: locationStatus,
+          isWithinRadius: canRegister,
+          authorizationDenied: tracker.authorizationDenied
+        )
+        WorkClockSummarySection(summary: summary)
+        WorkClockAbsenceSection(absences: monthlyAbsences, status: monthlyAbsenceStatus)
+        if let onShowDayEntries, !entries.isEmpty {
+          WorkClockDayEntriesButton(action: onShowDayEntries)
+        }
+      }
+      .padding(.horizontal, BecoTokens.Spacing.md)
+      .padding(.bottom, BecoTokens.Spacing.xxl)
+    }
+    .background(BecoTokens.ColorToken.background)
+    .toolbar(.hidden, for: .navigationBar)
+    .safeAreaInset(edge: .top, spacing: 0) {
+      BecoUserHeader(
+        name: user.name,
+        role: user.workSector.displayName,
+        date: Date.now.formatted(date: .abbreviated, time: .omitted),
+        onLogout: onLogout
+      )
+      .background(BecoTokens.ColorToken.background)
+    }
+    .safeAreaInset(edge: .bottom) {
+      WorkClockRegisterBar(
+        nextType: nextType,
+        isRegistering: isRegistering,
+        canRegister: canRegister,
+        onRegister: { handleRegisterTap(type: nextType, distance: distance ?? 0, canRegister: canRegister) }
+      )
+    }
+    .onAppear { tracker.start() }
+    .task { await reload() }
+    .alert(item: $feedbackAlert) { alert in
+      Alert(
+        title: Text(alert.title),
+        message: Text(alert.message),
+        dismissButton: .default(Text("OK"))
+      )
+    }
   }
 
   private func canUseClock(distance: Double?) -> Bool {
@@ -339,6 +277,50 @@ public struct WorkClockRootView: View {
   }()
 }
 
+// MARK: - Subviews (MV)
+
+private struct WorkClockTitleSection: View {
+  let nextType: WorkClockType
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: BecoTokens.Spacing.xxs) {
+      Text("Ponto").font(.largeTitle.bold())
+      Text("Próxima marcação: \(nextType.displayName)")
+        .foregroundStyle(BecoTokens.ColorToken.muted)
+    }
+  }
+}
+
+private struct WorkClockDayEntriesButton: View {
+  let action: () -> Void
+
+  var body: some View {
+    Button("Ver marcações do dia", action: action)
+      .buttonStyle(.bordered)
+  }
+}
+
+private struct WorkClockRegisterBar: View {
+  let nextType: WorkClockType
+  let isRegistering: Bool
+  let canRegister: Bool
+  let onRegister: () -> Void
+
+  var body: some View {
+    VStack(spacing: 12) {
+      BecoButton(
+        "Registrar \(nextType.displayName)",
+        isLoading: isRegistering,
+        action: onRegister
+      )
+      .disabled(isRegistering || !canRegister)
+    }
+    .padding(.horizontal)
+    .padding(.vertical, 12)
+    .background(Color(uiColor: .systemBackground))
+  }
+}
+
 private struct WorkClockFeedbackAlert: Identifiable {
   let title: String
   let message: String
@@ -346,7 +328,6 @@ private struct WorkClockFeedbackAlert: Identifiable {
 }
 
 private struct WorkClockStatusSection: View {
-  let nextType: WorkClockType
   let distance: Double?
   let accuracy: Double?
   let locationStatus: String
@@ -356,7 +337,10 @@ private struct WorkClockStatusSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: BecoTokens.Spacing.sm) {
       Text("Localização").font(.headline)
-      statusRow
+      WorkClockLocationStatusRow(
+        locationStatus: locationStatus,
+        isWithinRadius: isWithinRadius
+      )
       if let distance {
         Text(String(format: "Distância do local: %.1f m", distance))
       }
@@ -373,9 +357,13 @@ private struct WorkClockStatusSection: View {
     .padding(BecoTokens.Spacing.md)
     .background(BecoTokens.ColorToken.surface, in: RoundedRectangle(cornerRadius: 16))
   }
+}
 
-  @ViewBuilder
-  private var statusRow: some View {
+private struct WorkClockLocationStatusRow: View {
+  let locationStatus: String
+  let isWithinRadius: Bool
+
+  var body: some View {
     HStack {
       Image(systemName: isWithinRadius ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
         .foregroundColor(isWithinRadius ? .green : .red)
@@ -472,5 +460,3 @@ private extension Date {
     )
   }
 }
-
-import UIKit
