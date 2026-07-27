@@ -6,6 +6,7 @@ import DesignSystem
 
 public struct ActivitiesManagementView: View {
   private let repository: ChecklistRepository
+
   @State private var activities: [Activity] = []
   @State private var createSheet: ActivityCreateSheet?
   @State private var editSheet: ActivityEditSheet?
@@ -17,19 +18,9 @@ public struct ActivitiesManagementView: View {
 
   public var body: some View {
     List {
-      Section {
-        BecoPageHeader(title: "Atividades", subtitle: "Rotinas operacionais cadastradas")
-          .listRowInsets(EdgeInsets())
-          .listRowSeparator(.hidden)
-          .themedListRowBackground()
-      }
-      Section {
-        Button("Nova atividade") {
-          createSheet = ActivityCreateSheet()
-        }
-        .themedListRowBackground()
-      } header: {
-        themedSectionHeader("Ações")
+      ActivitiesHeaderSection()
+      ActivitiesActionsSection {
+        createSheet = ActivityCreateSheet()
       }
       ActivityListSection(
         activities: activities,
@@ -89,6 +80,146 @@ public struct ActivitiesManagementView: View {
 
   private func reload() {
     activities = (try? repository.allActivities()) ?? []
+  }
+}
+
+public struct PermissionManagementView: View {
+  private let repository: ChecklistRepository
+  private let userClient: UserClient?
+  private let authToken: String?
+
+  @State private var users: [User] = []
+  @State private var editSheet: PermissionEditSheet?
+  @State private var loadError: String?
+
+  public init(
+    repository: ChecklistRepository,
+    userClient: UserClient? = nil,
+    authToken: String? = nil
+  ) {
+    self.repository = repository
+    self.userClient = userClient
+    self.authToken = authToken
+  }
+
+  public var body: some View {
+    List {
+      PermissionHeaderSection()
+      if let loadError {
+        PermissionErrorSection(message: loadError)
+      }
+      PermissionUsersSection(users: users) { user in
+        editSheet = PermissionEditSheet(user: user)
+      }
+    }
+    .themedListStyle()
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
+    .task { await reloadUsers() }
+    .sheet(item: $editSheet) { sheet in
+      PermissionEditorSheet(
+        user: sheet.user,
+        repository: repository,
+        userClient: userClient,
+        authToken: authToken,
+        onSaved: {
+          Task { await reloadUsers() }
+          editSheet = nil
+        },
+        onCancel: { editSheet = nil }
+      )
+    }
+  }
+
+  private func reloadUsers() async {
+    if let userClient, let authToken, !authToken.isEmpty {
+      do {
+        let remoteUsers = try await userClient.listUsers(token: authToken)
+        try repository.upsertRemoteUsers(remoteUsers)
+        users = (try? repository.allUsers()) ?? []
+        loadError = nil
+        return
+      } catch {
+        loadError = error.localizedDescription
+      }
+    }
+    users = (try? repository.allUsers()) ?? []
+  }
+}
+
+// MARK: - Subviews (MV)
+
+private struct ActivitiesHeaderSection: View {
+  var body: some View {
+    Section {
+      BecoPageHeader(title: "Atividades", subtitle: "Rotinas operacionais cadastradas")
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .themedListRowBackground()
+    }
+  }
+}
+
+private struct ActivitiesActionsSection: View {
+  let onCreate: () -> Void
+
+  var body: some View {
+    Section {
+      Button("Nova atividade", action: onCreate)
+        .themedListRowBackground()
+    } header: {
+      themedSectionHeader("Ações")
+    }
+  }
+}
+
+private struct PermissionHeaderSection: View {
+  var body: some View {
+    Section {
+      BecoPageHeader(title: "Equipe", subtitle: "Usuários e permissões de acesso")
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .themedListRowBackground()
+    }
+  }
+}
+
+private struct PermissionErrorSection: View {
+  let message: String
+
+  var body: some View {
+    Section {
+      Text(message)
+        .foregroundColor(.secondary)
+        .themedListRowBackground()
+    }
+  }
+}
+
+private struct PermissionUsersSection: View {
+  let users: [User]
+  let onSelect: (User) -> Void
+
+  var body: some View {
+    Section {
+      ForEach(users, id: \.id) { user in
+        Button {
+          onSelect(user)
+        } label: {
+          HStack {
+            Text(user.name)
+            Spacer()
+            Text(user.permissionLevel.rawValue)
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+        }
+        .buttonStyle(.plain)
+        .themedListRowBackground()
+      }
+    } header: {
+      themedSectionHeader("Usuários")
+    }
   }
 }
 
@@ -157,94 +288,6 @@ private struct ActivityFormSheet: View {
         }
       }
     }
-  }
-}
-
-public struct PermissionManagementView: View {
-  private let repository: ChecklistRepository
-  private let userClient: UserClient?
-  private let authToken: String?
-  @State private var users: [User] = []
-  @State private var editSheet: PermissionEditSheet?
-  @State private var loadError: String?
-
-  public init(
-    repository: ChecklistRepository,
-    userClient: UserClient? = nil,
-    authToken: String? = nil
-  ) {
-    self.repository = repository
-    self.userClient = userClient
-    self.authToken = authToken
-  }
-
-  public var body: some View {
-    List {
-      Section {
-        BecoPageHeader(title: "Equipe", subtitle: "Usuários e permissões de acesso")
-          .listRowInsets(EdgeInsets())
-          .listRowSeparator(.hidden)
-          .themedListRowBackground()
-      }
-      if let loadError {
-        Section {
-          Text(loadError)
-            .foregroundColor(.secondary)
-            .themedListRowBackground()
-        }
-      }
-      Section {
-        ForEach(users, id: \.id) { user in
-          Button {
-            editSheet = PermissionEditSheet(user: user)
-          } label: {
-            HStack {
-              Text(user.name)
-              Spacer()
-              Text(user.permissionLevel.rawValue)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-          }
-          .buttonStyle(.plain)
-          .themedListRowBackground()
-        }
-      } header: {
-        themedSectionHeader("Usuários")
-      }
-    }
-    .themedListStyle()
-    .navigationTitle("")
-    .navigationBarTitleDisplayMode(.inline)
-    .task { await reloadUsers() }
-    .sheet(item: $editSheet) { sheet in
-      PermissionEditorSheet(
-        user: sheet.user,
-        repository: repository,
-        userClient: userClient,
-        authToken: authToken,
-        onSaved: {
-          Task { await reloadUsers() }
-          editSheet = nil
-        },
-        onCancel: { editSheet = nil }
-      )
-    }
-  }
-
-  private func reloadUsers() async {
-    if let userClient, let authToken, !authToken.isEmpty {
-      do {
-        let remoteUsers = try await userClient.listUsers(token: authToken)
-        try repository.upsertRemoteUsers(remoteUsers)
-        users = (try? repository.allUsers()) ?? []
-        loadError = nil
-        return
-      } catch {
-        loadError = error.localizedDescription
-      }
-    }
-    users = (try? repository.allUsers()) ?? []
   }
 }
 
@@ -405,6 +448,7 @@ private struct PermissionTogglesSection: View {
       Toggle("Insights de inventário", isOn: $permissions.canViewInventoryInsights)
         .themedListRowBackground()
       Toggle("Estoque administrativo", isOn: $permissions.canManageAdministrativeStock)
+        .themedListRowBackground()
       Toggle("Importar compras", isOn: $permissions.canImportPurchases)
         .themedListRowBackground()
     } header: {
