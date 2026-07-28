@@ -390,6 +390,31 @@ class SalesResourceTest {
             .body("totalQuantity",anyOf(is(25),is("25")));
     }
 
+    @Test void salesHeatmapReturnsDailyQuantitiesForYear(){
+        String token=adminToken(),dataset="sales-heatmap-"+UUID.randomUUID();
+        String csv="""
+            Data;Produto;Categoria;Local;Quantidade;Valor
+            10/01/2026;Cerveja;Bebidas;Bar;10;100,00
+            10/01/2026;Água;Bebidas;Bar;5;25,00
+            15/02/2026;Cerveja;Bebidas;Bar;20;200,00
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","heatmap.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200).extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","category","Categoria","location","Local","quantity","Quantidade","totalInCents","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(3));
+
+        given().auth().oauth2(token)
+            .when().get("/api/admin/dashboard/sales-heatmap?year=2026&datasetId="+dataset)
+            .then().statusCode(200)
+            .body("year",is(2026))
+            .body("days.date",hasItems("2026-01-10","2026-02-15"))
+            .body("days.find { it.date == '2026-01-10' }.quantity",anyOf(is(15),is(15.0f),is(15.0),is("15")))
+            .body("days.find { it.date == '2026-01-10' }.totalInCents",anyOf(is(12500),is(12500L)));
+    }
+
     private static String adminToken(){
         String device="sales-test-"+UUID.randomUUID();
         String first=given().contentType("application/json").body(Map.of("email","admin@checklistboteco.com","password","admin123","deviceId",device,"deviceName","JUnit sales"))

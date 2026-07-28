@@ -45,6 +45,36 @@ public class SalesQueryService {
         result.groups=groups.values().stream().sorted(Comparator.comparing((AggregateBucket bucket)->bucket.quantity,Comparator.reverseOrder()).thenComparingLong(bucket->-bucket.totalInCents)).limit(100).toList(); return result;
     }
 
+    public SalesHeatmapResponse heatmap(String datasetId, int year){
+        if(year<2000||year>2100) throw new IllegalArgumentException("Ano inválido");
+        LocalDate from=LocalDate.of(year,1,1);
+        LocalDate to=LocalDate.of(year,12,31);
+        LocalDate today=LocalDate.now();
+        if(year==today.getYear()&&to.isAfter(today)) to=today;
+        SaleQuery query=new SaleQuery();
+        query.from=from;
+        query.to=to;
+        Map<LocalDate,BigDecimal> qtyByDay=new TreeMap<>();
+        Map<LocalDate,Long> centsByDay=new TreeMap<>();
+        for(Sale sale:filtered(datasetId,query)){
+            if(sale.saleDate==null) continue;
+            BigDecimal qty=sale.quantity==null?BigDecimal.ZERO:sale.quantity;
+            qtyByDay.merge(sale.saleDate,qty,BigDecimal::add);
+            centsByDay.merge(sale.saleDate,sale.totalInCents,Long::sum);
+        }
+        SalesHeatmapResponse result=new SalesHeatmapResponse();
+        result.year=year;
+        result.datasetId=dataset(datasetId);
+        for(LocalDate date:qtyByDay.keySet()){
+            BigDecimal qty=qtyByDay.getOrDefault(date,BigDecimal.ZERO);
+            long cents=centsByDay.getOrDefault(date,0L);
+            if((qty!=null&&qty.compareTo(BigDecimal.ZERO)>0)||cents>0){
+                result.days.add(new SalesHeatmapDay(date.toString(),qty,cents));
+            }
+        }
+        return result;
+    }
+
     public ProductSearchResponse byProduct(String datasetId,ProductSearchRequest request){
         ProductSearchRequest query=request==null?new ProductSearchRequest():request;
         if(query.product==null||query.product.isBlank()) throw new IllegalArgumentException("Informe o nome ou trecho do produto");

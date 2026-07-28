@@ -100,6 +100,24 @@ public final class SalesModels {
         public BigDecimal totalQuantity=BigDecimal.ZERO;
     }
 
+    public static class SalesHeatmapDay {
+        public String date;
+        public BigDecimal quantity=BigDecimal.ZERO;
+        public long totalInCents;
+        public SalesHeatmapDay() {}
+        public SalesHeatmapDay(String date, BigDecimal quantity, long totalInCents){
+            this.date=date;
+            this.quantity=quantity==null?BigDecimal.ZERO:quantity;
+            this.totalInCents=totalInCents;
+        }
+    }
+
+    public static class SalesHeatmapResponse {
+        public int year;
+        public String datasetId="sales";
+        public List<SalesHeatmapDay> days=new ArrayList<>();
+    }
+
     public static class ProductSearchRequest extends SaleQuery {
         public String product;
         public int limit=20;
