@@ -34,8 +34,19 @@ struct MainTabView: View {
     self.context = context
     self.user = user
     let layout = AppTab.layout(for: user)
-    _selectedTab = State(initialValue: layout.startTab)
-    _loadedTabs = State(initialValue: [layout.startTab])
+    let start = Self.screenshotTab(from: layout) ?? layout.startTab
+    _selectedTab = State(initialValue: start)
+    _loadedTabs = State(initialValue: [start])
+  }
+
+  /// Optional tab override for README screenshots (`BecoScreenshotTab` in UserDefaults).
+  private static func screenshotTab(from layout: AppTabLayout) -> AppTab? {
+    let raw = UserDefaults.standard.string(forKey: "BecoScreenshotTab")
+    guard let raw, let tab = AppTab(rawValue: raw), layout.tabBarItems.contains(tab) else {
+      return nil
+    }
+    UserDefaults.standard.removeObject(forKey: "BecoScreenshotTab")
+    return tab
   }
 
   var body: some View {

@@ -28,22 +28,46 @@ O objetivo não é criar um ERP pesado. É criar uma camada prática para o dono
 
 ## Produto em telas
 
-Prints atuais dos apps mobile com o layout vigente aplicado em iOS e Android.
+Prints atuais do app iOS nativo (SwiftUI) após a refatoração MV — Dashboard, Chat IA, Compras, Contagem e hub Mais.
 
 <table>
   <tr>
-    <td align="center" width="50%">
-      <img src="docs/assets/readme/ios-ai-chat.png" alt="Chat IA no app iOS" width="260"><br>
-      <strong>iOS · Chat IA</strong><br>
-      Perguntas em linguagem natural sobre vendas, compras, estoque, perdas e ponto.
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-dashboard.png" alt="Dashboard no app iOS" width="220"><br>
+      <strong>iOS · Dashboard</strong><br>
+      Indicadores operacionais, sync e resumo por área.
     </td>
-    <td align="center" width="50%">
-      <img src="docs/assets/readme/android-checklist.png" alt="Checklist operacional no app Android" width="260"><br>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-ai-chat.png" alt="Chat IA no app iOS" width="220"><br>
+      <strong>iOS · Chat IA</strong><br>
+      Perguntas em linguagem natural sobre vendas, compras, estoque e ponto.
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-purchases.png" alt="Compras no app iOS" width="220"><br>
+      <strong>iOS · Compras</strong><br>
+      Sessões de comprovantes (OCR) e importação CSV.
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-inventory.png" alt="Contagem no app iOS" width="220"><br>
+      <strong>iOS · Contagem</strong><br>
+      Rascunho local com composer de texto/voz e envio em lote.
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-more.png" alt="Menu Mais no app iOS" width="220"><br>
+      <strong>iOS · Mais</strong><br>
+      Hub de módulos (Checklist, Atividades, Permissões).
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/android-checklist.png" alt="Checklist operacional no app Android" width="220"><br>
       <strong>Android · Checklist</strong><br>
-      Rotina operacional por perfil, filtros rápidos e navegação inferior atualizada.
+      Rotina operacional por perfil com navegação inferior Compose.
     </td>
   </tr>
 </table>
+
+Captura dos prints iOS (simulador): [`scripts/capture-readme-screenshots.sh`](scripts/capture-readme-screenshots.sh).
 
 ## O que o sistema faz hoje
 
