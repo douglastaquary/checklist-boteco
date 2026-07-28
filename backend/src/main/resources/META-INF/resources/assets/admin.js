@@ -139,6 +139,118 @@ async function api(path, options = {}) {
   return body;
 }
 
+function parseApiResponse(status, text) {
+  const body = text
+    ? (() => {
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          return { raw: text };
+        }
+      })()
+    : {};
+  if (status === 204) {
+    if (status < 200 || status >= 300) throw new Error(readApiError({}, status));
+    return null;
+  }
+  if (status < 200 || status >= 300) {
+    if (status === 401) {
+      token = '';
+      currentUser = null;
+      localStorage.removeItem('checklist-token');
+      setLoggedIn(false);
+    }
+    throw new Error(readApiError(body, status));
+  }
+  return body;
+}
+
+function apiWithUploadProgress(path, { method = 'POST', body } = {}, { onProgress, onUploadComplete } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, path);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = event => {
+      if (event.lengthComputable && typeof onProgress === 'function') {
+        onProgress(event.loaded, event.total);
+      }
+    };
+    xhr.upload.onload = () => {
+      if (typeof onUploadComplete === 'function') onUploadComplete();
+    };
+    xhr.onload = () => {
+      try {
+        resolve(parseApiResponse(xhr.status, xhr.responseText));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    xhr.onerror = () => reject(new Error('Falha de rede ao enviar o arquivo.'));
+    xhr.send(body);
+  });
+}
+
+function setSalesImportBusy(busy) {
+  const commit = $('commitSalesImport');
+  const analyze = $('salesImportForm')?.querySelector('button');
+  const file = $('salesFile');
+  if (commit) commit.disabled = busy;
+  if (analyze) analyze.disabled = busy;
+  if (file) file.disabled = busy;
+}
+
+function showSalesImportOverlay({ title, status, percent = 0, indeterminate = false }) {
+  const overlay = $('salesImportOverlay');
+  const bar = $('salesImportOverlayBar');
+  const barWrap = bar?.parentElement;
+  overlay.classList.remove('hidden');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  $('salesImportOverlayTitle').textContent = title;
+  $('salesImportOverlayStatus').textContent = status;
+  barWrap?.classList.toggle('is-indeterminate', indeterminate);
+  if (indeterminate) {
+    bar.style.width = '';
+    $('salesImportOverlayPercent').textContent = 'Processando…';
+  } else {
+    const value = Math.max(0, Math.min(100, Math.round(percent)));
+    bar.style.width = `${value}%`;
+    $('salesImportOverlayPercent').textContent = `${value}%`;
+  }
+  setSalesImportBusy(true);
+}
+
+function updateSalesImportOverlay({ status, percent, indeterminate }) {
+  if (status) $('salesImportOverlayStatus').textContent = status;
+  const bar = $('salesImportOverlayBar');
+  const barWrap = bar.parentElement;
+  if (typeof indeterminate === 'boolean') {
+    barWrap.classList.toggle('is-indeterminate', indeterminate);
+  }
+  if (barWrap.classList.contains('is-indeterminate')) {
+    $('salesImportOverlayPercent').textContent = 'Processando…';
+    return;
+  }
+  if (typeof percent === 'number') {
+    const value = Math.max(0, Math.min(100, Math.round(percent)));
+    bar.style.width = `${value}%`;
+    $('salesImportOverlayPercent').textContent = `${value}%`;
+  }
+}
+
+function hideSalesImportOverlay() {
+  const overlay = $('salesImportOverlay');
+  const bar = $('salesImportOverlayBar');
+  overlay.classList.add('hidden');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  bar.parentElement.classList.remove('is-indeterminate');
+  bar.style.width = '0%';
+  $('salesImportOverlayPercent').textContent = '0%';
+  setSalesImportBusy(false);
+}
+
 function buildUserPermissions(user, key, value) {
   const base = user?.permissions || {};
   return {
@@ -148,6 +260,7 @@ function buildUserPermissions(user, key, value) {
     canCreateInventoryCounts: Boolean(base.canCreateInventoryCounts),
     canViewInventoryInsights: Boolean(base.canViewInventoryInsights),
     canManageAdministrativeStock: Boolean(base.canManageAdministrativeStock),
+    canImportPurchases: Boolean(base.canImportPurchases),
     [key]: value
   };
 }
@@ -324,7 +437,7 @@ function renderUsers(users) {
         <small>${escapeHtml(user.workSector || '')}</small>
       </td>
       <td>${user.permissionLevel}</td>
-      ${['canRegisterUsers', 'canCreateActivities', 'canEditUsers', 'canCreateInventoryCounts', 'canViewInventoryInsights', 'canManageAdministrativeStock'].map(key => `
+      ${['canRegisterUsers', 'canCreateActivities', 'canEditUsers', 'canCreateInventoryCounts', 'canViewInventoryInsights', 'canManageAdministrativeStock', 'canImportPurchases'].map(key => `
         <td><input type="checkbox" data-user="${user.id}" data-key="${key}" ${user.permissions?.[key] ? 'checked' : ''} ${!allowPermissionEdit || user.permissionLevel === 'ADMIN' ? 'disabled' : ''}></td>
       `).join('')}
       <td class="user-actions">
@@ -430,7 +543,7 @@ async function saveUser(event) {
     } else {
       await api('/api/users', {
         method: 'POST',
-        body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false, canCreateInventoryCounts: false, canViewInventoryInsights: false, canManageAdministrativeStock: false } })
+        body: JSON.stringify({ ...payload, password: $('userPassword').value, permissions: { canRegisterUsers: false, canCreateActivities: false, canEditUsers: false, canCreateInventoryCounts: false, canViewInventoryInsights: false, canManageAdministrativeStock: false, canImportPurchases: false } })
       });
       userMessage('Usuário criado com sucesso. No primeiro acesso mobile, a senha deverá ser trocada.', true);
     }
@@ -871,25 +984,53 @@ $('commitPurchaseImport').addEventListener('click', async () => {
 $('salesImportForm').addEventListener('submit', async event => {
   event.preventDefault();
   const file = $('salesFile').files[0];
-  const pasted = $('salesCsvText').value.trim();
-  if (!file && !pasted) {
-    $('salesImportMessage').textContent = 'Selecione um arquivo ou cole o conteúdo CSV.';
+  if (!file) {
+    $('salesImportMessage').textContent = 'Selecione um arquivo CSV para continuar.';
     return;
   }
-  $('salesImportMessage').textContent = 'Analisando arquivo…';
+  $('salesImportMessage').textContent = '';
+  showSalesImportOverlay({
+    title: 'Enviando arquivo…',
+    status: `Lendo ${file.name}`,
+    percent: 0
+  });
   try {
-    const data = await api('/api/sales/imports/preview', {
-      method: 'POST',
-      body: JSON.stringify({ fileName: file?.name || 'vendas-coladas.csv', csv: file ? await file.text() : pasted, datasetId: 'sales' })
-    });
+    const csv = await file.text();
+    updateSalesImportOverlay({ status: 'Enviando CSV para análise…', percent: 5 });
+    const data = await apiWithUploadProgress(
+      '/api/sales/imports/preview',
+      {
+        method: 'POST',
+        body: JSON.stringify({ fileName: file.name, csv, datasetId: 'sales' })
+      },
+      {
+        onProgress: (loaded, total) => {
+          const uploadPercent = total ? Math.round((loaded / total) * 85) + 5 : 50;
+          updateSalesImportOverlay({
+            status: `Upload ${Math.min(100, Math.round((loaded / total) * 100))}% · ${file.name}`,
+            percent: uploadPercent
+          });
+        },
+        onUploadComplete: () => {
+          showSalesImportOverlay({
+            title: 'Analisando CSV…',
+            status: 'Montando prévia e mapeamento no servidor',
+            indeterminate: true
+          });
+        }
+      }
+    );
     renderSalesPreview(data);
+    $('salesImportMessage').textContent = 'Prévia pronta. Confira o mapeamento e confirme a importação.';
   } catch (error) {
     $('salesImportMessage').textContent = error.message;
+  } finally {
+    hideSalesImportOverlay();
   }
 });
 
 $('commitSalesImport').addEventListener('click', async () => {
-  if (!salesPreview) return;
+  if (!salesPreview || $('commitSalesImport').disabled) return;
   const mapping = {};
   document.querySelectorAll('[data-sales-map]').forEach(select => {
     if (select.value) mapping[select.dataset.salesMap] = select.value;
@@ -900,18 +1041,42 @@ $('commitSalesImport').addEventListener('click', async () => {
     $('salesImportMessage').textContent = 'Mapeie data, produto e quantidade antes de importar.';
     return;
   }
-  $('salesImportMessage').textContent = 'Importando…';
+  $('salesImportMessage').textContent = '';
+  showSalesImportOverlay({
+    title: 'Confirmando importação…',
+    status: 'Enviando confirmação',
+    percent: 10
+  });
   try {
-    const data = await api(`/api/sales/imports/${salesPreview.id}/commit`, {
-      method: 'POST',
-      body: JSON.stringify({ datasetId: 'sales', mapping, preserveColumns: salesPreview.headers })
-    });
+    const payload = JSON.stringify({ datasetId: 'sales', mapping, preserveColumns: salesPreview.headers });
+    const data = await apiWithUploadProgress(
+      `/api/sales/imports/${salesPreview.id}/commit`,
+      { method: 'POST', body: payload },
+      {
+        onProgress: (loaded, total) => {
+          const uploadPercent = total ? Math.round((loaded / total) * 35) + 10 : 30;
+          updateSalesImportOverlay({
+            status: `Upload da confirmação ${Math.min(100, Math.round((loaded / total) * 100))}%`,
+            percent: uploadPercent
+          });
+        },
+        onUploadComplete: () => {
+          showSalesImportOverlay({
+            title: 'Gravando vendas…',
+            status: 'Processando linhas no servidor. Aguarde…',
+            indeterminate: true
+          });
+        }
+      }
+    );
     $('salesImportMessage').innerHTML = `<span class="import-ok">${data.importedRows} linhas importadas, ${data.duplicateRows} duplicadas (${data.inFileDuplicateRows || 0} no arquivo, ${data.existingDuplicateRows || 0} já existentes) e ${data.rejectedRows} rejeitadas.</span>`;
     $('salesPreview').classList.add('hidden');
     salesPreview = null;
     await loadSales();
   } catch (error) {
     $('salesImportMessage').textContent = error.message;
+  } finally {
+    hideSalesImportOverlay();
   }
 });
 

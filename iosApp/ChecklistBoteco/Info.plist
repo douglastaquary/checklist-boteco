@@ -33,6 +33,10 @@
   <string>Desbloquear login salvo com Face ID.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Validar registro de ponto dentro do estabelecimento.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Gravar a contagem de estoque por voz.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Transcrever o que você fala para adicionar itens na contagem.</string>
   <key>UIBackgroundModes</key>
   <array>
     <string>fetch</string>

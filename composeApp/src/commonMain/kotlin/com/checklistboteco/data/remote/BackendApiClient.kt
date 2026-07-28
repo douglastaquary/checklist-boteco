@@ -389,7 +389,8 @@ private data class FeaturePermissionsDto(
     val canEditUsers: Boolean = false,
     val canCreateInventoryCounts: Boolean = false,
     val canViewInventoryInsights: Boolean = false,
-    val canManageAdministrativeStock: Boolean = false
+    val canManageAdministrativeStock: Boolean = false,
+    val canImportPurchases: Boolean = false
 ) {
     fun toDomain(): FeaturePermissions {
         return FeaturePermissions(
@@ -398,7 +399,8 @@ private data class FeaturePermissionsDto(
             canEditUsers = canEditUsers,
             canCreateInventoryCounts = canCreateInventoryCounts,
             canViewInventoryInsights = canViewInventoryInsights,
-            canManageAdministrativeStock = canManageAdministrativeStock
+            canManageAdministrativeStock = canManageAdministrativeStock,
+            canImportPurchases = canImportPurchases
         )
     }
 
@@ -410,7 +412,8 @@ private data class FeaturePermissionsDto(
                 canEditUsers = permissions.canEditUsers,
                 canCreateInventoryCounts = permissions.canCreateInventoryCounts,
                 canViewInventoryInsights = permissions.canViewInventoryInsights,
-                canManageAdministrativeStock = permissions.canManageAdministrativeStock
+                canManageAdministrativeStock = permissions.canManageAdministrativeStock,
+                canImportPurchases = permissions.canImportPurchases
             )
         }
     }

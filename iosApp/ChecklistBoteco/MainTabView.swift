@@ -3,26 +3,39 @@ import Models
 import Env
 import Persistence
 import DesignSystem
+import AdminFeatures
+
+private enum MoreAdminSheet: String, Identifiable {
+  case activities
+  case permissions
+
+  var id: String { rawValue }
+}
 
 struct MainTabView: View {
   let context: MainTabContext
   let user: User
   @StateObject private var tabRouter = TabRouter()
+  @StateObject private var tabBarVisibility = TabBarVisibilityController()
 
-  @State private var selectedTab: AppTab = .checklist
-  @State private var loadedTabs: Set<AppTab> = [.checklist]
-  @State private var isMorePresented = false
+  @State private var selectedTab: AppTab
+  @State private var loadedTabs: Set<AppTab>
+  @State private var moreAdminSheet: MoreAdminSheet?
+
+  private var layout: AppTabLayout {
+    AppTab.layout(for: user)
+  }
 
   private var tabs: [AppTab] {
-    AppTab.available(for: user)
+    layout.tabBarItems
   }
 
-  private var primaryTabs: [AppTab] {
-    tabs.count <= 4 ? tabs : Array(tabs.prefix(3))
-  }
-
-  private var overflowTabs: [AppTab] {
-    tabs.count <= 4 ? [] : Array(tabs.dropFirst(3))
+  init(context: MainTabContext, user: User) {
+    self.context = context
+    self.user = user
+    let layout = AppTab.layout(for: user)
+    _selectedTab = State(initialValue: layout.startTab)
+    _loadedTabs = State(initialValue: [layout.startTab])
   }
 
   var body: some View {
@@ -35,76 +48,112 @@ struct MainTabView: View {
             Color.clear
           }
         }
-        .toolbar(.hidden, for: .tabBar)
         .tabItem { tab.label }
         .tag(tab)
       }
     }
-    .toolbar(.hidden, for: .tabBar)
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      BecoTabBar(
-        items: primaryTabs.map {
-          BecoTabBarItem(id: $0, title: $0.title, systemImage: $0.iconName)
-        },
-        selected: selectedTab,
-        hasOverflow: !overflowTabs.isEmpty,
-        overflowSelected: overflowTabs.contains(selectedTab),
-        onSelect: select,
-        onMore: { isMorePresented = true }
-      )
-    }
-    .sheet(isPresented: $isMorePresented) {
-      NavigationStack {
-        List(overflowTabs) { tab in
-          Button {
-            select(tab)
-            isMorePresented = false
-          } label: {
-            Label(tab.title, systemImage: tab.iconName)
-              .foregroundStyle(BecoTokens.ColorToken.ink)
-          }
-        }
-        .navigationTitle("Mais módulos")
-        .toolbar {
-          ToolbarItem(placement: .cancellationAction) {
-            Button("Fechar") { isMorePresented = false }
-          }
-        }
+    .tint(Color(red: 23 / 255, green: 23 / 255, blue: 23 / 255))
+    .environmentObject(tabBarVisibility)
+    .background(TabBarVisibilityBridge(isVisible: tabBarVisibility.isVisible))
+    .background(
+      TabBarReselectObserver { index in
+        guard tabs.indices.contains(index), tabs[index] == .more else { return }
+        tabRouter.reset(.more)
       }
-      .presentationDetents([.medium])
-    }
-    .tint(AppColors.primary)
+    )
     .onAppear {
-      if !tabs.contains(selectedTab) { selectedTab = tabs.first ?? .checklist }
+      NativeTabBarAppearance.apply()
+      if !tabs.contains(selectedTab) {
+        selectedTab = layout.startTab
+      }
       loadedTabs.insert(selectedTab)
     }
     .onChange(of: selectedTab) { tab in
       loadedTabs.insert(tab)
+      tabBarVisibility.resetScrollTracking()
+      if tab == .more {
+        tabRouter.reset(.more)
+      }
     }
     .onOpenURL { url in
       guard let link = AppDeepLink.parse(url) else { return }
       AppDeepLinkHandler.apply(
         link,
         user: user,
+        layout: layout,
         selectedTab: &selectedTab,
         tabRouter: tabRouter
       )
       loadedTabs.insert(selectedTab)
+      tabBarVisibility.resetScrollTracking()
     }
-  }
-
-  private func select(_ tab: AppTab) {
-    selectedTab = tab
-    loadedTabs.insert(tab)
+    .sheet(item: $moreAdminSheet) { sheet in
+      moreAdminCover(sheet)
+        .environmentObject(tabBarVisibility)
+        .becoCodexSheetChrome()
+    }
   }
 
   @ViewBuilder
   private func navigationStack(for tab: AppTab) -> some View {
     NavigationStack(path: tabRouter.binding(for: tab)) {
-      tab.makeContentView(context: context, user: user, tabRouter: tabRouter)
+      rootContent(for: tab)
         .navigationDestination(for: AppTabRoute.self) { route in
-          route.destination(context: context)
+          route.destination(
+            context: context,
+            user: user,
+            tabRouter: tabRouter,
+            hostTab: tab
+          )
         }
+    }
+  }
+
+  @ViewBuilder
+  private func rootContent(for tab: AppTab) -> some View {
+    if tab == .more {
+      MoreHubView(modules: layout.overflow) { module in
+        openOverflowModule(module)
+      }
+    } else {
+      tab.makeContentView(
+        context: context,
+        user: user,
+        tabRouter: tabRouter,
+        hostTab: tab
+      )
+    }
+  }
+
+  private func openOverflowModule(_ module: AppTab) {
+    switch module {
+    case .activities:
+      moreAdminSheet = .activities
+    case .permissions:
+      moreAdminSheet = .permissions
+    default:
+      loadedTabs.insert(module)
+      tabRouter.push(.overflowModule(module), on: .more)
+    }
+  }
+
+  @ViewBuilder
+  private func moreAdminCover(_ sheet: MoreAdminSheet) -> some View {
+    switch sheet {
+    case .activities:
+      ActivitiesManagementView(
+        repository: context.repository,
+        embeddedInCodexSheet: true,
+        onDismissSheet: { moreAdminSheet = nil }
+      )
+    case .permissions:
+      PermissionManagementView(
+        repository: context.repository,
+        userClient: context.userClient,
+        authToken: context.authToken,
+        embeddedInCodexSheet: true,
+        onDismissSheet: { moreAdminSheet = nil }
+      )
     }
   }
 }
@@ -116,6 +165,7 @@ extension MainTabView {
         repository: dependencies.repository,
         syncController: dependencies.syncController,
         inventoryClient: dependencies.inventoryClient,
+        purchaseClient: dependencies.purchaseClient,
         workClockClient: dependencies.workClockClient,
         userClient: dependencies.userClient,
         dashboardClient: dependencies.dashboardClient,

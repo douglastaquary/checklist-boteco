@@ -9,17 +9,20 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.checklistboteco.data.remote.PurchaseApiClient
 import com.checklistboteco.presentation.screen.ActivitiesManagementScreen
 import com.checklistboteco.presentation.screen.ChecklistScreen
 import com.checklistboteco.presentation.screen.DashboardScreen
 import com.checklistboteco.presentation.screen.InventoryCountScreen
 import com.checklistboteco.presentation.screen.PermissionManagementScreen
 import com.checklistboteco.presentation.screen.WorkClockScreen
+import com.checklistboteco.presentation.screen.purchases.PurchasesScreen
 import com.checklistboteco.presentation.viewmodel.ActivitiesManagementViewModel
 import com.checklistboteco.presentation.viewmodel.ChecklistViewModel
 import com.checklistboteco.presentation.viewmodel.DashboardViewModel
 import com.checklistboteco.presentation.viewmodel.InventoryCountViewModel
 import com.checklistboteco.presentation.viewmodel.PermissionManagementViewModel
+import com.checklistboteco.presentation.viewmodel.PurchasesViewModel
 import com.checklistboteco.presentation.viewmodel.WorkClockViewModel
 
 @Composable
@@ -100,6 +103,23 @@ fun MainNavGraph(
                         canManageAdministrativeStock = context.user.canManageAdministrativeStock(),
                         isAdmin = context.user.canManagePermissions()
                     )
+                } else {
+                    LazyTabPlaceholder()
+                }
+            }
+        }
+
+        if (AppDestination.Purchases in destinations) {
+            composable(AppDestination.Purchases.route) {
+                if (AppDestination.Purchases.route in loadedRoutes) {
+                    val viewModel = remember(context.authToken) {
+                        PurchasesViewModel(
+                            purchaseApiClient = PurchaseApiClient.fromEnvironment(),
+                            authToken = context.authToken,
+                            scope = scope
+                        )
+                    }
+                    PurchasesScreen(viewModel = viewModel)
                 } else {
                     LazyTabPlaceholder()
                 }

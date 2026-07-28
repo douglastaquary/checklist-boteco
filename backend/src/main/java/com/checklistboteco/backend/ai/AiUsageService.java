@@ -25,7 +25,7 @@ public class AiUsageService {
     @Inject ObjectMapper mapper;
     @ConfigProperty(name="ai.usage.local-file", defaultValue=".data/ai-usage-local.json") String localFile;
     @ConfigProperty(name="ai.budget.monthly-limit-cents", defaultValue="500") long defaultLimit;
-    @ConfigProperty(name="ai.budget.max-output-tokens", defaultValue="700") int defaultMaxOutput;
+    @ConfigProperty(name="ai.budget.max-output-tokens", defaultValue="1600") int defaultMaxOutput;
     @ConfigProperty(name="checklist.dynamodb.table") String table;
     @ConfigProperty(name="checklist.aws.region") String region;
     private final List<AuditRecord> records = new ArrayList<>();

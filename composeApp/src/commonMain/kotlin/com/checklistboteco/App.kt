@@ -101,6 +101,7 @@ fun App(
                         screen.user.featurePermissions.canCreateInventoryCounts,
                         screen.user.featurePermissions.canViewInventoryInsights,
                         screen.user.featurePermissions.canManageAdministrativeStock,
+                        screen.user.featurePermissions.canImportPurchases,
                         screen.authToken.orEmpty(),
                         screen.remoteUserId.orEmpty()
                     )
@@ -131,15 +132,15 @@ fun App(
                             canEditUsers = list[13] as Boolean,
                             canCreateInventoryCounts = list.getOrNull(14) as? Boolean ?: false,
                             canViewInventoryInsights = list.getOrNull(15) as? Boolean ?: false,
-                            canManageAdministrativeStock = list.getOrNull(16) as? Boolean ?: false
-                        )
+                            canManageAdministrativeStock = list.getOrNull(16) as? Boolean ?: false,
+                            canImportPurchases = list.getOrNull(17) as? Boolean ?: false
+                        ),
+                        mustChangePassword = false
                     )
                     Screen.Main(
                         user = user,
-                        authToken = (list.getOrNull(17) as? String)?.ifBlank { null }
-                            ?: ((list.getOrNull(16) as? String)?.ifBlank { null }),
-                        remoteUserId = (list.getOrNull(18) as? String)?.ifBlank { null }
-                            ?: ((list.getOrNull(17) as? String)?.ifBlank { null })
+                        authToken = (list.getOrNull(18) as? String)?.ifBlank { null },
+                        remoteUserId = (list.getOrNull(19) as? String)?.ifBlank { null }
                     )
                 }
             }

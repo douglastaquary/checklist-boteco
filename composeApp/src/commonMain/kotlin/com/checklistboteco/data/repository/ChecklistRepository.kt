@@ -256,6 +256,7 @@ class ChecklistRepository(
             featurePermissions.canCreateInventoryCounts.toLongFlag(),
             featurePermissions.canViewInventoryInsights.toLongFlag(),
             featurePermissions.canManageAdministrativeStock.toLongFlag(),
+            featurePermissions.canImportPurchases.toLongFlag(),
             mustChangePassword.toLongFlag()
         )
     }
@@ -299,6 +300,7 @@ class ChecklistRepository(
             permissions.canCreateInventoryCounts.toLongFlag(),
             permissions.canViewInventoryInsights.toLongFlag(),
             permissions.canManageAdministrativeStock.toLongFlag(),
+            permissions.canImportPurchases.toLongFlag(),
             userId
         )
     }
@@ -675,6 +677,7 @@ class ChecklistRepository(
             remote.featurePermissions.canCreateInventoryCounts.toLongFlag(),
             remote.featurePermissions.canViewInventoryInsights.toLongFlag(),
             remote.featurePermissions.canManageAdministrativeStock.toLongFlag(),
+            remote.featurePermissions.canImportPurchases.toLongFlag(),
             existing.id
         )
         updateUserRemoteId(existing.id, remoteId)
@@ -716,6 +719,7 @@ class ChecklistRepository(
                 Area.entries.joinToString(",") { it.name },
                 Clock.System.now().toEpochMilliseconds(),
                 null,
+                1L,
                 1L,
                 1L,
                 1L,
@@ -916,7 +920,8 @@ class ChecklistRepository(
                 canEditUsers = user.canEditUsers == 1L,
                 canCreateInventoryCounts = user.canCreateInventoryCounts == 1L,
                 canViewInventoryInsights = user.canViewInventoryInsights == 1L,
-                canManageAdministrativeStock = user.canManageAdministrativeStock == 1L
+                canManageAdministrativeStock = user.canManageAdministrativeStock == 1L,
+                canImportPurchases = user.canImportPurchases == 1L
             ),
             mustChangePassword = user.mustChangePassword == 1L
         )

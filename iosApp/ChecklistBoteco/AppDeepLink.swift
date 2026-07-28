@@ -16,7 +16,7 @@ enum AppDeepLink: Equatable {
 
     switch host {
     case "tab":
-      guard let tab = AppTab(rawValue: path) else { return nil }
+      guard let tab = AppTab(rawValue: path), tab != .more else { return nil }
       return .openTab(tab)
     case "inventory":
       if path == "audit" || path.isEmpty {
@@ -36,16 +36,17 @@ enum AppDeepLinkHandler {
   static func apply(
     _ link: AppDeepLink,
     user: User,
+    layout: AppTabLayout,
     selectedTab: inout AppTab,
     tabRouter: TabRouter
   ) {
     switch link {
     case .openTab(let tab):
       guard AppTab.available(for: user).contains(tab) else { return }
-      selectedTab = tab
+      open(tab, layout: layout, selectedTab: &selectedTab, tabRouter: tabRouter)
     case .inventoryAudit(let product, let date):
       guard AppTab.available(for: user).contains(.inventory) else { return }
-      selectedTab = .inventory
+      open(.inventory, layout: layout, selectedTab: &selectedTab, tabRouter: tabRouter)
       if let product, !product.isEmpty {
         let snapshot = InventoryAuditItemSnapshot(
           item: InventoryDailyAuditItem(
@@ -65,9 +66,27 @@ enum AppDeepLinkHandler {
             totalRemaining: 0
           )
         )
-        tabRouter.reset(.inventory)
-        tabRouter.push(.inventoryAuditDetail(snapshot), on: .inventory)
+        let host = layout.hosts(.inventory)
+        tabRouter.reset(host)
+        if host == .more {
+          tabRouter.push(.overflowModule(.inventory), on: .more)
+        }
+        tabRouter.push(.inventoryAuditDetail(snapshot), on: host)
       }
+    }
+  }
+
+  private static func open(
+    _ tab: AppTab,
+    layout: AppTabLayout,
+    selectedTab: inout AppTab,
+    tabRouter: TabRouter
+  ) {
+    let host = layout.hosts(tab)
+    selectedTab = host
+    if host == .more {
+      tabRouter.reset(.more)
+      tabRouter.push(.overflowModule(tab), on: .more)
     }
   }
 

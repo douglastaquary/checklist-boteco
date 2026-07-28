@@ -79,6 +79,7 @@ final class AppDependenciesHolder {
   let workClockClient: WorkClockClient?
   let dashboardClient: DashboardClient?
   let inventoryClient: InventoryClient?
+  let purchaseClient: PurchaseClient?
   let aiChatClient: AIChatClient?
   let deviceId: String
 
@@ -91,6 +92,7 @@ final class AppDependenciesHolder {
     workClockClient = deps.workClockClient
     dashboardClient = deps.dashboardClient
     inventoryClient = deps.inventoryClient
+    purchaseClient = deps.purchaseClient
     aiChatClient = deps.aiChatClient
     deviceId = deps.deviceId
   }
@@ -179,6 +181,7 @@ struct RootView: View {
 
 import Persistence
 import InventoryFeature
+import PurchasesFeature
 
 extension AppDependenciesHolder {
   var authToken: String? { session.authToken }

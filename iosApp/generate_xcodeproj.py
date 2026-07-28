@@ -18,12 +18,14 @@ APP_SOURCES = [
   "ChecklistBoteco/AppTabRoute.swift",
   "ChecklistBoteco/AppDeepLink.swift",
   "ChecklistBoteco/TabRouter.swift",
+  "ChecklistBoteco/SyncRefreshingContainer.swift",
+  "ChecklistBoteco/TabBarReselectObserver.swift",
 ]
 
 APP_PRODUCTS = [
   "Models", "Network", "Persistence", "Env", "DesignSystem", "Auth",
   "ChecklistFeature", "WorkClockFeature", "InventoryFeature",
-  "DashboardFeature", "AdminFeatures",
+  "DashboardFeature", "AdminFeatures", "AIChatFeature", "PurchasesFeature",
 ]
 
 
@@ -52,7 +54,7 @@ packages_ref = uid()
 packages_url = "../Packages"
 packages_isa = "XCRemoteSwiftPackageReference"
 packages_section = "XCRemoteSwiftPackageReference"
-packages_ref_line = f'repositoryURL = "{packages_url}"; requirement = {{kind = branch; branch = main;}};'
+packages_ref_line = f'repositoryURL = "{packages_url}"; requirement = {{kind = branch; branch = ios-packages;}};'
 product_deps = {name: uid() for name in APP_PRODUCTS}
 framework_build_files = {name: uid() for name in APP_PRODUCTS}
 
@@ -246,5 +248,6 @@ with open(os.path.join(scheme_dir, "ChecklistBoteco.xcscheme"), "w", encoding="u
 os.makedirs(PROJECT_DIR, exist_ok=True)
 with open(os.path.join(PROJECT_DIR, "project.pbxproj"), "w", encoding="utf-8") as f:
   f.write(pbx)
-print(f"Generated {PROJECT_DIR}/project.pbxproj (umbrella: {packages_url})")
+print(f"Generated {PROJECT_DIR}/project.pbxproj (umbrella: {packages_url}, branch ios-packages)")
 print("Packages faz parte do monorepo — commitar junto com o restante do projeto.")
+print("Antes do build no Xcode 14.2: ./scripts/ensure-packages-spm-git.sh")

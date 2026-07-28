@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.checklistboteco.domain.model.User
@@ -34,6 +35,12 @@ enum class AppDestination(
         icon = Icons.Default.Inventory2,
         contentDescription = "Contagem de estoque"
     ),
+    Purchases(
+        route = "purchases",
+        title = "Compras",
+        icon = Icons.Default.ReceiptLong,
+        contentDescription = "Compras e comprovantes"
+    ),
     Dashboard(
         route = "dashboard",
         title = "Dashboard",
@@ -58,6 +65,7 @@ enum class AppDestination(
             add(Checklist)
             if (user.canUseWorkClock()) add(WorkClock)
             if (user.canUseInventoryModule()) add(Inventory)
+            if (user.canUsePurchasesModule()) add(Purchases)
             if (user.canUseDashboardModule()) add(Dashboard)
             if (user.canUseActivitiesModule()) add(Activities)
             if (user.canManagePermissions()) add(Permissions)
@@ -65,10 +73,24 @@ enum class AppDestination(
 
         fun layoutFor(user: User): AppNavigationLayout {
             val available = availableFor(user)
-            return if (available.size <= 4) {
-                AppNavigationLayout(primary = available, overflow = emptyList())
+            if (available.size <= 4) {
+                return AppNavigationLayout(primary = available, overflow = emptyList())
+            }
+            val preferredPrimary = listOf(
+                Dashboard,
+                Purchases,
+                Inventory,
+                Checklist
+            )
+            val primary = preferredPrimary.filter { it in available }.take(4)
+            val overflow = available.filterNot { it in primary }
+            return if (primary.isEmpty) {
+                AppNavigationLayout(
+                    primary = available.take(4),
+                    overflow = available.drop(4)
+                )
             } else {
-                AppNavigationLayout(primary = available.take(3), overflow = available.drop(3))
+                AppNavigationLayout(primary = primary, overflow = overflow)
             }
         }
     }

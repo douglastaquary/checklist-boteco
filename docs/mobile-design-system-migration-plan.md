@@ -78,9 +78,15 @@ Critérios de aceite:
 
 ### Item 3 — Tab bar flutuante inspirada no iOS 26
 
-Objetivo: aplicar a referência 3 às duas plataformas: cápsula flutuante, superfície clara/translúcida, seleção interna arredondada, ícone + label e distância correta do indicador de gesto/barra de navegação.
+Objetivo original: cápsula flutuante nas duas plataformas.
 
-Contrato de `BecoBottomNavigation`/`BecoTabBar`:
+**Supersessão iOS (2026-07):** no iOS o shell usa **somente** `TabView` + `UITabBar` nativa estilizada (`NativeTabBarAppearance`). `BecoTabBar` foi removida. Zero duplicidade (não esconder a nativa + custom). Hide/show no scroll via `TabBarVisibilityController`.
+
+**Android:** mantém o contrato flutuante Compose (`BecoBottomNavigation`) abaixo — sem espelhar no iOS.
+
+Contrato legado de referência (Android / histórico):
+
+Contrato de `BecoBottomNavigation` (Android) / antigo `BecoTabBar` (iOS removido):
 
 - no máximo quatro destinos visíveis; os demais permanecem em “Mais”;
 - cápsula externa com cantos contínuos, blur/material quando suportado, borda sutil e sombra curta;
@@ -89,12 +95,11 @@ Contrato de `BecoBottomNavigation`/`BecoTabBar`:
 - altura e largura se adaptam a texto em português e font scale sem truncar destinos essenciais;
 - a barra respeita bottom safe area e não aplica padding duas vezes.
 
-iOS:
+iOS (atual):
 
-- manter `TabView`, `AppTab`, seleção, lazy loading e uma `NavigationStack` por tab como arquitetura de navegação;
-- encapsular a apresentação em um componente customizado/fallback compatível com iOS 16, sem perder estado ou deep links;
-- usar APIs nativas do iOS 26 somente sob disponibilidade, mantendo aparência equivalente no fallback;
-- garantir que conteúdo rolável permaneça visível acima da barra e que o indicador de gesto não seja coberto.
+- `TabView` + `AppTab` + `UITabBar` nativa; lazy loading e `NavigationStack` por tab;
+- aparência via `UITabBarAppearance` (tokens ink/muted);
+- **não** usar barra custom flutuante nem overlay paralelo à nativa.
 
 Android:
 

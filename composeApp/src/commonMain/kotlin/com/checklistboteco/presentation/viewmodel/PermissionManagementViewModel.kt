@@ -91,6 +91,7 @@ class PermissionManagementViewModel(
     fun updateCanCreateInventoryCounts(value:Boolean){ updateSelectedPermissions { it.copy(canCreateInventoryCounts=value) } }
     fun updateCanViewInventoryInsights(value:Boolean){ updateSelectedPermissions { it.copy(canViewInventoryInsights=value) } }
     fun updateCanManageAdministrativeStock(value:Boolean){ updateSelectedPermissions { it.copy(canManageAdministrativeStock=value) } }
+    fun updateCanImportPurchases(value:Boolean){ updateSelectedPermissions { it.copy(canImportPurchases=value) } }
 
     private fun updateSelectedPermissions(transform: (FeaturePermissions) -> FeaturePermissions) {
         if (!currentUser.canManagePermissions()) {

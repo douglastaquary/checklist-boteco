@@ -2,7 +2,7 @@
 
 Aplicativo **100% SwiftUI nativo** (sem Kotlin Multiplatform/Compose), organizado em Swift Packages em [`Packages/`](../Packages/) e shell em [`iosApp/`](../iosApp/).
 
-Integração SPM usa um package umbrella em `Packages/`, mantido como submódulo na branch dedicada `ios-packages`. O Xcode resolve uma revisão publicada e reproduzível desse package.
+`Packages/` faz parte do **monorepo** (mesma árvore do GitHub): Auth, DesignSystem, Network, etc. são pastas versionadas junto com `iosApp/`. O Xcode resolve o umbrella local via `../Packages` (`Package.swift`).
 
 ## Requisitos
 
@@ -44,39 +44,40 @@ Com API configurada: **sem seed local** — dados vêm do pull pós-login. Detal
 
 ## Abrir no Xcode
 
-1. Inicialize o submódulo após clonar ou trocar de branch:
+1. Clone o repositório (não há submódulo de `Packages/` — as fontes já estão na árvore).
+
+2. Prepare o `.git` local exigido pelo SPM no Xcode 14.2:
 
 ```bash
-git submodule update --init --recursive
+./scripts/ensure-packages-spm-git.sh
 ```
 
-2. Gere o projeto (se necessário):
+3. Gere o projeto (se necessário):
 
 ```bash
 python3 iosApp/generate_xcodeproj.py
 ```
 
-3. Abra `iosApp/ChecklistBoteco.xcodeproj`.
-4. O Xcode resolve **um** package source-control local em `Packages/`, fixado pelo `Package.resolved`.
-5. Selecione simulador iPhone e **Run** (⌘R).
+4. Abra `iosApp/ChecklistBoteco.xcodeproj`.
+5. O Xcode resolve `../Packages` via SPM (`localSourceControl` + branch `ios-packages`).
+6. Selecione simulador iPhone e **Run** (⌘R).
 
-### Atualizar código em `Packages/`
-
-As alterações do submódulo precisam ser publicadas antes de atualizar o ponteiro no projeto principal:
+Build CLI (já roda o prepare):
 
 ```bash
-cd Packages
-git switch ios-packages
-git add -A
-git commit -m "Descreva a alteração dos packages"
-git push origin ios-packages
-cd ..
-git add Packages iosApp/ChecklistBoteco.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+./scripts/build-ios.sh
 ```
 
-O commit do repositório principal registra o novo gitlink. Não edite a revisão manualmente sem publicar o commit do submódulo.
+### Alterar código em `Packages/`
 
-## Estrutura de pacotes (umbrella)
+Edite e faça commit **no mesmo branch do monorepo** (ex. `main`). Não use submodule.
+
+```bash
+git add Packages iosApp
+git commit -m "Descreva a alteração dos packages / app"
+```
+
+Se o Xcode não refletir a alteração, rode de novo `./scripts/ensure-packages-spm-git.sh` (atualiza o snapshot SPM) ou **File → Packages → Reset Package Caches**.## Estrutura de pacotes (umbrella)
 
 | Produto | Responsabilidade |
 |---------|------------------|
@@ -117,6 +118,13 @@ Não use `swift test` em `Packages/`: esse comando sempre compila para o host ma
 Validação suportada para alterações em `Packages/` e `iosApp/`:
 
 ```bash
+./scripts/build-ios.sh
+```
+
+Equivalente manual:
+
+```bash
+./scripts/ensure-packages-spm-git.sh
 xcodebuild -project iosApp/ChecklistBoteco.xcodeproj -scheme ChecklistBoteco \
   -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' \
@@ -131,13 +139,15 @@ xcodebuild -project iosApp/ChecklistBoteco.xcodeproj -scheme ChecklistBoteco \
 
 Verifique se o package local `Packages` está vinculado ao target **ChecklistBoteco** e se a pasta existe na raiz do repositório.
 
-### Package não atualiza após editar código
+### Package não atualiza / `does not appear to be a git repository`
 
-1. Confirme `git submodule status` sem prefixo `-` ou `+`.
-2. Confirme que o commit de `Packages/` foi enviado para `origin/ios-packages`.
-3. Execute **File → Packages → Reset Package Caches** no Xcode.
+No Xcode **14.2**, o SPM ainda exige um repositório Git em `Packages/` (branch `ios-packages`). Esse `.git` é **local** e está no `.gitignore` do monorepo — as fontes continuam versionadas no repo pai.
 
-## Funcionalidades (paridade Android)
+```bash
+./scripts/ensure-packages-spm-git.sh
+```
+
+Depois: **File → Packages → Reset Package Caches** no Xcode.## Funcionalidades (paridade Android)
 
 - Login remoto + 2FA + `/api/me`
 - Face ID: login salvo (usuário + senha) via Keychain

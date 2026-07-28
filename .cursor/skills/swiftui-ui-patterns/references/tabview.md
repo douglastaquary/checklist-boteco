@@ -8,6 +8,13 @@ Use this pattern for a scalable, multi-platform tab architecture with:
 - dynamic tabs sourced from data,
 - an interception hook for special tabs (e.g., compose).
 
+## Checklist Boteco (this repo)
+
+- **iOS:** use the system `TabView` + `UITabBar` only. Style with `NativeTabBarAppearance` / `UITabBarAppearance` (ink selected, muted unselected). Wire scroll hide/show via `TabBarVisibilityController` + `tracksTabBarOnScroll()`.
+- **Anti-pattern:** `.toolbar(.hidden, for: .tabBar)` plus a custom floating bar (`BecoTabBar` was removed). That duplicated chrome and is forbidden.
+- **Android:** keep Compose `BecoBottomNavigation` — do not try to share tab UI with iOS.
+- Shell reference: `iosApp/ChecklistBoteco/MainTabView.swift`, `Packages/DesignSystem/.../TabBarChrome.swift`.
+
 ## Core architecture
 
 - `AppTab` enum defines identity, labels, icons, and content builder.

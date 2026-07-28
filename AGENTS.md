@@ -18,20 +18,29 @@ Antes de implementar, leia a skill ou doc indicada para o domínio da tarefa.
 |---------|-------------|----------------------|
 | Backend, API, admin web, deploy AWS | Endpoints, Qute, DynamoDB, SAM | [`.cursor/skills/quarkus-serverless-qute/SKILL.md`](.cursor/skills/quarkus-serverless-qute/SKILL.md) |
 | Arquitetura serverless | Contratos e decisões | [`docs/architecture-serverless.md`](docs/architecture-serverless.md) |
-| **iOS / SwiftUI** | Telas, layout, estado, navegação, sheets | [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](.cursor/skills/swiftui-ui-patterns/SKILL.md) + [`docs/ios-swiftui-standards.md`](docs/ios-swiftui-standards.md) + [`docs/mobile-ui-ux-guidelines.md`](docs/mobile-ui-ux-guidelines.md) |
-| Setup iOS (Xcode, SPM, API local) | Build, simulador, troubleshooting | [`docs/ios-app.md`](docs/ios-app.md) |
+| **iOS / SwiftUI** | Telas, layout, estado, navegação, sheets, novas features UI | [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](.cursor/skills/swiftui-ui-patterns/SKILL.md) + **obrigatório** [`.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md`](.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md) + [`docs/ios-swiftui-standards.md`](docs/ios-swiftui-standards.md) |
+| Setup iOS (Xcode, SPM, API local) | Build, simulador, troubleshooting | [`docs/ios-app.md`](docs/ios-app.md) — após clone: `./scripts/ensure-packages-spm-git.sh` (Xcode 14.2) |
 | Android / KMP / Compose | Telas, navegação, Material 3, abas | [`.cursor/skills/compose-ui-patterns/SKILL.md`](.cursor/skills/compose-ui-patterns/SKILL.md) + [`docs/android-compose-navigation.md`](docs/android-compose-navigation.md) + [`docs/mobile-ui-ux-guidelines.md`](docs/mobile-ui-ux-guidelines.md) |
 | Analytics (vendas, compras, ponto, estoque) | Perguntas sobre dados importados | Seção MCP abaixo + [`docs/mcp-local-test.md`](docs/mcp-local-test.md) |
 
 ### iOS — regras resumidas
 
 - Deployment: **iOS 16**, Xcode **14.2+**, Swift **5.7+**.
-- Estado compartilhado: `ObservableObject` + `@StateObject` / `@ObservedObject` / `@EnvironmentObject` (não `@Observable` neste target).
-- Sem ViewModels dedicados; views pequenas + serviços injetados.
+- **Arquitetura UI: MV** (Model–View) — views + `@State` / serviços injetados; **sem** ViewModels dedicados por tela. Ver [swiftui-view-refactor/SKILL.md](.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md) e [mv-patterns.md](.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/references/mv-patterns.md).
+- Estado compartilhado de app: `ObservableObject` + `@StateObject` / `@ObservedObject` / `@EnvironmentObject` (não `@Observable` neste target).
 - Bootstrap: `AppDependencies` com `init() throws` — proibido `try!` no launch.
 - Formatação: [`.swiftformat`](.swiftformat) (2 espaços).
 - Validação iOS: usar `xcodebuild` do app. Não usar `swift test` em `Packages/`, pois a CLI compila para macOS host e o projeto não suporta macOS.
-- Antes de criar/refatorar UI: ler o skill + entrada em [`references/components-index.md`](.cursor/skills/swiftui-ui-patterns/references/components-index.md).
+- Antes de **criar, ajustar ou refatorar** UI, ler nesta ordem (**obrigatório**):
+  1. [`.cursor/skills/swiftui-ui-patterns/SKILL.md`](.cursor/skills/swiftui-ui-patterns/SKILL.md)
+  2. [`.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md`](.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md) — subviews dedicadas, MV, body estável, sem lógica no `body`
+  3. [`.cursor/skills/swiftui-ui-patterns/ios-development.md`](.cursor/skills/swiftui-ui-patterns/ios-development.md)
+  4. Entrada em [`references/components-index.md`](.cursor/skills/swiftui-ui-patterns/references/components-index.md)
+  5. [`docs/ios-swiftui-standards.md`](docs/ios-swiftui-standards.md)
+- **UI iOS = somente SwiftUI/UIKit nativos** em `iosApp/` + `Packages/` (fonte no monorepo; não submodule). Proibido UI Compose/KMP no iOS.
+- Preferir controles de sistema (`TabView`, `NavigationStack`, `Form`, `List`) e `BecoButton` para CTAs.
+- **Tab bar — zero duplicidade:** iOS só `UITabBar` nativa; Android só Compose `BecoBottomNavigation`.
+- Componentes visuais iOS custom não usados devem ser **removidos**.
 
 ## Servidor MCP `checklist-boteco-analytics`
 

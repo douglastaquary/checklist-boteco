@@ -26,7 +26,8 @@ public class AdminGuard {
     public User requireAdmin(String authorization) {
         TokenService.Payload payload=requireToken(authorization);
         User user=store.getUser(payload.userId);
-        if(user==null||user.permissionLevel!=PermissionLevel.ADMIN) fail(Response.Status.FORBIDDEN,"Permissão administrativa necessária");
+        if(user==null) fail(Response.Status.UNAUTHORIZED,"Sessão inválida após reinício do servidor. Faça login novamente.");
+        if(user.permissionLevel!=PermissionLevel.ADMIN) fail(Response.Status.FORBIDDEN,"Permissão administrativa necessária");
         return user;
     }
 
@@ -79,6 +80,13 @@ public class AdminGuard {
         User user=requireUser(authorization);
         if(user.permissionLevel==PermissionLevel.ADMIN || (user.permissions!=null&&user.permissions.canManageAdministrativeStock)) return user;
         fail(Response.Status.FORBIDDEN,"Permissão para contagem administrativa de estoque necessária");
+        return user;
+    }
+
+    public User requirePurchaseImportAccess(String authorization) {
+        User user=requireUser(authorization);
+        if(user.permissionLevel==PermissionLevel.ADMIN || (user.permissions!=null&&user.permissions.canImportPurchases)) return user;
+        fail(Response.Status.FORBIDDEN,"Permissão para importar compras necessária");
         return user;
     }
 

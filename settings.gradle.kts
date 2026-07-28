@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ChecklistBoteco"
 include(":composeApp")
+include(":receipt-processor")
