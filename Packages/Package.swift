@@ -55,7 +55,7 @@ let package = Package(
     ),
     .target(
       name: "InventoryFeature",
-      dependencies: ["Models", "Network", "Persistence", "DesignSystem"],
+      dependencies: ["Models", "Network", "Persistence", "DesignSystem", "AdminFeatures"],
       path: "Inventory/Sources/InventoryFeature"
     ),
     .target(
@@ -75,7 +75,7 @@ let package = Package(
     ),
     .target(
       name: "AIChatFeature",
-      dependencies: ["Network", "DesignSystem"],
+      dependencies: ["Network", "DesignSystem", "AdminFeatures", "Persistence"],
       path: "AIChat/Sources/AIChatFeature"
     ),
     .testTarget(name: "ModelsTests", dependencies: ["Models"], path: "Models/Tests/ModelsTests"),

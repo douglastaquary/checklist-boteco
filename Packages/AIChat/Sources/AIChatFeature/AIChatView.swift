@@ -1,23 +1,52 @@
 import SwiftUI
+import UIKit
 import Network
 import DesignSystem
+import Persistence
+import AdminFeatures
+
+private enum AIChatAdminDestination: String, Identifiable {
+  case activities
+  case permissions
+
+  var id: String { rawValue }
+}
 
 public struct AIChatView: View {
   @Environment(\.colorScheme) private var colorScheme
+  @EnvironmentObject private var tabBarVisibility: TabBarVisibilityController
 
   private let client: AIChatClient?
   private let token: String?
+  private let repository: ChecklistRepository?
+  private let userClient: UserClient?
 
+  @StateObject private var voiceController = BecoVoiceCaptureController()
   @State private var messages: [Message] = []
   @State private var text = ""
   @State private var isSending = false
   @State private var errorMessage: String?
   @State private var usage: AIUsageSummaryDTO?
-  @FocusState private var isInputFocused: Bool
+  @State private var composerScrollTick: UInt = 0
+  @State private var adminDestination: AIChatAdminDestination?
+  @State private var isInputFocused = false
 
-  public init(client: AIChatClient?, token: String?) {
+  fileprivate static let suggestionItems: [(value: String, icon: String)] = [
+    ("Quanto vendemos este mês?", "chart.line.uptrend.xyaxis"),
+    ("Quantas Heinekens vendemos em março?", "magnifyingglass"),
+    ("Houve perdas no estoque hoje?", "shippingbox")
+  ]
+
+  public init(
+    client: AIChatClient?,
+    token: String?,
+    repository: ChecklistRepository? = nil,
+    userClient: UserClient? = nil
+  ) {
     self.client = client
     self.token = token
+    self.repository = repository
+    self.userClient = userClient
   }
 
   private var trimmedText: String {
@@ -25,15 +54,15 @@ public struct AIChatView: View {
   }
 
   private var canSend: Bool {
-    !trimmedText.isEmpty && !isSending && usage?.blocked != true
+    !trimmedText.isEmpty && !isSending && usage?.blocked != true && !voiceController.isActive
   }
 
-  private var palette: AIChatPalette {
-    AIChatPalette(isDark: colorScheme == .dark)
+  private var palette: BecoChatPalette {
+    BecoChatPalette(isDark: colorScheme == .dark)
   }
 
-  private var isComposerExpanded: Bool {
-    isInputFocused && !text.isEmpty
+  private var isComposerEngaged: Bool {
+    isInputFocused || voiceController.isActive
   }
 
   public var body: some View {
@@ -53,7 +82,8 @@ public struct AIChatView: View {
           messages: messages,
           isSending: isSending,
           palette: palette,
-          onSuggestionTap: { text = $0 }
+          scrollTick: composerScrollTick,
+          onSuggestionTap: applySuggestion
         )
 
         if let errorMessage {
@@ -67,18 +97,163 @@ public struct AIChatView: View {
     }
     .navigationTitle("")
     .safeAreaInset(edge: .bottom) {
-      AIChatComposer(
-        text: $text,
-        isInputFocused: $isInputFocused,
-        isSending: isSending,
-        canSend: canSend,
-        isComposerExpanded: isComposerExpanded,
-        isBlocked: usage?.blocked == true,
-        palette: palette,
-        onSend: { Task { await send() } }
-      )
+      bottomChrome
     }
     .task { await loadUsage() }
+    .onChange(of: voiceController.errorMessage) { message in
+      if let message {
+        errorMessage = message
+      }
+    }
+    .onChange(of: voiceController.readyText) { ready in
+      guard let ready, !ready.isEmpty else { return }
+      text = ready
+      _ = voiceController.consumeReadyText()
+      isInputFocused = true
+    }
+    .onChange(of: isInputFocused) { focused in
+      syncTabBar(engaged: focused || voiceController.isActive)
+    }
+    .onChange(of: voiceController.phase) { phase in
+      let active = phase == .recording || phase == .transcribing
+      syncTabBar(engaged: active || isInputFocused)
+    }
+    .onDisappear {
+      tabBarVisibility.show()
+    }
+    .sheet(item: $adminDestination) { destination in
+      adminCover(destination)
+        .becoCodexSheetChrome()
+    }
+  }
+
+  @ViewBuilder
+  private var bottomChrome: some View {
+    VStack(spacing: 10) {
+      if isSending {
+        AIChatProcessingPill(palette: palette)
+      }
+
+      if voiceController.isActive {
+        BecoVoiceFeedbackBar(
+          controller: voiceController,
+          onCancel: { dismissComposerEngagement() }
+        )
+      } else {
+        BecoChatComposer(
+          text: $text,
+          isInputFocused: $isInputFocused,
+          placeholder: "Pergunte a AI do Beco",
+          canSend: canSend,
+          isSending: isSending,
+          isBlocked: usage?.blocked == true,
+          showsDismissButton: isComposerEngaged,
+          palette: palette,
+          onSend: { Task { await send() } },
+          onDismiss: { dismissComposerEngagement() },
+          onInputHeightChange: { _ in
+            composerScrollTick &+= 1
+          },
+          plusContent: { suggestionsMenu },
+          micContent: { micButton }
+        )
+      }
+    }
+    .padding(.horizontal, 18)
+    .padding(.top, 10)
+    .padding(.bottom, 8)
+    .background(BecoChatBottomFade())
+  }
+
+  private var suggestionsMenu: some View {
+    Menu {
+      ForEach(Self.suggestionItems, id: \.value) { item in
+        Button {
+          applySuggestion(item.value)
+        } label: {
+          Label(item.value, systemImage: item.icon)
+        }
+      }
+      if repository != nil {
+        Divider()
+        Button {
+          adminDestination = .activities
+        } label: {
+          Label("Atividades", systemImage: "checklist")
+        }
+        Button {
+          adminDestination = .permissions
+        } label: {
+          Label("Permissão", systemImage: "person.badge.key")
+        }
+      }
+    } label: {
+      BecoChatComposerIconButton(
+        systemName: "plus",
+        accessibilityLabel: "Sugestões e módulos",
+        palette: palette
+      )
+    }
+  }
+
+  private var micButton: some View {
+    BecoChatComposerIconButton(
+      systemName: "mic",
+      accessibilityLabel: "Entrada por voz",
+      palette: palette,
+      action: { voiceController.start() }
+    )
+    .disabled(isSending || usage?.blocked == true)
+    .opacity(isSending || usage?.blocked == true ? 0.45 : 1)
+  }
+
+  @ViewBuilder
+  private func adminCover(_ destination: AIChatAdminDestination) -> some View {
+    if let repository {
+      switch destination {
+      case .activities:
+        ActivitiesManagementView(
+          repository: repository,
+          embeddedInCodexSheet: true,
+          onDismissSheet: { adminDestination = nil }
+        )
+      case .permissions:
+        PermissionManagementView(
+          repository: repository,
+          userClient: userClient,
+          authToken: token,
+          embeddedInCodexSheet: true,
+          onDismissSheet: { adminDestination = nil }
+        )
+      }
+    }
+  }
+
+  private func applySuggestion(_ value: String) {
+    text = value
+    isInputFocused = true
+  }
+
+  private func dismissComposerEngagement() {
+    isInputFocused = false
+    UIApplication.shared.sendAction(
+      #selector(UIResponder.resignFirstResponder),
+      to: nil,
+      from: nil,
+      for: nil
+    )
+    if voiceController.isActive {
+      voiceController.cancel()
+    }
+    tabBarVisibility.show()
+  }
+
+  private func syncTabBar(engaged: Bool) {
+    if engaged {
+      tabBarVisibility.hide()
+    } else {
+      tabBarVisibility.show()
+    }
   }
 
   @MainActor
@@ -102,7 +277,7 @@ public struct AIChatView: View {
       )
       usage = response.budget
     } catch {
-      errorMessage = error.localizedDescription
+      errorMessage = AppErrorMapper.toUserMessage(error)
     }
   }
 
@@ -115,17 +290,8 @@ public struct AIChatView: View {
 
 // MARK: - Subviews (MV)
 
-private struct AIChatPalette {
-  let isDark: Bool
-
-  var foreground: Color { isDark ? .white : .black }
-  var mutedForeground: Color { isDark ? .white.opacity(0.62) : .secondary }
-  var glassStroke: Color { isDark ? .white.opacity(0.14) : .black.opacity(0.08) }
-  var glassShadow: Color { isDark ? .black.opacity(0.42) : .black.opacity(0.12) }
-}
-
 private struct AIChatBackground: View {
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
 
   var body: some View {
     ZStack {
@@ -152,7 +318,7 @@ private struct AIChatBackground: View {
 }
 
 private struct AIChatHeader: View {
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
 
   var body: some View {
     HStack(spacing: 12) {
@@ -160,7 +326,7 @@ private struct AIChatHeader: View {
         .font(.system(size: 18, weight: .semibold))
         .foregroundStyle(palette.foreground)
         .frame(width: 44, height: 44)
-        .background(AIChatGlassCapsule(palette: palette))
+        .background(BecoChatGlassCapsule(palette: palette))
 
       VStack(alignment: .leading, spacing: 2) {
         Text("AI do Beco")
@@ -182,7 +348,7 @@ private struct AIChatHeader: View {
       .foregroundStyle(palette.foreground)
       .frame(height: 44)
       .padding(.horizontal, 16)
-      .background(AIChatGlassCapsule(palette: palette))
+      .background(BecoChatGlassCapsule(palette: palette))
     }
   }
 }
@@ -209,7 +375,8 @@ private struct AIChatUsageBar: View {
 private struct AIChatMessageScroll: View {
   let messages: [Message]
   let isSending: Bool
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
+  let scrollTick: UInt
   let onSuggestionTap: (String) -> Void
 
   var body: some View {
@@ -221,10 +388,17 @@ private struct AIChatMessageScroll: View {
           }
           ForEach(messages) { message in
             AIChatBubble(message: message, palette: palette)
+              .id(message.id)
           }
           if isSending {
+            BecoChatSystemCaption("Consultando dados do Beco…")
+              .id("processing-caption")
             AIChatProcessingBubble(isSending: isSending, palette: palette)
+              .id("processing-bubble")
           }
+          Color.clear
+            .frame(height: 1)
+            .id("chat-bottom")
         }
         .padding(.horizontal, 18)
         .padding(.top, 18)
@@ -232,16 +406,26 @@ private struct AIChatMessageScroll: View {
       }
       .scrollDismissesKeyboard(.interactively)
       .onChange(of: messages.count) { _ in
-        if let last = messages.last {
-          proxy.scrollTo(last.id, anchor: .bottom)
-        }
+        scrollToBottom(proxy)
       }
+      .onChange(of: isSending) { _ in
+        scrollToBottom(proxy)
+      }
+      .onChange(of: scrollTick) { _ in
+        scrollToBottom(proxy)
+      }
+    }
+  }
+
+  private func scrollToBottom(_ proxy: ScrollViewProxy) {
+    withAnimation(.easeOut(duration: 0.2)) {
+      proxy.scrollTo("chat-bottom", anchor: .bottom)
     }
   }
 }
 
 private struct AIChatWelcome: View {
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
   let onSuggestionTap: (String) -> Void
 
   var body: some View {
@@ -272,36 +456,26 @@ private struct AIChatWelcome: View {
       }
 
       VStack(alignment: .leading, spacing: 10) {
-        AIChatSuggestionChip(
-          value: "Quanto vendemos este mês?",
-          icon: "chart.line.uptrend.xyaxis",
-          palette: palette,
-          action: { onSuggestionTap("Quanto vendemos este mês?") }
-        )
-        AIChatSuggestionChip(
-          value: "Quantas Heinekens vendemos em março?",
-          icon: "magnifyingglass",
-          palette: palette,
-          action: { onSuggestionTap("Quantas Heinekens vendemos em março?") }
-        )
-        AIChatSuggestionChip(
-          value: "Houve perdas no estoque hoje?",
-          icon: "shippingbox",
-          palette: palette,
-          action: { onSuggestionTap("Houve perdas no estoque hoje?") }
-        )
+        ForEach(AIChatView.suggestionItems, id: \.value) { item in
+          AIChatSuggestionChip(
+            value: item.value,
+            icon: item.icon,
+            palette: palette,
+            action: { onSuggestionTap(item.value) }
+          )
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(20)
-    .background(AIChatGlassRoundedRectangle(radius: 28, palette: palette))
+    .background(BecoChatGlassRoundedRectangle(radius: 28, palette: palette))
   }
 }
 
 private struct AIChatSuggestionChip: View {
   let value: String
   let icon: String
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
   let action: () -> Void
 
   var body: some View {
@@ -327,37 +501,29 @@ private struct AIChatSuggestionChip: View {
 
 private struct AIChatBubble: View {
   let message: Message
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
 
   private var isUser: Bool { message.role == "user" }
 
   var body: some View {
-    VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
-      Text(message.text)
-        .font(.body)
-        .foregroundStyle(isUser ? .white : palette.foreground)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-          RoundedRectangle(cornerRadius: 19, style: .continuous)
-            .fill(isUser ? Color.black.opacity(0.82) : Color.clear)
-            .background {
-              if !isUser {
-                AIChatGlassRoundedRectangle(radius: 19, palette: palette)
-              }
-            }
+    Group {
+      if isUser {
+        BecoChatUserTextBubble(message.text, palette: palette, cornerRadius: 19)
+      } else {
+        BecoChatAssistantTextBubble(
+          message.text,
+          palette: palette,
+          sourcesCaption: sourcesCaption
         )
-
-      if !message.tools.isEmpty {
-        Text("Fontes: \(message.tools.map(Self.toolLabel).joined(separator: ", "))")
-          .font(.caption2)
-          .foregroundStyle(palette.mutedForeground)
       }
     }
-    .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
-    .padding(.leading, isUser ? 54 : 0)
-    .padding(.trailing, isUser ? 0 : 42)
-    .id(message.id)
+  }
+
+  private var sourcesCaption: String? {
+    guard !message.tools.isEmpty else { return nil }
+    let labels = message.tools.map(Self.toolLabel)
+    let unique = Array(NSOrderedSet(array: labels)) as? [String] ?? labels
+    return "Fontes: \(unique.joined(separator: ", "))"
   }
 
   private static func toolLabel(_ value: String) -> String {
@@ -371,77 +537,32 @@ private struct AIChatBubble: View {
 
 private struct AIChatProcessingBubble: View {
   let isSending: Bool
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
 
   var body: some View {
-    HStack(spacing: 10) {
-      ForEach(0..<3, id: \.self) { index in
-        Circle()
-          .fill(Color.secondary.opacity(0.55))
-          .frame(width: 8, height: 8)
-          .scaleEffect(isSending ? 1.0 : 0.7)
-          .animation(
-            .easeInOut(duration: 0.8).repeatForever().delay(Double(index) * 0.16),
-            value: isSending
-          )
+    BecoChatAssistantBubble(palette: palette, cornerRadius: 18) {
+      HStack(spacing: 10) {
+        ForEach(0..<3, id: \.self) { index in
+          Circle()
+            .fill(Color.secondary.opacity(0.55))
+            .frame(width: 8, height: 8)
+            .scaleEffect(isSending ? 1.0 : 0.7)
+            .animation(
+              .easeInOut(duration: 0.8).repeatForever().delay(Double(index) * 0.16),
+              value: isSending
+            )
+        }
+        Text("Processando dados do Beco…")
+          .font(.subheadline.weight(.medium))
+          .foregroundStyle(palette.mutedForeground)
       }
-      Text("Processando dados do Beco…")
-        .font(.subheadline.weight(.medium))
-        .foregroundStyle(palette.mutedForeground)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(14)
-    .background(AIChatGlassRoundedRectangle(radius: 18, palette: palette))
     .shimmer(active: true)
   }
 }
 
-private struct AIChatComposer: View {
-  @Binding var text: String
-  var isInputFocused: FocusState<Bool>.Binding
-  let isSending: Bool
-  let canSend: Bool
-  let isComposerExpanded: Bool
-  let isBlocked: Bool
-  let palette: AIChatPalette
-  let onSend: () -> Void
-
-  var body: some View {
-    VStack(spacing: 10) {
-      if isSending {
-        AIChatProcessingPill(palette: palette)
-      }
-      AIChatComposerInputBar(
-        text: $text,
-        isInputFocused: isInputFocused,
-        isSending: isSending,
-        canSend: canSend,
-        isComposerExpanded: isComposerExpanded,
-        isBlocked: isBlocked,
-        palette: palette,
-        onSend: onSend
-      )
-    }
-    .padding(.horizontal, 18)
-    .padding(.top, 10)
-    .padding(.bottom, 8)
-    .background(
-      LinearGradient(
-        colors: [
-          Color(.systemGroupedBackground).opacity(0),
-          Color(.systemGroupedBackground).opacity(0.72),
-          Color(.systemGroupedBackground).opacity(0.96)
-        ],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-      .ignoresSafeArea()
-    )
-  }
-}
-
 private struct AIChatProcessingPill: View {
-  let palette: AIChatPalette
+  let palette: BecoChatPalette
 
   var body: some View {
     HStack(spacing: 8) {
@@ -454,187 +575,9 @@ private struct AIChatProcessingPill: View {
     .foregroundStyle(palette.mutedForeground)
     .padding(.horizontal, 14)
     .padding(.vertical, 7)
-    .background(AIChatGlassCapsule(palette: palette))
+    .background(BecoChatGlassCapsule(palette: palette))
     .frame(maxWidth: 260)
     .shimmer(active: true)
-  }
-}
-
-private struct AIChatComposerInputBar: View {
-  @Binding var text: String
-  var isInputFocused: FocusState<Bool>.Binding
-  let isSending: Bool
-  let canSend: Bool
-  let isComposerExpanded: Bool
-  let isBlocked: Bool
-  let palette: AIChatPalette
-  let onSend: () -> Void
-
-  var body: some View {
-    VStack(spacing: isComposerExpanded ? 8 : 0) {
-      if isComposerExpanded {
-        AIChatTextInput(
-          text: $text,
-          isInputFocused: isInputFocused,
-          isSending: isSending,
-          isBlocked: isBlocked,
-          isComposerExpanded: isComposerExpanded,
-          palette: palette,
-          onSubmit: onSend
-        )
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-      }
-
-      HStack(alignment: .center, spacing: 10) {
-        AIChatComposerIconButton(
-          systemName: "plus",
-          accessibilityLabel: "Adicionar contexto",
-          palette: palette
-        )
-        .disabled(true)
-        .opacity(0.75)
-
-        if !isComposerExpanded {
-          AIChatTextInput(
-            text: $text,
-            isInputFocused: isInputFocused,
-            isSending: isSending,
-            isBlocked: isBlocked,
-            isComposerExpanded: isComposerExpanded,
-            palette: palette,
-            onSubmit: onSend
-          )
-        }
-
-        Spacer(minLength: isComposerExpanded ? 8 : 0)
-
-        if isComposerExpanded {
-          Text("Beco · médio")
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(palette.mutedForeground)
-        }
-
-        AIChatComposerIconButton(
-          systemName: "mic",
-          accessibilityLabel: "Entrada por voz",
-          palette: palette
-        )
-        .disabled(true)
-
-        AIChatSendButton(canSend: canSend, palette: palette, action: onSend)
-      }
-      .padding(.leading, 16)
-      .padding(.trailing, 8)
-      .padding(.vertical, 6)
-    }
-    .background(AIChatGlassRoundedRectangle(radius: isComposerExpanded ? 26 : 32, palette: palette))
-    .overlay {
-      if isSending {
-        RoundedRectangle(cornerRadius: isComposerExpanded ? 26 : 32, style: .continuous)
-          .stroke(palette.glassStroke.opacity(1.25), lineWidth: 1)
-          .shimmer(active: true)
-      }
-    }
-  }
-}
-
-private struct AIChatTextInput: View {
-  @Binding var text: String
-  var isInputFocused: FocusState<Bool>.Binding
-  let isSending: Bool
-  let isBlocked: Bool
-  let isComposerExpanded: Bool
-  let palette: AIChatPalette
-  let onSubmit: () -> Void
-
-  var body: some View {
-    ZStack(alignment: .leading) {
-      if text.isEmpty {
-        Text("Pergunte a AI do Beco")
-          .font(.system(size: 17, weight: .regular))
-          .foregroundStyle(palette.mutedForeground)
-          .lineLimit(1)
-      }
-
-      TextField("", text: $text, axis: .vertical)
-        .focused(isInputFocused)
-        .lineLimit(1...5)
-        .font(.system(size: 17, weight: .regular))
-        .foregroundStyle(palette.foreground)
-        .tint(.blue)
-        .submitLabel(.send)
-        .onSubmit(onSubmit)
-        .disabled(isSending || isBlocked)
-    }
-    .padding(.vertical, isComposerExpanded ? 3 : 7)
-  }
-}
-
-private struct AIChatSendButton: View {
-  let canSend: Bool
-  let palette: AIChatPalette
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      ZStack {
-        Circle()
-          .fill(canSend ? palette.foreground : palette.foreground.opacity(palette.isDark ? 0.10 : 0.08))
-          .frame(width: 34, height: 34)
-        Image(systemName: canSend ? "arrow.up" : "square.fill")
-          .font(.system(size: canSend ? 18 : 14, weight: .semibold))
-          .foregroundStyle(
-            canSend
-              ? (palette.isDark ? Color.black : Color.white)
-              : palette.foreground.opacity(0.68)
-          )
-      }
-    }
-    .accessibilityLabel(canSend ? "Enviar pergunta" : "Aguardando pergunta")
-    .disabled(!canSend)
-  }
-}
-
-private struct AIChatComposerIconButton: View {
-  let systemName: String
-  let accessibilityLabel: String
-  let palette: AIChatPalette
-
-  var body: some View {
-    Button {} label: {
-      Image(systemName: systemName)
-        .font(.system(size: 22, weight: .regular))
-        .frame(width: 30, height: 34)
-        .foregroundStyle(palette.foreground)
-    }
-    .accessibilityLabel(accessibilityLabel)
-  }
-}
-
-private struct AIChatGlassCapsule: View {
-  let palette: AIChatPalette
-
-  var body: some View {
-    Capsule(style: .continuous)
-      .fill(.ultraThinMaterial)
-      .overlay(Capsule(style: .continuous).stroke(palette.glassStroke, lineWidth: 1))
-      .shadow(color: palette.glassShadow, radius: 18, x: 0, y: 10)
-  }
-}
-
-private struct AIChatGlassRoundedRectangle: View {
-  let radius: CGFloat
-  let palette: AIChatPalette
-
-  var body: some View {
-    RoundedRectangle(cornerRadius: radius, style: .continuous)
-      .fill(.ultraThinMaterial)
-      .overlay(
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-          .stroke(palette.glassStroke, lineWidth: 1)
-      )
-      .shadow(color: palette.glassShadow, radius: 24, x: 0, y: 14)
   }
 }
 

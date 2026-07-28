@@ -4,18 +4,19 @@ import DesignSystem
 
 enum InventoryDraftFormMode: Equatable {
   case create
+  case createPrefill(InventoryCountDraft)
   case edit(InventoryCountDraft)
 
   var navigationTitle: String {
     switch self {
-    case .create: return "Adicionar produto"
+    case .create, .createPrefill: return "Adicionar produto"
     case .edit: return "Editar produto"
     }
   }
 
   var saveButtonTitle: String {
     switch self {
-    case .create: return "Adicionar"
+    case .create, .createPrefill: return "Adicionar"
     case .edit: return "Salvar"
     }
   }
@@ -37,6 +38,8 @@ enum InventoryDraftFormMode: Equatable {
         salePriceInCents: 0,
         storageCondition: .gelado
       )
+    case .createPrefill(let draft):
+      return draft
     case .edit(let draft):
       return draft
     }
@@ -107,13 +110,21 @@ struct InventoryDraftFormSheet: View {
         }
 
         Section {
-          TextField("Valor de venda (R$)", text: $salePriceText)
-            .keyboardType(.decimalPad)
+          TextField("Valor de venda", text: $salePriceText)
+            .keyboardType(.numberPad)
             .themedListRowBackground()
+            .onChange(of: salePriceText) { value in
+              let masked = InventoryDraftFormatting.maskCurrencyInput(value)
+              if masked != value { salePriceText = masked }
+            }
           if showCostField {
-            TextField("Valor de custo (R$)", text: $costPriceText)
-              .keyboardType(.decimalPad)
+            TextField("Valor de custo", text: $costPriceText)
+              .keyboardType(.numberPad)
               .themedListRowBackground()
+              .onChange(of: costPriceText) { value in
+                let masked = InventoryDraftFormatting.maskCurrencyInput(value)
+                if masked != value { costPriceText = masked }
+              }
           }
         } header: {
           themedSectionHeader("Preços")
@@ -213,10 +224,30 @@ enum InventoryDraftFormatting {
     return String(value).replacingOccurrences(of: ".", with: ",")
   }
 
+  /// Display from cents, e.g. `125000` → `R$ 1.250,00`. Empty when zero.
   static func currency(_ cents: Int64) -> String {
     guard cents > 0 else { return "" }
-    let reais = Double(cents) / 100
-    return String(format: "%.2f", reais).replacingOccurrences(of: ".", with: ",")
+    return formatBRL(cents: cents)
+  }
+
+  /// Live mask while typing digits as cents: `1` → `R$ 0,01`, `1250` → `R$ 12,50`.
+  static func maskCurrencyInput(_ raw: String) -> String {
+    let digits = raw.filter(\.isNumber)
+    guard !digits.isEmpty else { return "" }
+    // Cap to avoid Int64 overflow from paste spam.
+    let clipped = String(digits.suffix(12))
+    guard let cents = Int64(clipped) else { return "" }
+    return formatBRL(cents: cents)
+  }
+
+  static func formatBRL(cents: Int64) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.locale = Locale(identifier: "pt_BR")
+    formatter.currencyCode = "BRL"
+    formatter.maximumFractionDigits = 2
+    formatter.minimumFractionDigits = 2
+    return formatter.string(from: NSNumber(value: Double(cents) / 100.0)) ?? "R$ 0,00"
   }
 
   static func parseDecimal(_ text: String) -> Double? {
@@ -227,10 +258,13 @@ enum InventoryDraftFormatting {
     return Double(normalized)
   }
 
+  /// Accepts masked `R$ 1.250,00` or plain digits typed as cents.
   static func parseCurrency(_ text: String) -> Int64? {
-    guard let value = parseDecimal(text) else { return nil }
-    guard value >= 0 else { return nil }
-    return Int64((value * 100).rounded())
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty { return 0 }
+    let digits = trimmed.filter(\.isNumber)
+    guard !digits.isEmpty, let cents = Int64(digits) else { return nil }
+    return cents
   }
 
   static func summary(for draft: InventoryCountDraft) -> String {

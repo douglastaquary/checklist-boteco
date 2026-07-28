@@ -18,6 +18,7 @@ public struct WorkClockRootView: View {
   private let deviceId: String
   private let onShowDayEntries: (() -> Void)?
   private let onLogout: () -> Void
+  private let embeddedInNavigationStack: Bool
 
   @StateObject private var tracker = LocationTracker()
   @State private var entries: [WorkClockEntry] = []
@@ -36,6 +37,7 @@ public struct WorkClockRootView: View {
     workClockClient: WorkClockClient? = nil,
     syncController: SyncController,
     deviceId: String,
+    embeddedInNavigationStack: Bool = false,
     onShowDayEntries: (() -> Void)? = nil,
     onLogout: @escaping () -> Void = {}
   ) {
@@ -47,6 +49,7 @@ public struct WorkClockRootView: View {
     self.workClockClient = workClockClient
     self.syncController = syncController
     self.deviceId = deviceId
+    self.embeddedInNavigationStack = embeddedInNavigationStack
     self.onShowDayEntries = onShowDayEntries
     self.onLogout = onLogout
   }
@@ -120,15 +123,17 @@ public struct WorkClockRootView: View {
       .padding(.bottom, BecoTokens.Spacing.xxl)
     }
     .background(BecoTokens.ColorToken.background)
-    .toolbar(.hidden, for: .navigationBar)
+    .toolbar(embeddedInNavigationStack ? .automatic : .hidden, for: .navigationBar)
     .safeAreaInset(edge: .top, spacing: 0) {
-      BecoUserHeader(
-        name: user.name,
-        role: user.workSector.displayName,
-        date: Date.now.formatted(date: .abbreviated, time: .omitted),
-        onLogout: onLogout
-      )
-      .background(BecoTokens.ColorToken.background)
+      if !embeddedInNavigationStack {
+        BecoUserHeader(
+          name: user.name,
+          role: user.workSector.displayName,
+          date: Date.now.formatted(date: .abbreviated, time: .omitted),
+          onLogout: onLogout
+        )
+        .background(BecoTokens.ColorToken.background)
+      }
     }
     .safeAreaInset(edge: .bottom) {
       WorkClockRegisterBar(

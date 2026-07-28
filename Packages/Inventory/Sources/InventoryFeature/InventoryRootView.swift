@@ -1,16 +1,27 @@
 import SwiftUI
+import UIKit
 import Models
 import Persistence
 import Network
 import DesignSystem
+import AdminFeatures
+
+private enum InventoryAdminDestination: String, Identifiable {
+  case activities
+  case permissions
+
+  var id: String { rawValue }
+}
 
 private enum InventoryDraftSheet: Identifiable {
   case create
+  case createPrefill(InventoryCountDraft)
   case edit(InventoryCountDraft)
 
   var id: String {
     switch self {
     case .create: return "create"
+    case .createPrefill: return "create-prefill"
     case .edit(let draft): return "edit-\(draft.id)"
     }
   }
@@ -18,8 +29,24 @@ private enum InventoryDraftSheet: Identifiable {
   var formMode: InventoryDraftFormMode {
     switch self {
     case .create: return .create
+    case .createPrefill(let draft): return .createPrefill(draft)
     case .edit(let draft): return .edit(draft)
     }
+  }
+}
+
+private struct InventorySessionEvent: Identifiable {
+  enum Kind {
+    case system(String)
+    case utterance(AttributedString, draftSummary: String?)
+  }
+
+  let id: UUID
+  let kind: Kind
+
+  init(kind: Kind) {
+    self.id = UUID()
+    self.kind = kind
   }
 }
 
@@ -28,17 +55,26 @@ public struct InventoryRootView: View {
   private let onLogout: () -> Void
   private let repository: ChecklistRepository
   private let inventoryClient: InventoryClient?
+  private let userClient: UserClient?
   private let token: String?
   private let canCreate: Bool
   private let canViewInsights: Bool
   private let canManageAdministrativeStock: Bool
 
+  @Environment(\.colorScheme) private var colorScheme
+  @EnvironmentObject private var tabBarVisibility: TabBarVisibilityController
+  @StateObject private var voiceController = BecoVoiceCaptureController()
   @State private var drafts: [InventoryCountDraft] = []
   @State private var administrativeMode = false
   @State private var banner: InventoryBanner?
   @State private var draftSheet: InventoryDraftSheet?
   @State private var showSubmitConfirm = false
   @State private var sending = false
+  @State private var composerText = ""
+  @State private var sessionEvents: [InventorySessionEvent] = []
+  @State private var composerScrollTick = 0
+  @State private var adminDestination: InventoryAdminDestination?
+  @State private var isComposerFocused = false
 
   @State private var auditSheetStep: AuditSheetStep?
   @State private var showAuditSheet = false
@@ -75,11 +111,28 @@ public struct InventoryRootView: View {
     return "Acesso somente aos insights e à auditoria."
   }
 
+  private var palette: BecoChatPalette {
+    BecoChatPalette(isDark: colorScheme == .dark)
+  }
+
+  private var trimmedComposer: String {
+    composerText.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var canSendComposer: Bool {
+    canCreateInMode && !trimmedComposer.isEmpty && !voiceController.isActive
+  }
+
+  private var isComposerEngaged: Bool {
+    isComposerFocused || voiceController.isActive
+  }
+
   public init(
     user: User,
     onLogout: @escaping () -> Void = {},
     repository: ChecklistRepository,
     inventoryClient: InventoryClient?,
+    userClient: UserClient? = nil,
     token: String?,
     canCreate: Bool,
     canViewInsights: Bool = false,
@@ -90,6 +143,7 @@ public struct InventoryRootView: View {
     self.onLogout = onLogout
     self.repository = repository
     self.inventoryClient = inventoryClient
+    self.userClient = userClient
     self.token = token
     self.canCreate = canCreate
     self.canViewInsights = canViewInsights
@@ -104,6 +158,7 @@ public struct InventoryRootView: View {
     onLogout: @escaping () -> Void = {},
     repository: ChecklistRepository,
     inventoryClient: InventoryClient?,
+    userClient: UserClient? = nil,
     token: String?,
     canCreate: Bool,
     canViewInsights: Bool,
@@ -115,6 +170,7 @@ public struct InventoryRootView: View {
     self.onLogout = onLogout
     self.repository = repository
     self.inventoryClient = inventoryClient
+    self.userClient = userClient
     self.token = token
     self.canCreate = canCreate
     self.canViewInsights = canViewInsights
@@ -125,28 +181,13 @@ public struct InventoryRootView: View {
   #endif
 
   public var body: some View {
-    List {
-      if canManageAdministrativeStock && canCreate {
-        InventoryModeFilterSection(administrativeMode: $administrativeMode) {
-          reload()
-        }
-      }
+    ZStack {
+      Color(.systemGroupedBackground).ignoresSafeArea()
 
-      InventoryIntroSection(subtitle: navigationSubtitle, helperText: helperText)
-
-      if canCreateInMode {
-        InventoryDraftSection(
-          drafts: drafts,
-          onEdit: { draftSheet = .edit($0) },
-          onDelete: deleteDrafts
-        )
-      }
-
-      if let banner {
-        InventoryBannerSection(banner: banner)
+      VStack(spacing: 0) {
+        sessionScroll
       }
     }
-    .themedListStyle()
     .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
     .safeAreaInset(edge: .top, spacing: 0) {
@@ -166,20 +207,7 @@ public struct InventoryRootView: View {
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if canCreateInMode {
-        InventorySubmitBar(
-          isSending: sending,
-          isDisabled: drafts.isEmpty || sending,
-          onReviewAndSend: { showSubmitConfirm = true }
-        )
-      }
-    }
-    .overlay(alignment: .bottomTrailing) {
-      if canCreateInMode {
-        InventoryAddDraftButton(lifted: canCreateInMode) {
-          draftSheet = .create
-        }
-      }
+      bottomChrome
     }
     .task { reload() }
     .onAppear {
@@ -187,12 +215,51 @@ public struct InventoryRootView: View {
         administrativeMode = true
         reload()
       }
+      if sessionEvents.isEmpty {
+        appendSystemEvent("Modo \(navigationSubtitle). Fale ou digite itens da contagem.")
+      }
+    }
+    .onChange(of: voiceController.errorMessage) { message in
+      if let message {
+        banner = .validation(message)
+      }
+    }
+    .onChange(of: voiceController.readyText) { text in
+      guard let text, !text.isEmpty else { return }
+      composerText = text
+      _ = voiceController.consumeReadyText()
+      isComposerFocused = true
+    }
+    .onChange(of: isComposerFocused) { focused in
+      if focused {
+        tabBarVisibility.hide()
+      } else if !voiceController.isActive {
+        tabBarVisibility.show()
+      }
+    }
+    .onChange(of: voiceController.phase) { phase in
+      let active = phase == .recording || phase == .transcribing
+      if active {
+        tabBarVisibility.hide()
+      } else if !isComposerFocused {
+        tabBarVisibility.show()
+      }
+    }
+    .onDisappear {
+      tabBarVisibility.show()
+    }
+    .sheet(item: $adminDestination) { destination in
+      inventoryAdminCover(destination)
+        .becoCodexSheetChrome()
     }
     .sheet(item: $draftSheet) { sheet in
       InventoryDraftFormSheet(
         mode: sheet.formMode,
         showCostField: canManageAdministrativeStock,
-        onSave: { saveDraft($0, isEdit: sheet.formMode != .create) },
+        onSave: { saveDraft($0, isEdit: {
+          if case .edit = sheet.formMode { return true }
+          return false
+        }()) },
         onCancel: { draftSheet = nil }
       )
       .environmentObject(AppTheme.shared)
@@ -238,6 +305,241 @@ public struct InventoryRootView: View {
     }
   }
 
+  private var sessionScroll: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 14) {
+          InventoryIntroCard(subtitle: navigationSubtitle, helperText: helperText)
+
+          if let banner {
+            Text(banner.message)
+              .font(.footnote)
+              .foregroundStyle(banner.textColor)
+              .padding(12)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+          }
+
+          ForEach(sessionEvents) { event in
+            InventorySessionEventRow(event: event, palette: palette)
+              .id(event.id)
+          }
+
+          if canCreateInMode {
+            InventoryDraftCards(
+              drafts: drafts,
+              onEdit: { draftSheet = .edit($0) },
+              onDelete: deleteDraft
+            )
+          }
+
+          Color.clear
+            .frame(height: 1)
+            .id("session-bottom")
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+      }
+      .scrollDismissesKeyboard(.interactively)
+      .onChange(of: sessionEvents.count) { _ in
+        scrollSessionToBottom(proxy)
+      }
+      .onChange(of: composerScrollTick) { _ in
+        scrollSessionToBottom(proxy)
+      }
+      .onChange(of: composerText) { _ in
+        scrollSessionToBottom(proxy)
+      }
+      .onChange(of: isComposerFocused) { focused in
+        if focused {
+          scrollSessionToBottom(proxy)
+        }
+      }
+    }
+  }
+
+  private func scrollSessionToBottom(_ proxy: ScrollViewProxy) {
+    withAnimation(.easeOut(duration: 0.2)) {
+      proxy.scrollTo("session-bottom", anchor: .bottom)
+    }
+  }
+
+  @ViewBuilder
+  private var bottomChrome: some View {
+    if canCreateInMode {
+      VStack(spacing: 0) {
+        InventorySubmitBar(
+          isSending: sending,
+          isDisabled: drafts.isEmpty || sending || voiceController.isActive,
+          onReviewAndSend: { showSubmitConfirm = true }
+        )
+
+        if voiceController.isActive {
+          BecoVoiceFeedbackBar(
+            controller: voiceController,
+            onCancel: { dismissComposerEngagement() }
+          )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+        } else {
+          BecoChatComposer(
+            text: $composerText,
+            isInputFocused: $isComposerFocused,
+            placeholder: "Adicionar item à contagem",
+            canSend: canSendComposer,
+            isSending: false,
+            showsDismissButton: isComposerEngaged,
+            palette: palette,
+            onSend: { submitComposerText() },
+            onDismiss: { dismissComposerEngagement() },
+            onInputHeightChange: { _ in
+              composerScrollTick &+= 1
+            },
+            plusContent: { plusMenu },
+            micContent: { micButton }
+          )
+          .padding(.horizontal, 16)
+          .padding(.top, 8)
+          .padding(.bottom, 10)
+        }
+      }
+      .background(BecoChatBottomFade())
+    }
+  }
+
+  private var plusMenu: some View {
+    Menu {
+      if canCreate {
+        Button {
+          setMode(administrative: false)
+        } label: {
+          Label("Abertura", systemImage: administrativeMode ? "circle" : "checkmark.circle.fill")
+        }
+      }
+      if canManageAdministrativeStock {
+        Button {
+          setMode(administrative: true)
+        } label: {
+          Label("Estoque admin", systemImage: administrativeMode ? "checkmark.circle.fill" : "circle")
+        }
+      }
+      Divider()
+      Button {
+        draftSheet = .create
+      } label: {
+        Label("Adicionar item…", systemImage: "plus.circle")
+      }
+      Divider()
+      Button {
+        adminDestination = .activities
+      } label: {
+        Label("Atividades", systemImage: "checklist")
+      }
+      Button {
+        adminDestination = .permissions
+      } label: {
+        Label("Permissão", systemImage: "person.badge.key")
+      }
+    } label: {
+      Image(systemName: "plus")
+        .font(.system(size: 22, weight: .regular))
+        .frame(width: 34, height: 34)
+        .foregroundStyle(palette.foreground)
+        .contentShape(Rectangle())
+    }
+    .accessibilityLabel("Opções da contagem")
+  }
+
+  private var micButton: some View {
+    Button {
+      voiceController.start()
+    } label: {
+      Image(systemName: "mic")
+        .font(.system(size: 22, weight: .regular))
+        .frame(width: 34, height: 34)
+        .foregroundStyle(palette.foreground)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Gravar por voz")
+  }
+
+  @ViewBuilder
+  private func inventoryAdminCover(_ destination: InventoryAdminDestination) -> some View {
+    switch destination {
+    case .activities:
+      ActivitiesManagementView(
+        repository: repository,
+        embeddedInCodexSheet: true,
+        onDismissSheet: { adminDestination = nil }
+      )
+    case .permissions:
+      PermissionManagementView(
+        repository: repository,
+        userClient: userClient,
+        authToken: token,
+        embeddedInCodexSheet: true,
+        onDismissSheet: { adminDestination = nil }
+      )
+    }
+  }
+
+  private func dismissComposerEngagement() {
+    isComposerFocused = false
+    UIApplication.shared.sendAction(
+      #selector(UIResponder.resignFirstResponder),
+      to: nil,
+      from: nil,
+      for: nil
+    )
+    if voiceController.isActive {
+      voiceController.cancel()
+    }
+    tabBarVisibility.show()
+  }
+
+  private func setMode(administrative: Bool) {
+    guard administrativeMode != administrative else { return }
+    administrativeMode = administrative
+    reload()
+    appendSystemEvent("Modo \(navigationSubtitle)")
+  }
+
+  private func appendSystemEvent(_ text: String) {
+    sessionEvents.append(InventorySessionEvent(kind: .system(text)))
+  }
+
+  private func submitComposerText() {
+    let text = trimmedComposer
+    guard !text.isEmpty else { return }
+    composerText = ""
+    isComposerFocused = false
+    ingestUtterance(text)
+  }
+
+  private func ingestUtterance(_ text: String) {
+    let parsed = InventoryCountUtteranceParser.parse(text)
+    let highlighted = InventoryCountUtteranceParser.highlightedText(
+      original: text,
+      tokens: parsed.highlightTokens
+    )
+    if parsed.isCompleteEnough {
+      saveDraft(parsed.draft, isEdit: false)
+      sessionEvents.append(
+        InventorySessionEvent(
+          kind: .utterance(highlighted, draftSummary: InventoryDraftFormatting.summary(for: parsed.draft))
+        )
+      )
+    } else {
+      sessionEvents.append(
+        InventorySessionEvent(kind: .utterance(highlighted, draftSummary: nil))
+      )
+      draftSheet = .createPrefill(parsed.draft)
+    }
+  }
+
   private func reload() {
     drafts = (try? repository.inventoryDrafts(administrative: administrativeMode)) ?? []
   }
@@ -257,10 +559,8 @@ public struct InventoryRootView: View {
     }
   }
 
-  private func deleteDrafts(at offsets: IndexSet) {
-    for index in offsets {
-      try? repository.deleteInventoryDraft(id: drafts[index].id)
-    }
+  private func deleteDraft(_ draft: InventoryCountDraft) {
+    try? repository.deleteInventoryDraft(id: draft.id)
     reload()
   }
 
@@ -295,6 +595,9 @@ public struct InventoryRootView: View {
         administrative: administrativeMode
       )
       try repository.clearInventoryDrafts(administrative: administrativeMode)
+      sessionEvents.append(
+        InventorySessionEvent(kind: .system("Contagem enviada. Sessão limpa para novos itens."))
+      )
       banner = .success(
         administrativeMode
           ? "Contagem administrativa enviada e saldo atualizado."
@@ -455,47 +758,105 @@ public struct InventoryRootView: View {
 
 // MARK: - Subviews (MV)
 
-private struct InventoryModeFilterSection: View {
-  @Binding var administrativeMode: Bool
-  let onModeChange: () -> Void
-
-  var body: some View {
-    Section {
-      BecoSegmentedFilter(
-        options: [(false, "Abertura", nil), (true, "Estoque admin", nil)],
-        selected: $administrativeMode
-      )
-      .onChange(of: administrativeMode) { _ in onModeChange() }
-      .themedListRowBackground()
-    }
-  }
-}
-
-private struct InventoryIntroSection: View {
+private struct InventoryIntroCard: View {
   let subtitle: String
   let helperText: String
 
   var body: some View {
-    Section {
+    VStack(alignment: .leading, spacing: 6) {
       Text(subtitle)
-        .font(.subheadline.weight(.semibold))
-        .themedListRowBackground()
+        .font(.headline.weight(.semibold))
       Text(helperText)
         .font(.footnote)
-        .foregroundColor(.secondary)
-        .themedListRowBackground()
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(16)
+    .background(
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
+    )
+  }
+}
+
+private struct InventorySessionEventRow: View {
+  let event: InventorySessionEvent
+  let palette: BecoChatPalette
+
+  var body: some View {
+    switch event.kind {
+    case .system(let text):
+      BecoChatSystemCaption(text)
+    case .utterance(let attributed, let summary):
+      VStack(alignment: .trailing, spacing: 8) {
+        BecoChatUserTextBubble(attributed, palette: palette)
+
+        if let summary {
+          HStack(spacing: 8) {
+            Image(systemName: "shippingbox")
+              .font(.caption.weight(.semibold))
+            Text(summary)
+              .font(.caption.weight(.medium))
+          }
+          .foregroundStyle(palette.foreground)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 10)
+          .background(BecoChatGlassRoundedRectangle(radius: 14, palette: palette))
+          .frame(maxWidth: .infinity, alignment: .trailing)
+          .padding(.leading, 48)
+        }
+      }
     }
   }
 }
 
-private struct InventoryBannerSection: View {
-  let banner: InventoryBanner
+private struct InventoryDraftCards: View {
+  let drafts: [InventoryCountDraft]
+  let onEdit: (InventoryCountDraft) -> Void
+  let onDelete: (InventoryCountDraft) -> Void
 
   var body: some View {
-    Section {
-      Text(banner.message)
-        .foregroundColor(banner.textColor)
-        .themedListRowBackground()
+    VStack(alignment: .leading, spacing: 10) {
+      Text("Rascunho")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.secondary)
+
+      if drafts.isEmpty {
+        Text("Nenhum produto ainda. Use + , digite ou segure o microfone.")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      } else {
+        ForEach(drafts) { draft in
+          HStack {
+            Button {
+              onEdit(draft)
+            } label: {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(draft.name)
+                  .font(.headline)
+                  .foregroundStyle(.primary)
+                Text(InventoryDraftFormatting.summary(for: draft))
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+
+            Button(role: .destructive) {
+              onDelete(draft)
+            } label: {
+              Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+          }
+          .padding(14)
+          .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+              .fill(Color(.secondarySystemGroupedBackground))
+          )
+        }
+      }
     }
   }
 }
@@ -506,32 +867,14 @@ private struct InventorySubmitBar: View {
   let onReviewAndSend: () -> Void
 
   var body: some View {
-    VStack(spacing: 0) {
-      Divider()
-      BecoButton(
-        isSending ? "Enviando…" : "Revisar e enviar",
-        isLoading: isSending,
-        action: onReviewAndSend
-      )
-      .disabled(isDisabled)
-      .padding(.horizontal, 16)
-      .padding(.vertical, 12)
-      .background(.bar)
-    }
-  }
-}
-
-private struct InventoryAddDraftButton: View {
-  let lifted: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      Label("Adicionar", systemImage: "plus")
-    }
-    .buttonStyle(.borderedProminent)
-    .padding(.trailing, 16)
-    .padding(.bottom, lifted ? 88 : 16)
+    BecoButton(
+      isSending ? "Enviando…" : "Revisar e enviar",
+      isLoading: isSending,
+      action: onReviewAndSend
+    )
+    .disabled(isDisabled)
+    .padding(.horizontal, 16)
+    .padding(.top, 10)
   }
 }
 
@@ -543,43 +886,6 @@ private struct InventoryAuditMenuButton: View {
       Button("Gerar auditoria", action: onGenerateAudit)
     } label: {
       Image(systemName: "ellipsis.circle")
-    }
-  }
-}
-
-private struct InventoryDraftSection: View {
-  let drafts: [InventoryCountDraft]
-  let onEdit: (InventoryCountDraft) -> Void
-  let onDelete: (IndexSet) -> Void
-
-  var body: some View {
-    Section {
-      if drafts.isEmpty {
-        Text("Nenhum produto adicionado. Toque em Adicionar para começar.")
-          .font(.footnote)
-          .foregroundColor(.secondary)
-          .themedListRowBackground()
-      } else {
-        ForEach(drafts) { draft in
-          Button {
-            onEdit(draft)
-          } label: {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(draft.name)
-                .font(.headline)
-                .foregroundColor(.primary)
-              Text(InventoryDraftFormatting.summary(for: draft))
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-          }
-          .buttonStyle(.plain)
-          .themedListRowBackground()
-        }
-        .onDelete(perform: onDelete)
-      }
-    } header: {
-      themedSectionHeader("Rascunho")
     }
   }
 }

@@ -23,7 +23,8 @@ class AiResourceTest {
         given().header("Authorization","Bearer "+token).when().get("/api/ai/usage").then().statusCode(200).body("blocked",is(false));
         given().header("Authorization","Bearer "+token).contentType("application/json")
             .body(Map.of("messages",java.util.List.of(Map.of("role","user","text","Quanto vendeu hoje?"))))
-            .when().post("/api/ai/chat").then().statusCode(503);
+            .when().post("/api/ai/chat").then().statusCode(503)
+            .body("message",org.hamcrest.Matchers.containsString("OPENAI_API_KEY"));
     }
 
     @Test void adminCanUpdateBudget(){
@@ -49,6 +50,16 @@ class AiResourceTest {
         AiModels.ChatRequest request=new AiModels.ChatRequest();
         request.messages=List.of(message);
         assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_by_seller"));
+    }
+
+    @Test void quantosProductQuestionInLastMonthAllowsSalesByProduct(){
+        AiModels.ChatMessage message=new AiModels.ChatMessage();
+        message.role="user";
+        message.text="Quantos tabuas, porcao de carne de sol foram vendidas no ultimo mes ate os dias de hoje";
+        AiModels.ChatRequest request=new AiModels.ChatRequest();
+        request.messages=List.of(message);
+        assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_by_product"));
+        assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_quantity_by_product_in_period"));
     }
 
     private String login(){

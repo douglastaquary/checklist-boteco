@@ -26,7 +26,8 @@ public class AdminGuard {
     public User requireAdmin(String authorization) {
         TokenService.Payload payload=requireToken(authorization);
         User user=store.getUser(payload.userId);
-        if(user==null||user.permissionLevel!=PermissionLevel.ADMIN) fail(Response.Status.FORBIDDEN,"Permissão administrativa necessária");
+        if(user==null) fail(Response.Status.UNAUTHORIZED,"Sessão inválida após reinício do servidor. Faça login novamente.");
+        if(user.permissionLevel!=PermissionLevel.ADMIN) fail(Response.Status.FORBIDDEN,"Permissão administrativa necessária");
         return user;
     }
 

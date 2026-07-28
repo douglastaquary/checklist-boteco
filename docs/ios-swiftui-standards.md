@@ -61,7 +61,13 @@ Arquivo: [`iosApp/ChecklistBoteco/AppDependencies.swift`](../iosApp/ChecklistBot
 
 ## Backlog MV por feature
 
-Refatorar telas grandes restantes conforme necessidade. Pilotos MV concluídos: Compras, Ponto, Inventário, AI Chat (`AIChatView`), Admin (`AdminFeaturesViews`).
+Refatorar telas grandes restantes conforme necessidade. Pilotos MV concluídos: Compras, Ponto, Inventário, AI Chat, Admin, Checklist (`ChecklistRootView`).
+
+### Navegação a partir de root / Mais
+
+- Destinos empilhados usam [`.becoBackButton()`](../Packages/DesignSystem/Sources/DesignSystem/BecoDesignSystem.swift).
+- Tab **Mais**: hub Codex + `overflowModule`; retap em Mais (ou troca para Mais) faz `tabRouter.reset(.more)` para reabrir a lista.
+- Módulos abertos pelo Mais passam `embeddedInNavigationStack: true` (não escondem a nav bar).
 
 ## Mapeamento skill → código atual
 

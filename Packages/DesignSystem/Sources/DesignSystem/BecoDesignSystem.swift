@@ -132,16 +132,19 @@ private struct BecoBackButtonModifier: ViewModifier {
           BecoBackButton { dismiss() }
         }
       }
-      .background(BecoInteractivePopGestureEnabler())
+      .becoInteractivePopGesture()
   }
 }
 
-private struct BecoInteractivePopGestureEnabler: UIViewControllerRepresentable {
-  func makeUIViewController(context: Context) -> Controller { Controller() }
-  func updateUIViewController(_ uiViewController: Controller, context: Context) {}
+/// Keeps edge-swipe pop working when the system back button is hidden.
+public struct BecoInteractivePopGestureEnabler: UIViewControllerRepresentable {
+  public init() {}
 
-  final class Controller: UIViewController {
-    override func viewDidAppear(_ animated: Bool) {
+  public func makeUIViewController(context: Context) -> Controller { Controller() }
+  public func updateUIViewController(_ uiViewController: Controller, context: Context) {}
+
+  public final class Controller: UIViewController {
+    public override func viewDidAppear(_ animated: Bool) {
       super.viewDidAppear(animated)
       navigationController?.interactivePopGestureRecognizer?.isEnabled = true
       navigationController?.interactivePopGestureRecognizer?.delegate = nil
@@ -152,6 +155,10 @@ private struct BecoInteractivePopGestureEnabler: UIViewControllerRepresentable {
 public extension View {
   func becoBackButton() -> some View {
     modifier(BecoBackButtonModifier())
+  }
+
+  func becoInteractivePopGesture() -> some View {
+    background(BecoInteractivePopGestureEnabler())
   }
 }
 
@@ -164,26 +171,45 @@ public extension BecoPageHeader where Actions == EmptyView {
 public struct BecoSegmentedFilter<Option: Hashable>: View {
   private let options: [(Option, String, Int?)]
   @Binding private var selected: Option
+  private let compact: Bool
 
-  public init(options: [(Option, String, Int?)], selected: Binding<Option>) {
+  public init(
+    options: [(Option, String, Int?)],
+    selected: Binding<Option>,
+    compact: Bool = false
+  ) {
     self.options = options
     _selected = selected
+    self.compact = compact
   }
 
   public var body: some View {
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: BecoTokens.Spacing.xs) {
+      HStack(spacing: compact ? 6 : BecoTokens.Spacing.xs) {
         ForEach(options, id: \.0) { option, label, count in
           Button { selected = option } label: {
-            HStack(spacing: BecoTokens.Spacing.xs) {
+            HStack(spacing: compact ? 4 : BecoTokens.Spacing.xs) {
               Text(label)
-              if let count { Text("\(count)").font(.caption.bold()).padding(.horizontal, 7).padding(.vertical, 3).background(selected == option ? Color.white.opacity(0.2) : BecoTokens.ColorToken.outline, in: Capsule()) }
+              if let count {
+                Text("\(count)")
+                  .font(compact ? .caption2.weight(.semibold) : .caption.bold())
+                  .padding(.horizontal, compact ? 5 : 7)
+                  .padding(.vertical, compact ? 1 : 3)
+                  .background(
+                    selected == option ? Color.white.opacity(0.2) : BecoTokens.ColorToken.outline,
+                    in: Capsule()
+                  )
+              }
             }
-            .font(.subheadline.weight(.semibold))
+            .font(compact ? .caption.weight(.medium) : .subheadline.weight(.semibold))
             .foregroundStyle(selected == option ? Color.white : BecoTokens.ColorToken.ink)
-            .padding(.horizontal, BecoTokens.Spacing.md)
-            .frame(minHeight: 44)
-            .background(selected == option ? BecoTokens.ColorToken.ink : BecoTokens.ColorToken.subtle, in: Capsule())
+            .padding(.horizontal, compact ? 10 : BecoTokens.Spacing.md)
+            .padding(.vertical, compact ? 5 : 0)
+            .frame(minHeight: compact ? 28 : 44)
+            .background(
+              selected == option ? BecoTokens.ColorToken.ink : BecoTokens.ColorToken.subtle,
+              in: Capsule()
+            )
           }
           .buttonStyle(.plain)
           .accessibilityLabel(count.map { "\(label), \($0) itens" } ?? label)

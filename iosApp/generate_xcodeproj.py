@@ -18,12 +18,14 @@ APP_SOURCES = [
   "ChecklistBoteco/AppTabRoute.swift",
   "ChecklistBoteco/AppDeepLink.swift",
   "ChecklistBoteco/TabRouter.swift",
+  "ChecklistBoteco/SyncRefreshingContainer.swift",
+  "ChecklistBoteco/TabBarReselectObserver.swift",
 ]
 
 APP_PRODUCTS = [
   "Models", "Network", "Persistence", "Env", "DesignSystem", "Auth",
   "ChecklistFeature", "WorkClockFeature", "InventoryFeature",
-  "DashboardFeature", "AdminFeatures",
+  "DashboardFeature", "AdminFeatures", "AIChatFeature", "PurchasesFeature",
 ]
 
 

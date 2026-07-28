@@ -182,7 +182,11 @@ public final class InventoryClient: Sendable {
         )
       }
     )
-    let _: [String: String] = try await api.request(path: path, method: "POST", token: token, body: body)
+    // Backend returns CountSession / AdminStockSession (201) — not a string map.
+    struct SubmitCountResponse: Decodable {
+      let id: String
+    }
+    _ = try await api.request(path: path, method: "POST", token: token, body: body) as SubmitCountResponse
   }
 
   public func dailyAudit(token: String, date: String) async throws -> InventoryDailyAudit {

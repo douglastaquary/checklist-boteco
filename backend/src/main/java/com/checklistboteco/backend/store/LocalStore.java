@@ -51,13 +51,34 @@ public class LocalStore implements AppStore {
     @PostConstruct void initializeLocal(){ if(!(this instanceof DynamoDbStore)){ loadChecklistSchedule(); seed(); } }
 
     protected void seed() {
-        if(!users.isEmpty()) return;
-        var request=new CreateUserRequest(); request.name="Administrador"; request.email="admin@checklistboteco.com";
-        request.password=initialAdminPassword; request.workSector=WorkSector.GERENTE; request.permissionLevel=PermissionLevel.ADMIN;
-        createUserInternal(request,false,true);
+        ensureDefaultAdmin();
+        if (!activities.isEmpty()) return;
         createSeedActivity("Abrir o salão",Area.ATENDIMENTO,Frequency.DIARIO,2);
         createSeedActivity("Conferir estoque crítico",Area.ESTOQUE,Frequency.DIARIO,3);
         createSeedActivity("Higienizar bancadas",Area.COZINHA,Frequency.DIARIO,2);
+    }
+
+    /** Keeps local/dev admin usable with checklist.initial-admin-password (default admin123). */
+    private void ensureDefaultAdmin() {
+        String email="admin@checklistboteco.com";
+        User existing=users.values().stream()
+            .filter(user->email.equalsIgnoreCase(user.email))
+            .findFirst()
+            .orElse(null);
+        if(existing!=null){
+            existing.passwordHash=passwords.hash(initialAdminPassword);
+            existing.mustChangePassword=false;
+            existing.permissionLevel=PermissionLevel.ADMIN;
+            existing.permissions=FeaturePermissions.admin();
+            return;
+        }
+        var request=new CreateUserRequest();
+        request.name="Administrador";
+        request.email=email;
+        request.password=initialAdminPassword;
+        request.workSector=WorkSector.GERENTE;
+        request.permissionLevel=PermissionLevel.ADMIN;
+        createUserInternal(request,false,false);
     }
 
     private void createSeedActivity(String name,Area area,Frequency frequency,int effort) {

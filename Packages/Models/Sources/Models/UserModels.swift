@@ -237,6 +237,8 @@ public enum AppTab: String, CaseIterable, Identifiable, Sendable {
   case activities
   case permissions
   case aiChat
+  /// Tab hub for overflow modules (avoids UIKit system More, which blanks SwiftUI pushes).
+  case more
 
   public var id: String { rawValue }
 
@@ -250,9 +252,11 @@ public enum AppTab: String, CaseIterable, Identifiable, Sendable {
     case .activities: return "Atividades"
     case .permissions: return "Permissões"
     case .aiChat: return "Chat IA"
+    case .more: return "Mais"
     }
   }
 
+  /// Modules the user can open (never includes `.more`).
   public static func available(for user: User) -> [AppTab] {
     var tabs: [AppTab] = [.checklist]
     if user.canUseWorkClock() { tabs.append(.workClock) }
@@ -262,6 +266,59 @@ public enum AppTab: String, CaseIterable, Identifiable, Sendable {
     if user.canUseActivitiesModule() { tabs.append(.activities) }
     if user.canManagePermissions() { tabs.append(.permissions) }
     if user.permissionLevel == .admin { tabs.append(.aiChat) }
-    return tabs
+    return ordered(tabs, for: user)
+  }
+
+  /// Primary tab-bar items (≤4) + overflow shown under custom Mais.
+  public static func layout(for user: User) -> AppTabLayout {
+    let all = available(for: user)
+    if all.count <= 4 {
+      return AppTabLayout(primary: all, overflow: [])
+    }
+    let preferredPrimary: [AppTab]
+    if user.permissionLevel == .admin {
+      preferredPrimary = [.dashboard, .aiChat, .purchases, .inventory]
+    } else {
+      preferredPrimary = Array(all.prefix(4))
+    }
+    let primary = preferredPrimary.filter { all.contains($0) }
+    let overflow = all.filter { !primary.contains($0) }
+    if primary.isEmpty {
+      return AppTabLayout(primary: Array(all.prefix(4)), overflow: Array(all.dropFirst(4)))
+    }
+    return AppTabLayout(primary: primary, overflow: overflow)
+  }
+
+  private static func ordered(_ tabs: [AppTab], for user: User) -> [AppTab] {
+    guard user.permissionLevel == .admin else { return tabs }
+    let priority: [AppTab] = [
+      .dashboard, .aiChat, .purchases, .inventory,
+      .checklist, .workClock, .activities, .permissions
+    ]
+    return priority.filter { tabs.contains($0) } + tabs.filter { !priority.contains($0) }
+  }
+}
+
+public struct AppTabLayout: Sendable {
+  public let primary: [AppTab]
+  public let overflow: [AppTab]
+
+  public init(primary: [AppTab], overflow: [AppTab]) {
+    self.primary = primary
+    self.overflow = overflow
+  }
+
+  public var tabBarItems: [AppTab] {
+    overflow.isEmpty ? primary : primary + [.more]
+  }
+
+  public var startTab: AppTab {
+    primary.first ?? .checklist
+  }
+
+  public func hosts(_ tab: AppTab) -> AppTab {
+    if primary.contains(tab) { return tab }
+    if overflow.contains(tab) { return .more }
+    return tab
   }
 }

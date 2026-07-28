@@ -55,6 +55,8 @@ public enum AppErrorMapper {
     case 403: return "Você não tem permissão para esta ação."
     case 404: return "Recurso não encontrado no servidor."
     case 408, 504: return "O servidor demorou para responder. Tente novamente."
+    case 503:
+      return "Chat de IA indisponível. Configure OPENAI_API_KEY no backend e reinicie o servidor."
     case 500...599: return "O servidor encontrou um problema. Tente novamente em instantes."
     default: return "Não foi possível concluir a operação (erro \(status))."
     }
