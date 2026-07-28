@@ -40,6 +40,23 @@ Siga a tabela do skill (seção *State ownership summary*) com fallback iOS 16:
 - Hide/show da tab no scroll: `tracksTabBarOnScroll()` / `tabBarScrollAnchor()` (DesignSystem).
 - CTAs: [`BecoButton`](../Packages/DesignSystem/Sources/DesignSystem/BecoButton.swift) (mín. 44pt HIG).
 
+### Sheets / page sheet (Codex chrome)
+
+- Preferir `.sheet(item:)` (não `fullScreenCover`) para módulos admin abertos de Mais / Chat / Contagem.
+- Chrome compartilhado: [`BecoCodexChrome.swift`](../Packages/DesignSystem/Sources/DesignSystem/BecoCodexChrome.swift)
+  - `.becoCodexSheetChrome()` — detent `.large`, cantos via `UISheetPresentationController.preferredCornerRadius` (iOS 16 / Xcode 14.2).
+  - `BecoCodexSheetMetrics.chromeEdgeInset` (**12pt iguais** top/leading/trailing) para X e voltar alinhados ao contorno do canto.
+  - `BecoCodexCloseOverlay` / `BecoCodexDetailChrome` — controles fora da toolbar nativa.
+- Tema do sheet **segue o app** (`preferredColorScheme` do root; sem forçar dark no modal).
+- Modal Codex **owns** `NavigationStack` (`embeddedInCodexSheet: true`); na tab Mais, módulos usam o stack do pai (`embeddedInParentNavigationStack: true`) para evitar crash de stacks aninhados.
+
+### Navegação a partir de root / Mais
+
+- Destinos empilhados usam [`.becoBackButton()`](../Packages/DesignSystem/Sources/DesignSystem/BecoDesignSystem.swift).
+- Tab **Mais**: hub + `overflowModule`; retap em Mais (ou troca para Mais) faz `tabRouter.reset(.more)` para reabrir a lista.
+- **Atividades / Permissão** abrem em page sheet Codex (não push na tab).
+- Demais módulos do Mais continuam push no `NavigationStack` da tab.
+
 ### Bootstrap do app
 
 Arquivo: [`iosApp/ChecklistBoteco/AppDependencies.swift`](../iosApp/ChecklistBoteco/AppDependencies.swift)
@@ -61,13 +78,7 @@ Arquivo: [`iosApp/ChecklistBoteco/AppDependencies.swift`](../iosApp/ChecklistBot
 
 ## Backlog MV por feature
 
-Refatorar telas grandes restantes conforme necessidade. Pilotos MV concluídos: Compras, Ponto, Inventário, AI Chat, Admin, Checklist (`ChecklistRootView`).
-
-### Navegação a partir de root / Mais
-
-- Destinos empilhados usam [`.becoBackButton()`](../Packages/DesignSystem/Sources/DesignSystem/BecoDesignSystem.swift).
-- Tab **Mais**: hub Codex + `overflowModule`; retap em Mais (ou troca para Mais) faz `tabRouter.reset(.more)` para reabrir a lista.
-- Módulos abertos pelo Mais passam `embeddedInNavigationStack: true` (não escondem a nav bar).
+Refatorar telas grandes restantes conforme necessidade. Pilotos MV concluídos: Compras, Ponto, Inventário, AI Chat, Admin, Checklist (`ChecklistRootView`), Dashboard.
 
 ## Mapeamento skill → código atual
 
@@ -77,7 +88,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 |------|-------------------|-----------------|----------------|
 | App shell / tabs | [`tabview.md`](../.cursor/skills/swiftui-ui-patterns/references/tabview.md), [`navigationstack.md`](../.cursor/skills/swiftui-ui-patterns/references/navigationstack.md) | [`MainTabView.swift`](../iosApp/ChecklistBoteco/MainTabView.swift), [`TabBarChrome.swift`](../Packages/DesignSystem/Sources/DesignSystem/TabBarChrome.swift), [`AppTabRoute.swift`](../iosApp/ChecklistBoteco/AppTabRoute.swift) | — |
 | Auth / forms | [`form.md`](../.cursor/skills/swiftui-ui-patterns/references/form.md), [`async-state.md`](../.cursor/skills/swiftui-ui-patterns/references/async-state.md) | [`LoginView.swift`](../Packages/Auth/Sources/Auth/LoginView.swift) | Previews 2FA/biometria |
-| Sheets / modals | [`sheets.md`](../.cursor/skills/swiftui-ui-patterns/references/sheets.md) | Permissões (Admin), Checklist (câmera), Inventário (rascunho) | — |
+| Sheets / modals | [`sheets.md`](../.cursor/skills/swiftui-ui-patterns/references/sheets.md) + Codex chrome | [`BecoCodexChrome.swift`](../Packages/DesignSystem/Sources/DesignSystem/BecoCodexChrome.swift), Admin Atividades/Permissão (page sheet), Checklist (câmera), Inventário (rascunho) | — |
 | Feedback global | [`overlay.md`](../.cursor/skills/swiftui-ui-patterns/references/overlay.md) | [`DesignSystem.swift`](../Packages/DesignSystem/Sources/DesignSystem/DesignSystem.swift) | Cores de linha via `AppTheme` |
 | Listas / features | [`list.md`](../.cursor/skills/swiftui-ui-patterns/references/list.md) | Inventory, WorkClock, AdminFeatures | Extrair subviews; estados loading/error explícitos |
 | Previews | [`previews.md`](../.cursor/skills/swiftui-ui-patterns/references/previews.md) | [`LoginView+Preview.swift`](../Packages/Auth/Sources/Auth/LoginView+Preview.swift) | `#Preview` / PreviewProvider por feature |
@@ -95,6 +106,7 @@ Referências obrigatórias ao refatorar. A coluna *Backlog* indica divergências
 
 Antes de abrir PR com mudanças SwiftUI:
 
+- [ ] Sheets admin usam `.sheet` + `becoCodexSheetChrome()` (não `fullScreenCover`); tema alinhado ao app; insets iguais no X/voltar.
 - [ ] Li e apliquei [swiftui-view-refactor/SKILL.md](../.cursor/skills/swiftui-ui-patterns/swiftui-view-refactor/SKILL.md) (MV, subviews dedicadas, body estável).
 - [ ] Li a referência do componente em `references/`.
 - [ ] Ownership de state está na camada correta (`@State` local vs `@EnvironmentObject` compartilhado).

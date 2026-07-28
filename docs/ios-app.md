@@ -68,6 +68,12 @@ Build CLI (já roda o prepare):
 ./scripts/build-ios.sh
 ```
 
+Prints do README (abas Dashboard / Chat / Compras / Contagem / Mais no simulador):
+
+```bash
+./scripts/capture-readme-screenshots.sh
+```
+
 ### Alterar código em `Packages/`
 
 Edite e faça commit **no mesmo branch do monorepo** (ex. `main`). Não use submodule.
@@ -77,7 +83,9 @@ git add Packages iosApp
 git commit -m "Descreva a alteração dos packages / app"
 ```
 
-Se o Xcode não refletir a alteração, rode de novo `./scripts/ensure-packages-spm-git.sh` (atualiza o snapshot SPM) ou **File → Packages → Reset Package Caches**.## Estrutura de pacotes (umbrella)
+Se o Xcode não refletir a alteração, rode de novo `./scripts/ensure-packages-spm-git.sh` (atualiza o snapshot SPM) ou **File → Packages → Reset Package Caches**.
+
+## Estrutura de pacotes (umbrella)
 
 | Produto | Responsabilidade |
 |---------|------------------|
@@ -85,7 +93,7 @@ Se o Xcode não refletir a alteração, rode de novo `./scripts/ensure-packages-
 | `Network` | APIClient, AuthClient, SyncClient, ErrorMapper |
 | `Persistence` | GRDB (SQLite), ChecklistRepository, outbox |
 | `Env` | AppSession, SyncEngine, BGTask sync |
-| `DesignSystem` | Cores, overlay de loading, alertas |
+| `DesignSystem` | Tema, `BecoButton`, tab chrome, composer chat, **Codex page-sheet chrome** |
 | `Auth` | Login, registro, Keychain + Face ID |
 | `ChecklistFeature` | Checklist por área + câmera |
 | `WorkClockFeature` | Ponto + CoreLocation geofence 5 m |

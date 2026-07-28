@@ -147,9 +147,21 @@ struct EditItemSheet: View {
 - Keep sheet views lightweight and composed from smaller views; avoid large monoliths.
 - Let sheets own their actions and call `dismiss()` internally instead of forwarding `onCancel` or `onConfirm` closures through many layers.
 
+## Checklist Boteco — page sheet Codex (iOS 16)
+
+Admin modules (Atividades / Permissão) opened from Mais, Chat IA, or Contagem:
+
+- Present with `.sheet(item:)` + `.becoCodexSheetChrome()` — **not** `fullScreenCover`.
+- Shared chrome lives in `Packages/DesignSystem/.../BecoCodexChrome.swift`.
+- Corner radius via `UISheetPresentationController.preferredCornerRadius` (Xcode 14.2-safe; avoid `presentationCornerRadius` which needs iOS 16.4).
+- Equal edge inset (`BecoCodexSheetMetrics.chromeEdgeInset = 12`) for close (X) and back so controls hug the rounded page-sheet corner.
+- Follow the app color scheme (root `preferredColorScheme`); do not force dark on the sheet.
+- Sheet owns its `NavigationStack` when `embeddedInCodexSheet: true`. When the same screen is embedded in the Mais tab stack, set `embeddedInParentNavigationStack: true` and **do not** nest another `NavigationStack`.
+
 ## Pitfalls
 
 - Avoid mixing `sheet(isPresented:)` and `sheet(item:)` for the same concern; prefer a single enum.
 - Avoid `if let` inside a sheet body when the presentation state already carries the selected model; prefer `sheet(item:)`.
 - Do not store heavy state inside `SheetDestination`; pass lightweight identifiers or models.
 - If multiple sheets can appear from the same screen, give them distinct `id` values.
+- Do not nest `NavigationStack` inside an already-navigating tab stack (crash risk on iOS 16).
