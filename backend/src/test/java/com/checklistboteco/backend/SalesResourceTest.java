@@ -390,6 +390,58 @@ class SalesResourceTest {
             .body("totalQuantity",anyOf(is(25),is("25")));
     }
 
+    @Test void salesProductSearchIgnoresAccentsAndSimplePlurals(){
+        String token=adminToken(),dataset="sales-accent-"+UUID.randomUUID();
+        String csv="""
+            Data;Produto;Categoria;Local;Quantidade;Valor
+            05/07/2026;CALDO PELA ÉGUA;Comidas;Beco da Praia;2;40,00
+            07/07/2026;CALDO PELA ÉGUA;Comidas;Beco da Praia;4;80,00
+            05/07/2026;CALDINHO DE FEIJAO;Comidas;Beco da Praia;1;18,00
+            11/07/2026;CALDINHO DE FEIJAO;Comidas;Beco da Praia;3;54,00
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-accent.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200).extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","category","Categoria","location","Local","quantity","Quantidade","totalInCents","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(4));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-06-28","to","2026-07-28","text","egua","pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(2))
+            .body("totalQuantity",anyOf(is(6),is("6")));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-06-28","to","2026-07-28","text","feijão","pageSize",50))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(2))
+            .body("totalQuantity",anyOf(is(4),is("4")));
+
+        Map<String,Object> caldoRequest=Map.of(
+            "jsonrpc","2.0","id",51,"method","tools/call",
+            "params",Map.of(
+                "name","sales_quantity_by_product_in_period",
+                "arguments",Map.of("datasetId",dataset,"product","caldos pela egua","from","2026-06-28","to","2026-07-28")
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(caldoRequest).when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.totalItems",is(2))
+            .body("result.structuredContent.totalQuantity",anyOf(is(6),is("6")))
+            .body("result.structuredContent.items[0].description",containsString("CALDO PELA"));
+
+        Map<String,Object> caldinhoRequest=Map.of(
+            "jsonrpc","2.0","id",52,"method","tools/call",
+            "params",Map.of(
+                "name","sales_by_product",
+                "arguments",Map.of("datasetId",dataset,"product","caldinho de feijão","from","2026-06-28","to","2026-07-28")
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(caldinhoRequest).when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.totalItems",is(2))
+            .body("result.structuredContent.totalQuantity",anyOf(is(4),is("4")))
+            .body("result.structuredContent.items[0].description",containsString("CALDINHO DE FEIJAO"));
+    }
+
     @Test void salesHeatmapReturnsDailyQuantitiesForYear(){
         String token=adminToken(),dataset="sales-heatmap-"+UUID.randomUUID();
         String csv="""
