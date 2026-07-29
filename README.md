@@ -1,4 +1,9 @@
-# Checklist Boteco
+<h1>
+  <img src="docs/assets/readme/xocoalho-icon.png" alt="Ícone do Xocoalho" width="72" align="absmiddle">
+  Xocoalho
+</h1>
+
+**Checklist Boteco** · Dados do negócio sempre perto do dono.
 
 Sistema operacional leve para bares, restaurantes e botecos pequenos que querem sair da planilha e aproximar o dono dos dados reais da operação.
 
@@ -14,9 +19,15 @@ Aqui, a ideia é que a IA consiga consultar os dados do negócio e responder em 
 
 O dono continua no controle. A diferença é que ele pergunta para o sistema como perguntaria para uma pessoa da equipe.
 
+## Por que Xocoalho?
+
+**Xocoalho** é a identidade pública do projeto Checklist Boteco. O nome é uma releitura do chocalho usado no sertão para localizar o gado nas pastagens: um objeto simples, reconhecível e cujo som forte funciona como sinal de presença e alerta.
+
+No app, essa ideia representa um dono sempre próximo dos dados e dos acontecimentos do negócio, capaz de perceber rapidamente o que precisa de atenção. A grafia com **X** dá identidade própria à marca, enquanto o ícone frontal em relevo e as cores discretas do pôr do sol do sertão nordestino conectam o produto à origem de seu criador.
+
 ## Visão do produto
 
-O Checklist Boteco combina operação diária, dados importados e IA para transformar um bar pequeno em uma operação mais observável.
+O Xocoalho combina operação diária, dados importados e IA para transformar um bar pequeno em uma operação mais observável.
 
 - **Apps mobile para a equipe:** checklist, ponto, contagem e rotinas do dia.
 - **Painel web administrativo:** usuários, permissões, atividades, vendas, compras, auditoria e dashboards.

@@ -287,7 +287,7 @@ public final class AppSession: ObservableObject {
     #if os(iOS)
     return UIDevice.current.name
     #else
-    return Host.current().localizedName ?? "ChecklistBoteco"
+    return Host.current().localizedName ?? "Xocoalho"
     #endif
   }
 }

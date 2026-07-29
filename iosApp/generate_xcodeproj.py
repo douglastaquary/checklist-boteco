@@ -48,6 +48,8 @@ group_app = uid()
 group_config = uid()
 product_ref = uid()
 info_plist = uid()
+asset_catalog = uid()
+asset_catalog_build_file = uid()
 debug_xcconfig = uid()
 release_xcconfig = uid()
 packages_ref = uid()
@@ -77,6 +79,10 @@ pbx = f"""// !$*UTF8*$!
 """
 for bf, ref in build_files:
   pbx += f"\t\t{bf} /* file */ = {{isa = PBXBuildFile; fileRef = {ref}; }};\n"
+pbx += (
+  f"\t\t{asset_catalog_build_file} /* Assets.xcassets in Resources */ = {{isa = PBXBuildFile; "
+  f"fileRef = {asset_catalog} /* Assets.xcassets */; }};\n"
+)
 for name in APP_PRODUCTS:
   pbx += (
     f"\t\t{framework_build_files[name]} /* {name} in Frameworks */ = {{isa = PBXBuildFile; "
@@ -101,6 +107,10 @@ pbx += (
   f"path = Info.plist; sourceTree = \"<group>\"; }};\n"
 )
 pbx += (
+  f"\t\t{asset_catalog} /* Assets.xcassets */ = {{isa = PBXFileReference; "
+  f"lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = \"<group>\"; }};\n"
+)
+pbx += (
   f"\t\t{debug_xcconfig} /* Debug.xcconfig */ = {{isa = PBXFileReference; lastKnownFileType = text.xcconfig; "
   f"path = Debug.xcconfig; sourceTree = \"<group>\"; }};\n"
 )
@@ -118,7 +128,7 @@ pbx += (
 )
 pbx += "/* End PBXFrameworksBuildPhase section */\n\n"
 
-children = ", ".join(file_refs[s] for s in APP_SOURCES) + f", {info_plist}"
+children = ", ".join(file_refs[s] for s in APP_SOURCES) + f", {info_plist}, {asset_catalog}"
 pbx += "/* Begin PBXGroup section */\n"
 pbx += (
   f"\t\t{group_root} = {{isa = PBXGroup; children = ({group_app}, {group_config}, {group_products}); "
@@ -161,7 +171,7 @@ pbx += "/* End PBXProject section */\n\n"
 pbx += "/* Begin PBXResourcesBuildPhase section */\n"
 pbx += (
   f"\t\t{resources_phase} /* Resources */ = {{isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; "
-  f"files = (); runOnlyForDeploymentPostprocessing = 0; }};\n"
+  f"files = ({asset_catalog_build_file}); runOnlyForDeploymentPostprocessing = 0; }};\n"
 )
 pbx += "/* End PBXResourcesBuildPhase section */\n\n"
 
@@ -180,7 +190,8 @@ for cfg_uid, name, xc_ref in [
 ]:
   pbx += (
     f"\t\t{cfg_uid} /* {name} */ = {{isa = XCBuildConfiguration; baseConfigurationReference = {xc_ref}; "
-    f"buildSettings = {{ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; "
+    f"buildSettings = {{ALWAYS_SEARCH_USER_PATHS = NO; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; "
+    f"CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; "
     f"GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; "
     f"LD_RUNPATH_SEARCH_PATHS = (\"$(inherited)\", \"@executable_path/Frameworks\"); MARKETING_VERSION = 1.0; "
     f"ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; "

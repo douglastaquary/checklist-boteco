@@ -332,7 +332,7 @@ private struct AIChatHeader: View {
         Text("AI do Beco")
           .font(.headline.weight(.semibold))
           .foregroundStyle(palette.foreground)
-        Text("ChecklistBoteco · dados do Beco da Praia")
+        Text("Xocoalho · dados do Beco da Praia")
           .font(.caption)
           .foregroundStyle(palette.mutedForeground)
           .lineLimit(1)

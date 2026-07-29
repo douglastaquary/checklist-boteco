@@ -11,5 +11,5 @@ import jakarta.ws.rs.core.MediaType;
 @Path("/")
 public class AdminResource {
     @Inject Template admin;
-    @GET @Produces(MediaType.TEXT_HTML) public TemplateInstance index(){ return admin.data("title","Checklist Boteco"); }
+    @GET @Produces(MediaType.TEXT_HTML) public TemplateInstance index(){ return admin.data("title","Xocoalho"); }
 }

@@ -280,7 +280,7 @@ class BackendApiClient private constructor(
             val host = parsed.host.lowercase()
             val isLocalDev = host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2"
             require(isLocalDev && parsed.protocol.name == "http") {
-                "A API do Checklist Boteco deve usar HTTPS fora de hosts locais de desenvolvimento."
+                "A API do Xocoalho deve usar HTTPS fora de hosts locais de desenvolvimento."
             }
         }
     }

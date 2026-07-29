@@ -17,6 +17,7 @@
 		0B21713095AB4BC8BA8630C4 /* file */ = {isa = PBXBuildFile; fileRef = D73C1235476443568C14233F; };
 		61789866ABFE4BF9A89671F0 /* file */ = {isa = PBXBuildFile; fileRef = BC2D1B4E5DD34BA998C6BA9F; };
 		F83774BEDA684F759D8BA23F /* file */ = {isa = PBXBuildFile; fileRef = 4704525E5816432393E8B6F6; };
+		B2C0B2C0B2C0B2C0B2C0B2C0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1C0A1C0A1C0A1C0A1C0A1C0 /* Assets.xcassets */; };
 		6E3FDC3830CE4FB1BA644024 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 164EF8A045514D49B0CE2E12 /* Models */; };
 		1937ADE764F947E48D192ADC /* Network in Frameworks */ = {isa = PBXBuildFile; productRef = 96BA83B5560F472F8FA98BF5 /* Network */; };
 		17517C1BCC2448F682E966D7 /* Persistence in Frameworks */ = {isa = PBXBuildFile; productRef = 727C376D0D80454DBB4D43AE /* Persistence */; };
@@ -46,6 +47,7 @@
 		4704525E5816432393E8B6F6 /* TabBarReselectObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarReselectObserver.swift; sourceTree = "<group>"; };
 		99486DCE4B814A8CAD59A3C5 /* ChecklistBoteco.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChecklistBoteco.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B83505F213094826A6FFA8D7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1C0A1C0A1C0A1C0A1C0A1C0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8B72A69F88AB4961B8500D12 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		5B444DA12CA74C87BB2B2FB9 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -58,7 +60,7 @@
 		7ECA0509B2EB4C94947937AB = {isa = PBXGroup; children = (3656275D89C04784B859B267, BCC1377CE9F543D894292213, A5EA196763EA486391EBFF0C); sourceTree = "<group>"; };
 		A5EA196763EA486391EBFF0C /* Products */ = {isa = PBXGroup; children = (99486DCE4B814A8CAD59A3C5); name = Products; sourceTree = "<group>"; };
 		BCC1377CE9F543D894292213 /* Config */ = {isa = PBXGroup; children = (8B72A69F88AB4961B8500D12, 5B444DA12CA74C87BB2B2FB9); path = Config; sourceTree = "<group>"; };
-		3656275D89C04784B859B267 /* ChecklistBoteco */ = {isa = PBXGroup; children = (0F611C71D88544749AEC924A, 08220122D70F4025AC6C7FB8, 0854FECCE3084E41AFB2B770, 9505D15977BC4CCCA59B5990, 010B3B20F7AD4C3CAD0F1AF3, D225F7ED20A84E36B5EC79AB, 9FE11C758FF949CD9416F8CB, A7F7D56CD15B4C94ABF72210, D73C1235476443568C14233F, BC2D1B4E5DD34BA998C6BA9F, 4704525E5816432393E8B6F6, B83505F213094826A6FFA8D7); path = ChecklistBoteco; sourceTree = "<group>"; };
+		3656275D89C04784B859B267 /* ChecklistBoteco */ = {isa = PBXGroup; children = (0F611C71D88544749AEC924A, 08220122D70F4025AC6C7FB8, 0854FECCE3084E41AFB2B770, 9505D15977BC4CCCA59B5990, 010B3B20F7AD4C3CAD0F1AF3, D225F7ED20A84E36B5EC79AB, 9FE11C758FF949CD9416F8CB, A7F7D56CD15B4C94ABF72210, D73C1235476443568C14233F, BC2D1B4E5DD34BA998C6BA9F, 4704525E5816432393E8B6F6, B83505F213094826A6FFA8D7, A1C0A1C0A1C0A1C0A1C0A1C0); path = ChecklistBoteco; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -70,7 +72,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A70039C1A404410A86C74137 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A70039C1A404410A86C74137 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (B2C0B2C0B2C0B2C0B2C0B2C0); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -78,8 +80,8 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		60A45080735F45BD8BD3F994 /* Debug */ = {isa = XCBuildConfiguration; baseConfigurationReference = 8B72A69F88AB4961B8500D12; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
-		F8A7FA18416A4BE0B82F254E /* Release */ = {isa = XCBuildConfiguration; baseConfigurationReference = 5B444DA12CA74C87BB2B2FB9; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Release; };
+		60A45080735F45BD8BD3F994 /* Debug */ = {isa = XCBuildConfiguration; baseConfigurationReference = 8B72A69F88AB4961B8500D12; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
+		F8A7FA18416A4BE0B82F254E /* Release */ = {isa = XCBuildConfiguration; baseConfigurationReference = 5B444DA12CA74C87BB2B2FB9; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = ChecklistBoteco/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); MARKETING_VERSION = 1.0; ONLY_ACTIVE_ARCH = YES; PRODUCT_BUNDLE_IDENTIFIER = com.checklistboteco.ios; PRODUCT_NAME = ChecklistBoteco; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Release; };
 		94F67E1E7BC54F62A7BB6A82 = {isa = XCConfigurationList; buildConfigurations = (60A45080735F45BD8BD3F994, F8A7FA18416A4BE0B82F254E); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		7E885DF795AD4DF0ACFB109B = {isa = XCConfigurationList; buildConfigurations = (60A45080735F45BD8BD3F994, F8A7FA18416A4BE0B82F254E); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCBuildConfiguration section */

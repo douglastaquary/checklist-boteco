@@ -16,6 +16,6 @@ public class AuthCallbackResource {
     @GET
     @Produces(MediaType.TEXT_HTML)
     public TemplateInstance callback() {
-        return authCallback.data("title", "Checklist Boteco");
+        return authCallback.data("title", "Xocoalho");
     }
 }

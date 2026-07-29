@@ -77,17 +77,16 @@ enum class AppDestination(
                 return AppNavigationLayout(primary = available, overflow = emptyList())
             }
             val preferredPrimary = listOf(
+                Checklist,
                 Dashboard,
-                Purchases,
-                Inventory,
-                Checklist
+                Inventory
             )
-            val primary = preferredPrimary.filter { it in available }.take(4)
+            val primary = preferredPrimary.filter { it in available }.take(3)
             val overflow = available.filterNot { it in primary }
-            return if (primary.isEmpty) {
+            return if (primary.isEmpty()) {
                 AppNavigationLayout(
-                    primary = available.take(4),
-                    overflow = available.drop(4)
+                    primary = available.take(3),
+                    overflow = available.drop(3)
                 )
             } else {
                 AppNavigationLayout(primary = primary, overflow = overflow)

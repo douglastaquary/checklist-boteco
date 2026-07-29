@@ -9,7 +9,7 @@ import com.checklistboteco.data.database.DesktopDatabaseDriverFactory
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "Checklist Boteco",
+        title = "Xocoalho",
         state = rememberWindowState(width = 400.dp, height = 700.dp)
     ) {
         App(databaseDriverFactory = DesktopDatabaseDriverFactory())
