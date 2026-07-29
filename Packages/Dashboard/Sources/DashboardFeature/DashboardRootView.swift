@@ -37,6 +37,7 @@ public struct DashboardRootView: View {
   private let dashboardClient: DashboardClient?
   private let authToken: String?
   private let onSelectArea: ((Area) -> Void)?
+  private let onLogout: () -> Void
 
   @Environment(\.colorScheme) private var colorScheme
   @State private var activities: [Activity] = []
@@ -47,11 +48,13 @@ public struct DashboardRootView: View {
     repository: ChecklistRepository,
     dashboardClient: DashboardClient? = nil,
     authToken: String? = nil,
+    onLogout: @escaping () -> Void = {},
     onSelectArea: ((Area) -> Void)? = nil
   ) {
     self.repository = repository
     self.dashboardClient = dashboardClient
     self.authToken = authToken
+    self.onLogout = onLogout
     self.onSelectArea = onSelectArea
   }
 
@@ -96,13 +99,37 @@ public struct DashboardRootView: View {
 
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Dashboard")
-              .font(.largeTitle.bold())
-              .foregroundStyle(foreground)
-            Text("Indicadores operacionais do Beco")
-              .font(.subheadline)
-              .foregroundStyle(muted)
+          HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Dashboard")
+                .font(.largeTitle.bold())
+                .foregroundStyle(foreground)
+              Text("Indicadores operacionais do Beco")
+                .font(.subheadline)
+                .foregroundStyle(muted)
+            }
+            Spacer(minLength: 8)
+            Menu {
+              Button(role: .destructive, action: onLogout) {
+                Label("Sair", systemImage: "rectangle.portrait.and.arrow.right")
+              }
+            } label: {
+              Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(foreground)
+                .frame(width: 44, height: 44)
+                .background(
+                  Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                      Circle().stroke(
+                        isDark ? Color.white.opacity(0.14) : Color.black.opacity(0.08),
+                        lineWidth: 1
+                      )
+                    )
+                )
+            }
+            .accessibilityLabel("Mais opções")
           }
           .padding(.top, 8)
 

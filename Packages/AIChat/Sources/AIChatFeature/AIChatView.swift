@@ -25,6 +25,7 @@ public struct AIChatView: View {
   @State private var messages: [Message] = []
   @State private var text = ""
   @State private var isSending = false
+  @State private var isLoadingUsage = true
   @State private var errorMessage: String?
   @State private var usage: AIUsageSummaryDTO?
   @State private var composerScrollTick: UInt = 0
@@ -74,7 +75,9 @@ public struct AIChatView: View {
           .padding(.horizontal, 20)
           .padding(.top, 10)
 
-        if let usage {
+        if isLoadingUsage {
+          AIChatUsageBarShimmer(palette: palette)
+        } else if let usage {
           AIChatUsageBar(usage: usage, mutedForegroundColor: palette.mutedForeground)
         }
 
@@ -130,10 +133,6 @@ public struct AIChatView: View {
   @ViewBuilder
   private var bottomChrome: some View {
     VStack(spacing: 10) {
-      if isSending {
-        AIChatProcessingPill(palette: palette)
-      }
-
       if voiceController.isActive {
         BecoVoiceFeedbackBar(
           controller: voiceController,
@@ -283,6 +282,8 @@ public struct AIChatView: View {
 
   @MainActor
   private func loadUsage() async {
+    isLoadingUsage = true
+    defer { isLoadingUsage = false }
     guard let client, let token else { return }
     usage = try? await client.usage(token: token)
   }
@@ -321,35 +322,16 @@ private struct AIChatHeader: View {
   let palette: BecoChatPalette
 
   var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: "sparkles")
-        .font(.system(size: 18, weight: .semibold))
+    VStack(alignment: .leading, spacing: 2) {
+      Text("AI do Beco")
+        .font(.headline.weight(.semibold))
         .foregroundStyle(palette.foreground)
-        .frame(width: 44, height: 44)
-        .background(BecoChatGlassCapsule(palette: palette))
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text("AI do Beco")
-          .font(.headline.weight(.semibold))
-          .foregroundStyle(palette.foreground)
-        Text("ChecklistBoteco · dados do Beco da Praia")
-          .font(.caption)
-          .foregroundStyle(palette.mutedForeground)
-          .lineLimit(1)
-      }
-
-      Spacer(minLength: 8)
-
-      HStack(spacing: 14) {
-        Image(systemName: "square.and.pencil")
-        Image(systemName: "ellipsis")
-      }
-      .font(.system(size: 17, weight: .semibold))
-      .foregroundStyle(palette.foreground)
-      .frame(height: 44)
-      .padding(.horizontal, 16)
-      .background(BecoChatGlassCapsule(palette: palette))
+      Text("ChecklistBoteco · dados do Beco da Praia")
+        .font(.caption)
+        .foregroundStyle(palette.mutedForeground)
+        .lineLimit(1)
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
@@ -391,9 +373,7 @@ private struct AIChatMessageScroll: View {
               .id(message.id)
           }
           if isSending {
-            BecoChatSystemCaption("Consultando dados do Beco…")
-              .id("processing-caption")
-            AIChatProcessingBubble(isSending: isSending, palette: palette)
+            AIChatProcessingBubble(palette: palette)
               .id("processing-bubble")
           }
           Color.clear
@@ -535,48 +515,46 @@ private struct AIChatBubble: View {
   }
 }
 
-private struct AIChatProcessingBubble: View {
-  let isSending: Bool
+private struct AIChatUsageBarShimmer: View {
   let palette: BecoChatPalette
 
   var body: some View {
-    BecoChatAssistantBubble(palette: palette, cornerRadius: 18) {
-      HStack(spacing: 10) {
-        ForEach(0..<3, id: \.self) { index in
-          Circle()
-            .fill(Color.secondary.opacity(0.55))
-            .frame(width: 8, height: 8)
-            .scaleEffect(isSending ? 1.0 : 0.7)
-            .animation(
-              .easeInOut(duration: 0.8).repeatForever().delay(Double(index) * 0.16),
-              value: isSending
-            )
-        }
-        Text("Processando dados do Beco…")
-          .font(.subheadline.weight(.medium))
-          .foregroundStyle(palette.mutedForeground)
-      }
+    HStack {
+      RoundedRectangle(cornerRadius: 4, style: .continuous)
+        .fill(palette.foreground.opacity(palette.isDark ? 0.14 : 0.08))
+        .frame(width: 120, height: 12)
+      Spacer()
+      RoundedRectangle(cornerRadius: 4, style: .continuous)
+        .fill(palette.foreground.opacity(palette.isDark ? 0.14 : 0.08))
+        .frame(width: 72, height: 12)
     }
+    .padding(.horizontal, 20)
+    .padding(.vertical, 8)
     .shimmer(active: true)
   }
 }
 
-private struct AIChatProcessingPill: View {
+private struct AIChatProcessingBubble: View {
   let palette: BecoChatPalette
 
   var body: some View {
-    HStack(spacing: 8) {
-      Image(systemName: "sparkles")
-        .font(.caption.weight(.bold))
-      Text("Consultando dados do Beco")
-      Spacer(minLength: 0)
+    BecoChatAssistantBubble(palette: palette, cornerRadius: 18) {
+      VStack(alignment: .leading, spacing: 10) {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .fill(Color.secondary.opacity(0.28))
+          .frame(height: 12)
+          .frame(maxWidth: 220)
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .fill(Color.secondary.opacity(0.22))
+          .frame(height: 12)
+          .frame(maxWidth: 180)
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .fill(Color.secondary.opacity(0.18))
+          .frame(height: 12)
+          .frame(maxWidth: 140)
+      }
+      .padding(.vertical, 2)
     }
-    .font(.caption.weight(.semibold))
-    .foregroundStyle(palette.mutedForeground)
-    .padding(.horizontal, 14)
-    .padding(.vertical, 7)
-    .background(BecoChatGlassCapsule(palette: palette))
-    .frame(maxWidth: 260)
     .shimmer(active: true)
   }
 }

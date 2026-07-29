@@ -200,9 +200,16 @@ public struct InventoryRootView: View {
       .background(BecoTokens.ColorToken.background)
     }
     .toolbar {
-      if canOpenAudit {
-        ToolbarItem(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .navigationBarTrailing) {
+        if canOpenAudit {
           InventoryAuditMenuButton(onGenerateAudit: openAuditSheet)
+        }
+        if canCreateInMode {
+          InventorySubmitToolbarButton(
+            isSending: sending,
+            isEnabled: !drafts.isEmpty && !sending && !voiceController.isActive,
+            action: { showSubmitConfirm = true }
+          )
         }
       }
     }
@@ -369,12 +376,6 @@ public struct InventoryRootView: View {
   private var bottomChrome: some View {
     if canCreateInMode {
       VStack(spacing: 0) {
-        InventorySubmitBar(
-          isSending: sending,
-          isDisabled: drafts.isEmpty || sending || voiceController.isActive,
-          onReviewAndSend: { showSubmitConfirm = true }
-        )
-
         if voiceController.isActive {
           BecoVoiceFeedbackBar(
             controller: voiceController,
@@ -861,20 +862,21 @@ private struct InventoryDraftCards: View {
   }
 }
 
-private struct InventorySubmitBar: View {
+private struct InventorySubmitToolbarButton: View {
   let isSending: Bool
-  let isDisabled: Bool
-  let onReviewAndSend: () -> Void
+  let isEnabled: Bool
+  let action: () -> Void
 
   var body: some View {
-    BecoButton(
-      isSending ? "Enviando…" : "Revisar e enviar",
-      isLoading: isSending,
-      action: onReviewAndSend
-    )
-    .disabled(isDisabled)
-    .padding(.horizontal, 16)
-    .padding(.top, 10)
+    Button(action: action) {
+      if isSending {
+        ProgressView()
+      } else {
+        Image(systemName: "paperplane")
+      }
+    }
+    .disabled(!isEnabled)
+    .accessibilityLabel("Revisar e enviar")
   }
 }
 
