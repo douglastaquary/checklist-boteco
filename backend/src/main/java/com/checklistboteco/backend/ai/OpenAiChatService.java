@@ -37,6 +37,7 @@ public class OpenAiChatService {
         Perguntas sobre quantidade vendida de um produto (ex.: quantas/quantos tainhas, tábuas, porção de carne de sol, cerveja)
         devem chamar sales_by_product ou sales_quantity_by_product_in_period com from/to resolvidos a partir da data atual.
         "último mês até hoje" / "ultimo mes ate o dia de hoje" significa os últimos 30 dias até a data atual (não o mês calendário anterior).
+        A busca de produto ignora acentos e plurais simples; passe o nome falado pelo usuário (ex.: caldos pela égua, caldinho de feijão).
         Se os dados forem insuficientes, diga exatamente o que falta. Ferramentas são somente leitura.
         """;
     @Inject ObjectMapper mapper;

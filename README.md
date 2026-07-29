@@ -28,41 +28,41 @@ O objetivo não é criar um ERP pesado. É criar uma camada prática para o dono
 
 ## Produto em telas
 
-Prints atuais do app iOS nativo (SwiftUI) após a refatoração MV — Dashboard, Chat IA, Compras, Contagem e hub Mais.
+Prints atuais do app iOS nativo (SwiftUI) — Dashboard com heatmap de vendas, Chat IA com resposta, Checklist, modal de Atividades, Contagem e Compras.
 
 <table>
   <tr>
     <td align="center" width="33%">
-      <img src="docs/assets/readme/ios-dashboard.png" alt="Dashboard no app iOS" width="220"><br>
+      <img src="docs/assets/readme/ios-dashboard-update.png" alt="Dashboard no app iOS" width="220"><br>
       <strong>iOS · Dashboard</strong><br>
-      Indicadores operacionais, sync e resumo por área.
+      Heatmap de vendas, sync e resumo por área.
     </td>
     <td align="center" width="33%">
-      <img src="docs/assets/readme/ios-ai-chat.png" alt="Chat IA no app iOS" width="220"><br>
+      <img src="docs/assets/readme/ios-chat-ai-response.png" alt="Chat IA no app iOS" width="220"><br>
       <strong>iOS · Chat IA</strong><br>
       Perguntas em linguagem natural sobre vendas, compras, estoque e ponto.
     </td>
     <td align="center" width="33%">
-      <img src="docs/assets/readme/ios-purchases.png" alt="Compras no app iOS" width="220"><br>
-      <strong>iOS · Compras</strong><br>
-      Sessões de comprovantes (OCR) e importação CSV.
+      <img src="docs/assets/readme/ios-checklist.png" alt="Checklist no app iOS" width="220"><br>
+      <strong>iOS · Checklist</strong><br>
+      Rotina operacional por área com prazo e feedback visual.
     </td>
   </tr>
   <tr>
+    <td align="center" width="33%">
+      <img src="docs/assets/readme/ios-activities-modal.png" alt="Atividades no app iOS" width="220"><br>
+      <strong>iOS · Atividades</strong><br>
+      Gestão de atividades em page sheet com chrome Codex.
+    </td>
     <td align="center" width="33%">
       <img src="docs/assets/readme/ios-inventory.png" alt="Contagem no app iOS" width="220"><br>
       <strong>iOS · Contagem</strong><br>
       Rascunho local com composer de texto/voz e envio em lote.
     </td>
     <td align="center" width="33%">
-      <img src="docs/assets/readme/ios-more.png" alt="Menu Mais no app iOS" width="220"><br>
-      <strong>iOS · Mais</strong><br>
-      Hub de módulos (Checklist, Atividades, Permissões).
-    </td>
-    <td align="center" width="33%">
-      <img src="docs/assets/readme/android-checklist.png" alt="Checklist operacional no app Android" width="220"><br>
-      <strong>Android · Checklist</strong><br>
-      Rotina operacional por perfil com navegação inferior Compose.
+      <img src="docs/assets/readme/ios-purchases.png" alt="Compras no app iOS" width="220"><br>
+      <strong>iOS · Compras</strong><br>
+      Sessões de comprovantes (OCR) e importação CSV.
     </td>
   </tr>
 </table>

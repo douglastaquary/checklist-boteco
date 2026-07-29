@@ -5,6 +5,7 @@ import com.checklistboteco.backend.security.TokenService;
 import com.checklistboteco.backend.security.AdminGuard;
 import com.checklistboteco.backend.store.AppStore;
 import com.checklistboteco.backend.checklist.ChecklistTimingService;
+import com.checklistboteco.backend.sales.application.SalesQueryService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
@@ -20,6 +21,7 @@ public class ApiResource {
     @Inject TokenService tokens;
     @Inject AdminGuard guard;
     @Inject ChecklistTimingService checklistTiming;
+    @Inject SalesQueryService salesQueries;
     @ConfigProperty(name="checklist.auth.expose-device-code") boolean exposeDeviceCode;
     @ConfigProperty(name="worksite.radiusMeters", defaultValue="5") double worksiteRadiusMeters;
 
@@ -87,6 +89,16 @@ public class ApiResource {
     }
     @GET @Path("/admin/checklist/overview") public ChecklistOverview adminChecklistOverview(@HeaderParam("Authorization") String auth,@QueryParam("date") String rawDate){ requireAdmin(auth); return checklistOverview(rawDate); }
     @GET @Path("/admin/dashboard") public DashboardStats dashboard(@HeaderParam("Authorization") String auth){ requireAdmin(auth); return store.dashboard(); }
+    @GET @Path("/admin/dashboard/sales-heatmap")
+    public com.checklistboteco.backend.sales.domain.SalesModels.SalesHeatmapResponse salesHeatmap(
+        @HeaderParam("Authorization") String auth,
+        @QueryParam("year") Integer year,
+        @QueryParam("datasetId") String dataset
+    ){
+        requireAdmin(auth);
+        int targetYear=year==null?LocalDate.now().getYear():year;
+        return salesQueries.heatmap(dataset,targetYear);
+    }
     @GET @Path("/sync/pull") public SyncPullResponse pull(@HeaderParam("Authorization") String auth,@QueryParam("cursor") @DefaultValue("0") String cursor,@QueryParam("limit") @DefaultValue("500") int limit){
         TokenService.Payload payload=requireToken(auth); return response(store.pullChanges(payload.userId,parseCursor(cursor),Math.max(1,Math.min(500,limit))));
     }

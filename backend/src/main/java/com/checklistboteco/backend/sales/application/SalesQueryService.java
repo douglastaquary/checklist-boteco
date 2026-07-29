@@ -6,6 +6,7 @@ import com.checklistboteco.backend.sales.persistence.SalesRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -45,11 +46,41 @@ public class SalesQueryService {
         result.groups=groups.values().stream().sorted(Comparator.comparing((AggregateBucket bucket)->bucket.quantity,Comparator.reverseOrder()).thenComparingLong(bucket->-bucket.totalInCents)).limit(100).toList(); return result;
     }
 
+    public SalesHeatmapResponse heatmap(String datasetId, int year){
+        if(year<2000||year>2100) throw new IllegalArgumentException("Ano inválido");
+        LocalDate from=LocalDate.of(year,1,1);
+        LocalDate to=LocalDate.of(year,12,31);
+        LocalDate today=LocalDate.now();
+        if(year==today.getYear()&&to.isAfter(today)) to=today;
+        SaleQuery query=new SaleQuery();
+        query.from=from;
+        query.to=to;
+        Map<LocalDate,BigDecimal> qtyByDay=new TreeMap<>();
+        Map<LocalDate,Long> centsByDay=new TreeMap<>();
+        for(Sale sale:filtered(datasetId,query)){
+            if(sale.saleDate==null) continue;
+            BigDecimal qty=sale.quantity==null?BigDecimal.ZERO:sale.quantity;
+            qtyByDay.merge(sale.saleDate,qty,BigDecimal::add);
+            centsByDay.merge(sale.saleDate,sale.totalInCents,Long::sum);
+        }
+        SalesHeatmapResponse result=new SalesHeatmapResponse();
+        result.year=year;
+        result.datasetId=dataset(datasetId);
+        for(LocalDate date:qtyByDay.keySet()){
+            BigDecimal qty=qtyByDay.getOrDefault(date,BigDecimal.ZERO);
+            long cents=centsByDay.getOrDefault(date,0L);
+            if((qty!=null&&qty.compareTo(BigDecimal.ZERO)>0)||cents>0){
+                result.days.add(new SalesHeatmapDay(date.toString(),qty,cents));
+            }
+        }
+        return result;
+    }
+
     public ProductSearchResponse byProduct(String datasetId,ProductSearchRequest request){
         ProductSearchRequest query=request==null?new ProductSearchRequest():request;
         if(query.product==null||query.product.isBlank()) throw new IllegalArgumentException("Informe o nome ou trecho do produto");
         validate(query,datasetId);
-        List<Sale> values=filtered(datasetId,query).stream().filter(sale->contains(sale.description,query.product.trim().toLowerCase(Locale.ROOT))).toList();
+        List<Sale> values=filtered(datasetId,query).stream().filter(sale->productMatches(sale.description,query.product)).toList();
         Map<String,ProductMatch> groups=new LinkedHashMap<>();
         for(Sale sale:values){
             String key=Objects.toString(sale.description,"Sem descrição")+"|"+Objects.toString(sale.location,"Sem local");
@@ -120,7 +151,7 @@ public class SalesQueryService {
         return repository.sales(dataset(datasetId)).stream().filter(sale->query.from==null||query.to==null||(sale.saleDate!=null&&!sale.saleDate.isBefore(query.from)&&!sale.saleDate.isAfter(query.to)))
             .filter(sale->query.categories==null||query.categories.isEmpty()||query.categories.stream().anyMatch(value->equalsIgnoreCase(value,sale.category)))
             .filter(sale->query.locations==null||query.locations.isEmpty()||query.locations.stream().anyMatch(value->equalsIgnoreCase(value,sale.location)))
-            .filter(sale->query.sellers==null||query.sellers.isEmpty()||query.sellers.stream().anyMatch(value->contains(sale.seller,value.toLowerCase(Locale.ROOT))))
+            .filter(sale->query.sellers==null||query.sellers.isEmpty()||query.sellers.stream().anyMatch(value->contains(sale.seller,value)))
             .filter(sale->query.minTotalInCents==null||sale.totalInCents>=query.minTotalInCents).filter(sale->query.maxTotalInCents==null||sale.totalInCents<=query.maxTotalInCents)
             .filter(sale->search==null||search.isBlank()||contains(sale.description,search)||contains(sale.category,search)||contains(sale.location,search)||contains(sale.seller,search)||sale.attributes.values().stream().anyMatch(value->contains(Objects.toString(value,""),search)))
             .filter(sale->matchesAttributes(sale,query.attributes)).toList();
@@ -154,7 +185,57 @@ public class SalesQueryService {
     private static List<String> filters(SaleQuery query){ List<String> values=new ArrayList<>(); if(query.from!=null){ values.add("from="+query.from); values.add("to="+query.to); } if(query.categories!=null&&!query.categories.isEmpty()) values.add("categories="+query.categories); if(query.locations!=null&&!query.locations.isEmpty()) values.add("locations="+query.locations); if(query.sellers!=null&&!query.sellers.isEmpty()) values.add("sellers="+query.sellers); if(query.minTotalInCents!=null) values.add("minTotalInCents="+query.minTotalInCents); if(query.maxTotalInCents!=null) values.add("maxTotalInCents="+query.maxTotalInCents); if(query.text!=null&&!query.text.isBlank()) values.add("text="+query.text); if(query.attributes!=null&&!query.attributes.isEmpty()) values.add("attributes="+query.attributes.keySet()); return values; }
     private static String dataset(String value){ return value==null||value.isBlank()?"sales":value.trim(); }
     private static boolean equalsIgnoreCase(String a,String b){ return a!=null&&b!=null&&a.equalsIgnoreCase(b); }
-    private static boolean contains(String value,String search){ return value!=null&&value.toLowerCase(Locale.ROOT).contains(search); }
+    /** Accent-insensitive substring match (web text filter and sellers). */
+    private static boolean contains(String value,String search){
+        if(value==null||search==null||search.isBlank()) return false;
+        return normalize(value).contains(normalize(search));
+    }
+    /**
+     * Product match for AI/MCP: ignores accents/punctuation, tolerates simple plurals
+     * (caldos→caldo) and requires all significant query tokens to appear in the description.
+     */
+    static boolean productMatches(String description,String product){
+        if(description==null||product==null||product.isBlank()) return false;
+        String hay=normalize(description);
+        String needle=normalize(product);
+        if(hay.isBlank()||needle.isBlank()) return false;
+        if(hay.contains(needle)) return true;
+        List<String> queryTokens=significantTokens(needle);
+        if(queryTokens.isEmpty()) return false;
+        List<String> hayTokens=significantTokens(hay);
+        return queryTokens.stream().allMatch(qt->hayTokens.stream().anyMatch(ht->tokensCompatible(qt,ht)));
+    }
+    private static boolean tokensCompatible(String query,String hay){
+        if(query.equals(hay)) return true;
+        String q=stripSimplePlural(query);
+        String h=stripSimplePlural(hay);
+        if(q.equals(h)) return true;
+        if(q.length()>=4&&h.length()>=3&&(h.startsWith(q)||q.startsWith(h))) return true;
+        return hay.contains(query)||query.contains(hay);
+    }
+    private static String stripSimplePlural(String token){
+        if(token.length()>3&&token.endsWith("s")&&!token.endsWith("ss")) return token.substring(0,token.length()-1);
+        return token;
+    }
+    private static final Set<String> PRODUCT_STOPWORDS=Set.of(
+        "de","da","do","das","dos","a","o","e","em","no","na","nos","nas","um","uma","uns","umas","com","por","para","ao","aos","as","os"
+    );
+    private static List<String> significantTokens(String normalized){
+        List<String> out=new ArrayList<>();
+        for(String token:normalized.split("\\s+")){
+            if(token.length()<2||PRODUCT_STOPWORDS.contains(token)) continue;
+            out.add(token);
+        }
+        return out;
+    }
+    static String normalize(String value){
+        return Normalizer.normalize(Objects.toString(value,""),Normalizer.Form.NFD)
+            .replaceAll("\\p{M}+","")
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9]+"," ")
+            .trim()
+            .replaceAll("\\s+"," ");
+    }
     private static String sellerLabel(String value){ return value==null||value.isBlank()?"Sem usuário":value; }
     private static String groupKey(Object value){ String key=Objects.toString(value,"").trim(); return key.isBlank()?"Sem valor":key; }
     private static BigDecimal decimal(String value){ try { return new BigDecimal(value.replace(',','.')); } catch(Exception e){ return BigDecimal.ZERO; } }

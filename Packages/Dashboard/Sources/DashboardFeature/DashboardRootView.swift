@@ -41,6 +41,7 @@ public struct DashboardRootView: View {
   @Environment(\.colorScheme) private var colorScheme
   @State private var activities: [Activity] = []
   @State private var remoteStats: DashboardStats?
+  @State private var salesHeatmap: SalesHeatmapResponse?
 
   public init(
     repository: ChecklistRepository,
@@ -58,6 +59,18 @@ public struct DashboardRootView: View {
   private var foreground: Color { isDark ? .white : .black }
   private var muted: Color { isDark ? .white.opacity(0.62) : .secondary }
   private var card: Color { isDark ? Color.white.opacity(0.08) : Color(.secondarySystemGroupedBackground) }
+
+  private var heatmapYear: Int {
+    salesHeatmap?.year ?? Calendar.current.component(.year, from: Date())
+  }
+
+  private var heatmapQuantities: [Date: Double] {
+    Self.dayMetrics(from: salesHeatmap?.days ?? []).quantities
+  }
+
+  private var heatmapRevenue: [Date: Int64] {
+    Self.dayMetrics(from: salesHeatmap?.days ?? []).revenue
+  }
 
   private var displayedActivityCount: Int {
     remoteStats?.totalActivities ?? activities.count
@@ -113,6 +126,14 @@ public struct DashboardRootView: View {
             )
           }
 
+          BecoSalesHeatmap(
+            title: "Vendas \(heatmapYear)",
+            quantitiesByDay: heatmapQuantities,
+            revenueCentsByDay: heatmapRevenue,
+            year: heatmapYear,
+            isDark: isDark
+          )
+
           DashboardAreasSection(
             areas: Area.allCases,
             countForArea: areaCount(for:),
@@ -143,7 +164,33 @@ public struct DashboardRootView: View {
   private func reload() async {
     activities = (try? repository.allActivities()) ?? []
     guard let dashboardClient, let authToken, !authToken.isEmpty else { return }
-    remoteStats = try? await dashboardClient.fetchStats(token: authToken)
+    async let stats = dashboardClient.fetchStats(token: authToken)
+    async let heatmap = dashboardClient.fetchSalesHeatmap(
+      year: Calendar.current.component(.year, from: Date()),
+      token: authToken
+    )
+    remoteStats = try? await stats
+    salesHeatmap = try? await heatmap
+  }
+
+  static func dayMetrics(from days: [SalesHeatmapDay]) -> (quantities: [Date: Double], revenue: [Date: Int64]) {
+    var calendar = Calendar.current
+    calendar.timeZone = TimeZone.current
+    let formatter = DateFormatter()
+    formatter.calendar = calendar
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone.current
+    formatter.dateFormat = "yyyy-MM-dd"
+
+    var quantities: [Date: Double] = [:]
+    var revenue: [Date: Int64] = [:]
+    for day in days {
+      guard let date = formatter.date(from: day.date) else { continue }
+      let key = calendar.startOfDay(for: date)
+      quantities[key] = day.quantity
+      revenue[key] = day.totalInCents
+    }
+    return (quantities, revenue)
   }
 }
 
