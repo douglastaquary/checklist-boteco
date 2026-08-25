@@ -5,6 +5,7 @@ import io.restassured.path.json.JsonPath;
 import jakarta.inject.Inject;
 import com.checklistboteco.backend.ai.AiModels;
 import com.checklistboteco.backend.ai.OpenAiChatService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import static org.hamcrest.Matchers.is;
 @QuarkusTest
 class AiResourceTest {
     @Inject OpenAiChatService chatService;
+    @Inject ObjectMapper mapper;
 
     @Test void chatAndUsageRequireAdmin(){
         given().when().get("/api/ai/usage").then().statusCode(401);
@@ -60,6 +62,26 @@ class AiResourceTest {
         request.messages=List.of(message);
         assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_by_product"));
         assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_quantity_by_product_in_period"));
+    }
+
+    @Test void monthlyDiscrepancyQuestionAllowsMonthComparison(){
+        AiModels.ChatMessage message=new AiModels.ChatMessage();
+        message.role="user";
+        message.text="Por que o mês de maio faturou mais do que a média dos outros meses? O que aconteceu de diferente?";
+        AiModels.ChatRequest request=new AiModels.ChatRequest();
+        request.messages=List.of(message);
+        assertThat(chatService.allowedToolsForTesting(request),hasItem("sales_month_compare"));
+    }
+
+    @Test void incompleteResponseUsesDeterministicFallback() throws Exception {
+        var response=mapper.readTree("""
+            {
+              "status":"incomplete",
+              "incomplete_details":{"reason":"max_output_tokens"},
+              "output":[{"type":"message","content":[{"type":"output_text","text":"Resposta parcial -"}]}]
+            }
+            """);
+        assertThat(chatService.answerForTesting(response,"Análise calculada pelo backend"),is("Análise calculada pelo backend"));
     }
 
     private String login(){

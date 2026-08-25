@@ -38,6 +38,82 @@ class SalesResourceTest {
             .when().post("/api/sales/aggregate?datasetId="+dataset).then().statusCode(200).body("totalItems",is(2)).body("groups.key",hasItems("Cerveja Pilsen","Água com gás"));
     }
 
+    @Test void salesCanBeAggregatedByMonthThroughMcp(){
+        String token=adminToken(),dataset="sales-month-"+UUID.randomUUID();
+        String csv="""
+            Data;Produto;Quantidade;Valor
+            10/05/2026;Cerveja Pilsen;10;200,00
+            20/05/2026;Água com gás;20;100,00
+            05/06/2026;Cerveja Pilsen;6;120,00
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-mensais.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200).extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","quantity","Quantidade","totalInCents","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(3));
+
+        Map<String,Object> request=Map.of(
+            "jsonrpc","2.0",
+            "id",2,
+            "method","tools/call",
+            "params",Map.of(
+                "name","sales_aggregate",
+                "arguments",Map.of("datasetId",dataset,"from","2026-05-01","to","2026-06-30","groupBy","month")
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(request)
+            .when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.groupBy",is("month"))
+            .body("result.structuredContent.groups.find { it.key == '2026-05' }.totalInCents",is(30000))
+            .body("result.structuredContent.groups.find { it.key == '2026-06' }.totalInCents",is(12000));
+    }
+
+    @Test void salesMonthCompareExplainsRevenueDriversThroughMcp(){
+        String token=adminToken(),dataset="sales-month-compare-"+UUID.randomUUID();
+        String csv="""
+            Data;Produto;Quantidade;Valor
+            01/04/2026;ÁGUA COM GÁS;5;100,00
+            30/04/2026;HEINEKEN 600ML;5;100,00
+            02/05/2026;HEINEKEN 600ML;10;500,00
+            17/05/2026;HEINEKEN 600ML;10;500,00
+            30/05/2026;HEINEKEN 600ML;10;500,00
+            01/06/2026;ÁGUA COM GÁS;5;100,00
+            30/06/2026;HEINEKEN 600ML;5;100,00
+            01/07/2026;ÁGUA COM GÁS;5;100,00
+            31/07/2026;HEINEKEN 600ML;5;100,00
+            15/08/2026;HEINEKEN 600ML;50;2.000,00
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","comparacao-mensal.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200).extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data","description","Produto","quantity","Quantidade","totalInCents","Valor")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200).body("importedRows",is(10));
+
+        Map<String,Object> request=Map.of(
+            "jsonrpc","2.0",
+            "id",3,
+            "method","tools/call",
+            "params",Map.of(
+                "name","sales_month_compare",
+                "arguments",Map.of("datasetId",dataset,"focusMonth","2026-05","from","2026-04-01","to","2026-08-31","topProducts",5)
+            )
+        );
+        given().auth().oauth2("local-purchases-token").contentType("application/json").body(request)
+            .when().post("/mcp").then().statusCode(200)
+            .body("result.structuredContent.focusMonth",is("2026-05"))
+            .body("result.structuredContent.baselineMonths",containsInAnyOrder("2026-04","2026-06","2026-07"))
+            .body("result.structuredContent.focus.totalInCents",is(150000))
+            .body("result.structuredContent.baselineAverage.totalInCents",is(20000))
+            .body("result.structuredContent.delta.revenueInCents",is(130000))
+            .body("result.structuredContent.topProductDrivers[0].product",is("HEINEKEN 600ML"))
+            .body("result.structuredContent.topDays[0].dayOfWeek",anyOf(is("SATURDAY"),is("SUNDAY")))
+            .body("result.structuredContent.findings",not(empty()));
+    }
+
     @Test void stockAuditAndMcpExposeReadOnlySalesTools(){
         String token=adminToken();
         String purchaseDataset="audit-purchases-"+UUID.randomUUID();
@@ -79,7 +155,7 @@ class SalesResourceTest {
 
         Map<String,Object> request=Map.of("jsonrpc","2.0","id",1,"method","tools/list","params",Map.of());
         given().auth().oauth2("local-purchases-token").contentType("application/json").body(request).when().post("/mcp").then().statusCode(200)
-            .body("result.tools.name",hasItems("sales_get_schema","sales_list","sales_aggregate","sales_by_product","sales_quantity_by_product_in_period","sales_by_seller","sales_get_imports","sales_audit_stock"));
+            .body("result.tools.name",hasItems("sales_get_schema","sales_list","sales_aggregate","sales_month_compare","sales_by_product","sales_quantity_by_product_in_period","sales_by_seller","sales_get_imports","sales_audit_stock"));
     }
 
     @Test void salesImportAggregatesSellerAndServiceChargeForMcpAndAdminQueries(){

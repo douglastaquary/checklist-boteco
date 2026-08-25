@@ -5,6 +5,7 @@ import static com.checklistboteco.backend.purchases.domain.PurchaseModels.*;
 import com.checklistboteco.backend.purchases.application.PurchaseImportService;
 import com.checklistboteco.backend.purchases.application.PurchaseQueryService;
 import com.checklistboteco.backend.sales.application.SalesAuditService;
+import com.checklistboteco.backend.sales.application.SalesAnalyticsService;
 import com.checklistboteco.backend.sales.application.SalesImportService;
 import com.checklistboteco.backend.sales.application.SalesQueryService;
 import com.checklistboteco.backend.sales.domain.SalesModels.ProductSearchRequest;
@@ -33,6 +34,7 @@ public class PurchaseMcpResource {
     @Inject PurchaseQueryService purchaseQueries;
     @Inject PurchaseImportService purchaseImports;
     @Inject SalesQueryService salesQueries;
+    @Inject SalesAnalyticsService salesAnalytics;
     @Inject SalesImportService salesImports;
     @Inject SalesAuditService salesAudits;
     @Inject InventoryService inventory;
@@ -47,7 +49,7 @@ public class PurchaseMcpResource {
         try {
             if(request==null||request.method==null) return rpcError(id,-32600,"Requisição MCP inválida");
             Object result=switch(request.method){
-                case "initialize" -> Map.of("protocolVersion","2025-03-26","capabilities",Map.of("tools",Map.of("listChanged",false)),"serverInfo",Map.of("name","checklist-boteco-analytics","version","1.3.0","defaultLocation",DEFAULT_LOCATION));
+                case "initialize" -> Map.of("protocolVersion","2025-03-26","capabilities",Map.of("tools",Map.of("listChanged",false)),"serverInfo",Map.of("name","checklist-boteco-analytics","version","1.4.0","defaultLocation",DEFAULT_LOCATION));
                 case "notifications/initialized" -> null;
                 case "ping" -> Map.of();
                 case "tools/list" -> Map.of("tools",tools());
@@ -70,6 +72,7 @@ public class PurchaseMcpResource {
             case "sales_get_schema" -> salesQueries.schema(Objects.toString(args.get("datasetId"),"sales"));
             case "sales_list" -> salesQueries.query(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),SaleQuery.class));
             case "sales_aggregate" -> salesQueries.aggregate(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),com.checklistboteco.backend.sales.domain.SalesModels.AggregateRequest.class));
+            case "sales_month_compare" -> salesAnalytics.compareMonth(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),com.checklistboteco.backend.sales.domain.SalesModels.MonthCompareRequest.class));
             case "sales_by_product" -> salesQueries.byProduct(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),ProductSearchRequest.class));
             case "sales_quantity_by_product_in_period" -> salesQueries.byProduct(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),ProductSearchRequest.class));
             case "sales_by_seller" -> salesQueries.bySeller(Objects.toString(args.get("datasetId"),"sales"),mapper.convertValue(normalizeSalesArgs(args),SellerSearchRequest.class));
@@ -111,7 +114,8 @@ public class PurchaseMcpResource {
             tool("purchases_get_imports","Lista lotes importados de compras e sua cobertura",Map.of("type","object","properties",Map.of())),
             tool("sales_get_schema","Schema e cobertura de vendas",Map.of("type","object","properties",Map.of("datasetId",Map.of("type","string")))),
             tool("sales_list","Lista vendas do Beco da Praia",Map.of("type","object","properties",salesPeriodProps,"required",List.of("from","to"))),
-            tool("sales_aggregate","Soma vendas por grupo, incluindo total e 10%",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("groupBy",Map.of("type","string"))),"required",List.of("from","to","groupBy"))),
+            tool("sales_aggregate","Soma vendas por grupo, incluindo total e 10%. Use groupBy=month para comparar faturamento mensal.",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("groupBy",Map.of("type","string","description","Dimensão de agrupamento; use month para mês no formato YYYY-MM"))),"required",List.of("from","to","groupBy"))),
+            tool("sales_month_compare","Explica por que um mês faturou mais ou menos que a média dos outros meses completos usando volume, valor médio por linha, calendário, dias da semana, top dias e mix de produtos.",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("focusMonth",Map.of("type","string","pattern","^\\d{4}-\\d{2}$","description","Mês analisado no formato YYYY-MM"),"topProducts",Map.of("type","integer","minimum",3,"maximum",20,"default",10))),"required",List.of("focusMonth"))),
             tool("sales_by_product","Vendas por produto: quantidade e total",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product"))),
             tool("sales_quantity_by_product_in_period","Quantidade e total de produto em período",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("product",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("product","from","to"))),
             tool("sales_by_seller","Vendas por usuário/vendedor/garçom, total e 10%",Map.of("type","object","properties",merge(salesPeriodProps,Map.of("seller",Map.of("type","string"),"limit",Map.of("type","integer","minimum",1,"maximum",100))),"required",List.of("from","to"))),

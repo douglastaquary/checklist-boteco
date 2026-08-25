@@ -81,8 +81,9 @@ Configurações opcionais:
 |---|---:|---|
 | `OPENAI_MODEL` | `gpt-5-mini` | Modelo de respostas e function calling |
 | `AI_MONTHLY_LIMIT_CENTS` | `500` | Limite mensal em centavos de dólar |
-| `AI_MAX_OUTPUT_TOKENS` | `700` | Máximo de tokens por resposta |
-| `OPENAI_TIMEOUT_SECONDS` | `15` | Timeout da chamada externa |
+| `AI_MAX_OUTPUT_TOKENS` | `1600` | Máximo de tokens por etapa da resposta |
+| `OPENAI_TIMEOUT_SECONDS` | `60` | Timeout da chamada externa |
+| `OPENAI_REASONING_EFFORT` | `low` | Esforço de raciocínio para priorizar respostas rápidas e completas |
 
 ## Consumo e custos
 
@@ -98,6 +99,18 @@ Para reduzir consumo, o servidor:
 - usa um prefixo estável para favorecer prompt caching;
 - faz no máximo uma rodada de execução das ferramentas e uma resposta final.
 
+## Análise mensal de faturamento
+
+Perguntas como “por que maio faturou mais que os outros meses?” usam `sales_month_compare`. A ferramenta calcula no backend, sem enviar vendas individuais ao modelo:
+
+- faturamento do mês e diferença contra a média dos outros meses completos;
+- quantidade, número de linhas, receita média por dia e valor médio por linha;
+- participação de fins de semana e desempenho por dia da semana;
+- produtos que mais contribuíram para a diferença;
+- dias de maior faturamento.
+
+Os resultados representam associações observadas nos dados, não causalidade externa comprovada. Se a OpenAI interromper a geração por limite de tokens, o backend devolve os achados determinísticos em vez da mensagem genérica de resposta incompleta.
+
 ## Exemplos
 
 - “Quanto vendemos em abril no Beco?”
@@ -105,6 +118,7 @@ Para reduzir consumo, o servidor:
 - “Quantas Heinekens vendemos em março de 2026?”
 - “Quanto o João Rodrigues vendeu ontem no forró e quanto deu de 10%?”
 - “Quanto deu de 10% por garçom no fim de semana?”
+- “Por que maio de 2026 faturou mais do que a média dos outros meses? O que aconteceu de diferente?”
 - “Quais foram os maiores gastos com mercadorias este mês?”
 - “Houve perda ou extravio no estoque hoje?”
 - “Quem fez horas extras nesta semana?”

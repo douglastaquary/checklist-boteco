@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
@@ -15,6 +16,7 @@ import java.util.function.Function;
 @ApplicationScoped
 public class SalesQueryService {
     private static final Set<String> NORMALIZED=Set.of("saleDate","description","category","location","seller","documentNumber","quantity","unit","unitPriceInCents","totalInCents","serviceChargeInCents");
+    private static final Set<String> DERIVED_GROUPS=Set.of("month");
     @Inject SalesRepository repository;
 
     public ImportSchema schema(String datasetId){
@@ -38,7 +40,7 @@ public class SalesQueryService {
 
     public AggregateResponse aggregate(String datasetId,AggregateRequest request){
         if(request==null) throw new IllegalArgumentException("Consulta obrigatória"); validate(request,datasetId); ImportSchema schema=schema(datasetId);
-        boolean valid=NORMALIZED.contains(request.groupBy)||schema.fields.stream().anyMatch(field->!field.normalized&&Objects.equals(field.key,request.groupBy));
+        boolean valid=DERIVED_GROUPS.contains(request.groupBy)||NORMALIZED.contains(request.groupBy)||schema.fields.stream().anyMatch(field->!field.normalized&&Objects.equals(field.key,request.groupBy));
         if(!valid) throw new IllegalArgumentException("Campo de agrupamento inválido: "+request.groupBy);
         List<Sale> values=filtered(datasetId,request); Map<String,AggregateBucket> groups=new LinkedHashMap<>();
         for(Sale sale:values){ String key=groupKey(field(sale,request.groupBy)); AggregateBucket bucket=groups.computeIfAbsent(key,current->{ var created=new AggregateBucket(); created.key=current; return created; }); bucket.count++; bucket.totalInCents+=sale.totalInCents; bucket.serviceChargeInCents+=sale.serviceChargeInCents; bucket.quantity=bucket.quantity.add(sale.quantity==null?BigDecimal.ZERO:sale.quantity); }
@@ -181,7 +183,7 @@ public class SalesQueryService {
         SortField sort=query.sort==null||query.sort.isEmpty()?new SortField():query.sort.get(0); Function<Sale,Comparable> getter=sale->{ Object value=field(sale,sort.field); return value instanceof Comparable<?> comparable?(Comparable)comparable:Objects.toString(value,""); };
         Comparator<Sale> comparator=Comparator.comparing(getter,Comparator.nullsLast(Comparator.naturalOrder())); return "ASC".equalsIgnoreCase(sort.direction)?comparator:comparator.reversed();
     }
-    private static Object field(Sale sale,String name){ return switch(Objects.toString(name,"")){ case "saleDate"->sale.saleDate; case "description"->sale.description; case "category"->sale.category; case "location"->sale.location; case "seller"->sale.seller; case "documentNumber"->sale.documentNumber; case "quantity"->sale.quantity; case "unit"->sale.unit; case "unitPriceInCents"->sale.unitPriceInCents; case "totalInCents"->sale.totalInCents; case "serviceChargeInCents"->sale.serviceChargeInCents; case "importedAt"->sale.importedAt; default->sale.attributes.get(name); }; }
+    private static Object field(Sale sale,String name){ return switch(Objects.toString(name,"")){ case "month"->sale.saleDate==null?null:YearMonth.from(sale.saleDate).toString(); case "saleDate"->sale.saleDate; case "description"->sale.description; case "category"->sale.category; case "location"->sale.location; case "seller"->sale.seller; case "documentNumber"->sale.documentNumber; case "quantity"->sale.quantity; case "unit"->sale.unit; case "unitPriceInCents"->sale.unitPriceInCents; case "totalInCents"->sale.totalInCents; case "serviceChargeInCents"->sale.serviceChargeInCents; case "importedAt"->sale.importedAt; default->sale.attributes.get(name); }; }
     private static List<String> filters(SaleQuery query){ List<String> values=new ArrayList<>(); if(query.from!=null){ values.add("from="+query.from); values.add("to="+query.to); } if(query.categories!=null&&!query.categories.isEmpty()) values.add("categories="+query.categories); if(query.locations!=null&&!query.locations.isEmpty()) values.add("locations="+query.locations); if(query.sellers!=null&&!query.sellers.isEmpty()) values.add("sellers="+query.sellers); if(query.minTotalInCents!=null) values.add("minTotalInCents="+query.minTotalInCents); if(query.maxTotalInCents!=null) values.add("maxTotalInCents="+query.maxTotalInCents); if(query.text!=null&&!query.text.isBlank()) values.add("text="+query.text); if(query.attributes!=null&&!query.attributes.isEmpty()) values.add("attributes="+query.attributes.keySet()); return values; }
     private static String dataset(String value){ return value==null||value.isBlank()?"sales":value.trim(); }
     private static boolean equalsIgnoreCase(String a,String b){ return a!=null&&b!=null&&a.equalsIgnoreCase(b); }

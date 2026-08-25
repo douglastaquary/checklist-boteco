@@ -118,6 +118,52 @@ public final class SalesModels {
         public List<SalesHeatmapDay> days=new ArrayList<>();
     }
 
+    public static class MonthCompareRequest extends SaleQuery {
+        public String focusMonth;
+        public int topProducts=10;
+    }
+    public static class PeriodSnapshot {
+        public String label;
+        public long totalInCents,serviceChargeInCents,lineCount,averageDailyRevenueInCents,averageLineRevenueInCents;
+        public BigDecimal totalQuantity=BigDecimal.ZERO;
+        public int daysWithSales;
+        public double weekendRevenueSharePercent;
+    }
+    public static class MonthDelta {
+        public long revenueInCents,lineCount,averageDailyRevenueInCents,averageLineRevenueInCents;
+        public BigDecimal quantity=BigDecimal.ZERO;
+        public double revenuePercent,quantityPercent,lineCountPercent,averageDailyRevenuePercent,averageLineRevenuePercent,weekendSharePoints;
+    }
+    public static class WeekdayComparison {
+        public String dayOfWeek,label;
+        public long focusRevenueInCents,baselineAverageRevenueInCents;
+        public double focusSharePercent,baselineSharePercent,shareDeltaPoints;
+    }
+    public static class ProductDriver {
+        public String product;
+        public long focusRevenueInCents,baselineAverageRevenueInCents,revenueDeltaInCents;
+        public BigDecimal focusQuantity=BigDecimal.ZERO,baselineAverageQuantity=BigDecimal.ZERO;
+        public double focusRevenueSharePercent,baselineRevenueSharePercent,shareDeltaPoints;
+    }
+    public static class TopSalesDay {
+        public LocalDate date;
+        public String dayOfWeek,label;
+        public long totalInCents,lineCount;
+        public BigDecimal quantity=BigDecimal.ZERO;
+    }
+    public static class MonthCompareResponse {
+        public String datasetId="sales",focusMonth,baselineLabel,currency="BRL";
+        public LocalDate sourceCoverageFrom,sourceCoverageTo;
+        public List<String> baselineMonths=new ArrayList<>();
+        public PeriodSnapshot focus=new PeriodSnapshot(),baselineAverage=new PeriodSnapshot();
+        public MonthDelta delta=new MonthDelta();
+        public List<WeekdayComparison> weekdays=new ArrayList<>();
+        public List<ProductDriver> topProductDrivers=new ArrayList<>();
+        public List<TopSalesDay> topDays=new ArrayList<>();
+        public List<String> findings=new ArrayList<>(),filtersApplied=new ArrayList<>();
+        public String caveat="Os fatores indicam associações nos dados de venda; não comprovam causalidade externa.";
+    }
+
     public static class ProductSearchRequest extends SaleQuery {
         public String product;
         public int limit=20;

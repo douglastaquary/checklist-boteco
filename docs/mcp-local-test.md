@@ -84,6 +84,7 @@ Para orientar o agente às regras MCP e roteamento do projeto, use [`AGENTS.md`]
 - `sales_get_schema`
 - `sales_list`
 - `sales_aggregate`
+- `sales_month_compare`
 - `sales_by_product`
 - `sales_quantity_by_product_in_period`
 - `sales_by_seller`
@@ -130,6 +131,7 @@ Exemplos mais objetivos para validar o fluxo:
 - `Use o MCP checklist-boteco-analytics e responda qual a quantidade de amstel 600ml vendida no beco entre 2026-06-01 e 2026-06-30.`
 - `Use o MCP checklist-boteco-analytics e responda quantas heinekens foram vendidas no beco entre 2026-05-01 e 2026-05-31 e qual o total em reais.`
 - `Use o MCP checklist-boteco-analytics e agregue vendas por category entre 2026-06-01 e 2026-06-30.`
+- `Use sales_month_compare com focusMonth 2026-05 e explique por que maio faturou mais que a média dos outros meses completos.`
 - `Use o MCP checklist-boteco-analytics e responda quanto o João Rodrigues vendeu ontem no forró e quanto deu de 10%.`
 - `Use o MCP checklist-boteco-analytics e agregue vendas por seller entre 2026-06-01 e 2026-06-30.`
 - `Use o MCP checklist-boteco-analytics e faça sales_audit_stock de 2026-06-01 a 2026-06-30.`

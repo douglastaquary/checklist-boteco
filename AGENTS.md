@@ -60,6 +60,7 @@ Use o MCP **antes de responder por memória** quando a conversa mencionar:
 |----------|----------|
 | Vendas por produto / “quantas X vendeu?” | `sales_by_product` ou `sales_quantity_by_product_in_period` |
 | Vendas por usuário/vendedor/garçom e 10% | `sales_by_seller` ou `sales_aggregate` com `groupBy=seller` |
+| Comparação mensal / “por que este mês faturou mais?” | `sales_month_compare` |
 | Listagem de vendas | `sales_list` |
 | Totalizações (produto, categoria, local) | `sales_aggregate` |
 | Auditoria vendido × abastecido / extravio | `sales_audit_stock` |
@@ -78,6 +79,7 @@ Use o MCP **antes de responder por memória** quando a conversa mencionar:
 - `qual a quantidade de produto X no beco no período Y?` → `sales_by_product` com período
 - `quanto o João Rodrigues vendeu ontem no forró?` → `sales_by_seller` com período resolvido e local Beco da Praia
 - `quanto deu de 10% por garçom?` → `sales_aggregate` com `groupBy=seller`
+- `por que maio faturou mais que os outros meses?` → `sales_month_compare` com `focusMonth=2026-05`
 - `houve extravio de água com gás?` → `sales_audit_stock` com filtro textual
 - `quais dias João faltou em junho?` → `work_clock_absences` com período
 - `quantas faltas cada colaborador teve este mês?` → `work_clock_absences`

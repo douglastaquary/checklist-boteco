@@ -4,6 +4,7 @@ import com.checklistboteco.backend.ai.AiModels.*;
 import com.checklistboteco.backend.model.Models.ApiError;
 import com.checklistboteco.backend.model.Models.User;
 import com.checklistboteco.backend.purchases.mcp.PurchaseMcpResource;
+import com.checklistboteco.backend.sales.domain.SalesModels.MonthCompareResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -36,6 +37,10 @@ public class OpenAiChatService {
         Beco, beco da praia e o estabelecimento significam Beco da Praia. Informe período e unidade monetária.
         Perguntas sobre quantidade vendida de um produto (ex.: quantas/quantos tainhas, tábuas, porção de carne de sol, cerveja)
         devem chamar sales_by_product ou sales_quantity_by_product_in_period com from/to resolvidos a partir da data atual.
+        Para comparar apenas totais mensais, chame sales_aggregate com groupBy="month".
+        Para explicar por que um mês faturou mais ou menos, o que mudou ou quais fatores contribuíram, chame sales_month_compare.
+        Estruture a explicação em: comparação com a média, volume, valor médio por linha, calendário/fim de semana, produtos e top dias.
+        Descreva os fatores como associações observadas; não afirme causalidade externa sem dados que a comprovem.
         "último mês até hoje" / "ultimo mes ate o dia de hoje" significa os últimos 30 dias até a data atual (não o mês calendário anterior).
         A busca de produto ignora acentos e plurais simples; passe o nome falado pelo usuário (ex.: caldos pela égua, caldinho de feijão).
         Se os dados forem insuficientes, diga exatamente o que falta. Ferramentas são somente leitura.
@@ -47,6 +52,7 @@ public class OpenAiChatService {
     @ConfigProperty(name="ai.openai.model") String model;
     @ConfigProperty(name="ai.openai.base-url") String baseUrl;
     @ConfigProperty(name="ai.openai.timeout-seconds") int timeoutSeconds;
+    @ConfigProperty(name="ai.openai.reasoning-effort") String reasoningEffort;
     @ConfigProperty(name="ai.pricing.input-microdollars-per-million") long inputPrice;
     @ConfigProperty(name="ai.pricing.cached-input-microdollars-per-million") long cachedPrice;
     @ConfigProperty(name="ai.pricing.output-microdollars-per-million") long outputPrice;
@@ -68,12 +74,13 @@ public class OpenAiChatService {
             ObjectNode body=baseRequest(request);
             JsonNode response=send(body,apiKey);
             ArrayNode functionOutputs=mapper.createArrayNode();
+            Map<String,Object> toolResults=new LinkedHashMap<>();
             ArrayNode priorOutput=(ArrayNode)response.path("output");
             for(JsonNode item:priorOutput) if("function_call".equals(item.path("type").asText())) {
                 String name=item.path("name").asText();
                 if(!allowedTools(request).contains(name)) throw new IllegalArgumentException("Ferramenta não permitida: "+name);
                 Map<String,Object> args=mapper.readValue(item.path("arguments").asText("{}"),Map.class);
-                Object result=executeCached(name,args); consulted.add(name);
+                Object result=executeCached(name,args); consulted.add(name); toolResults.put(name,result);
                 ObjectNode output=mapper.createObjectNode(); output.put("type","function_call_output"); output.put("call_id",item.path("call_id").asText()); output.put("output",mapper.writeValueAsString(result)); functionOutputs.add(output);
             }
             Usage total=readUsage(response);
@@ -83,7 +90,7 @@ public class OpenAiChatService {
                 response=send(followup,apiKey); merge(total,readUsage(response));
             }
             total.estimatedCostMicros=cost(total);
-            ChatResponse result=new ChatResponse(); result.requestId=requestId; result.answer=answer(response); result.consultedTools=consulted; result.usage=total;
+            ChatResponse result=new ChatResponse(); result.requestId=requestId; result.answer=answer(response,deterministicFallback(toolResults)); result.consultedTools=consulted; result.usage=total;
             AuditRecord audit=new AuditRecord(); audit.id=requestId; audit.userId=user.id; audit.month=YearMonth.now().toString(); audit.model=model; audit.createdAt=System.currentTimeMillis(); audit.latencyMs=audit.createdAt-started; audit.inputTokens=total.inputTokens; audit.cachedInputTokens=total.cachedInputTokens; audit.outputTokens=total.outputTokens; audit.estimatedCostMicros=total.estimatedCostMicros; audit.tools=consulted;
             usageService.record(audit); result.budget=usageService.summary(null); return result;
         } catch(WebApplicationException e){ throw e; }
@@ -106,7 +113,8 @@ public class OpenAiChatService {
         return new WebApplicationException(Response.status(status).entity(new ApiError(message)).type(MediaType.APPLICATION_JSON).build());
     }
     private ObjectNode baseRequest(ChatRequest request){
-        ObjectNode body=mapper.createObjectNode(); body.put("model",model); body.put("instructions",INSTRUCTIONS+"\nData atual em America/Fortaleza: "+LocalDate.now(ZoneId.of("America/Fortaleza"))+". Resolva datas relativas como ontem antes de chamar ferramentas."); body.put("store",false); body.put("max_output_tokens",usageService.budget().maxOutputTokens); body.put("prompt_cache_key","checklist-boteco-ai-v1");
+        ObjectNode body=mapper.createObjectNode(); body.put("model",model); body.put("instructions",INSTRUCTIONS+"\nData atual em America/Sao_Paulo: "+LocalDate.now(ZoneId.of("America/Sao_Paulo"))+". Resolva datas relativas como ontem antes de chamar ferramentas."); body.put("store",false); body.put("max_output_tokens",usageService.budget().maxOutputTokens); body.put("prompt_cache_key","checklist-boteco-ai-v2");
+        if(reasoningEffort!=null&&!reasoningEffort.isBlank()) body.putObject("reasoning").put("effort",reasoningEffort);
         ArrayNode input=body.putArray("input"); request.messages.stream().skip(Math.max(0,request.messages.size()-4)).forEach(message->{ ObjectNode item=input.addObject(); item.put("role",safeRole(message.role)); item.put("content",message.text.trim()); });
         ArrayNode tools=body.putArray("tools"); Set<String> allowed=allowedTools(request);
         analytics.tools().stream().filter(tool->allowed.contains(tool.get("name"))).forEach(tool->{ ObjectNode value=tools.addObject(); value.put("type","function"); value.put("name",tool.get("name").toString()); value.put("description",tool.get("description").toString()); value.set("parameters",mapper.valueToTree(tool.get("inputSchema"))); value.put("strict",false); });
@@ -116,6 +124,7 @@ public class OpenAiChatService {
     private Set<String> allowedTools(ChatRequest request){
         String text=request.messages.get(request.messages.size()-1).text.toLowerCase(Locale.ROOT); LinkedHashSet<String> names=new LinkedHashSet<>();
         if(has(text,"venda","vendeu","vendemos","vendida","vendidas","vendido","vendidos","fatur","produto","quantas","quantos","quanto","heineken","cerveja","porcao","porção","tabua","tábua","carne","tainha","ultimo mes","último mês","ultimo mês","último mes")) names.addAll(List.of("sales_by_product","sales_quantity_by_product_in_period","sales_aggregate","sales_get_imports"));
+        if(has(text,"por que","porque","por quê","discrep","diferença","diferenca","faturou mais","faturou menos","mês vendeu","mes vendeu","média dos outros meses","media dos outros meses")) names.add("sales_month_compare");
         if(has(text,"usuario","usuário","vendedor","garçom","garcom","atendente","operador","funcionario","funcionário","joão","joao","10%","gorjeta","serviço","servico","forró","forro")) names.addAll(List.of("sales_by_seller","sales_aggregate","sales_get_imports"));
         if(has(text,"compra","gasto","fornecedor","mercadoria","custo")) names.addAll(List.of("purchases_aggregate","purchases_list","purchases_get_imports"));
         if(has(text,"estoque","contagem","extravio","perda","abastec")) names.addAll(List.of("inventory_daily_audit","inventory_count_sessions","sales_audit_stock"));
@@ -150,7 +159,7 @@ public class OpenAiChatService {
         } catch(Exception ignored){ return null; }
     }
     private Usage readUsage(JsonNode response){ Usage u=new Usage(); JsonNode usage=response.path("usage"); u.inputTokens=usage.path("input_tokens").asInt(); u.cachedInputTokens=usage.path("input_tokens_details").path("cached_tokens").asInt(); u.outputTokens=usage.path("output_tokens").asInt(); u.totalTokens=usage.path("total_tokens").asInt(); return u; }
-    private String answer(JsonNode response){
+    private String answer(JsonNode response,String fallback){
         StringBuilder text=new StringBuilder();
         for(JsonNode item:response.path("output")) if("message".equals(item.path("type").asText())) {
             for(JsonNode content:item.path("content")) if("output_text".equals(content.path("type").asText())) {
@@ -161,12 +170,33 @@ public class OpenAiChatService {
                 }
             }
         }
-        if(text.length()>0) return text.toString().trim();
         String status=response.path("status").asText("");
         if("incomplete".equals(status)) {
-            return "A resposta da IA ficou incompleta. Tente perguntar de novo de forma mais direta.";
+            String reason=response.path("incomplete_details").path("reason").asText("não informado");
+            LOG.warnf("AI response incomplete reason=%s",reason);
+            if(fallback!=null&&!fallback.isBlank()) return fallback;
+            if(text.length()>0) return text.toString().trim()+"\n\nA geração foi interrompida ("+reason+").";
+            return "A resposta da IA foi interrompida ("+reason+"). Tente novamente com um período menor.";
         }
+        if(text.length()>0) return text.toString().trim();
+        if(fallback!=null&&!fallback.isBlank()) return fallback;
         return "Não encontrei informações suficientes para responder.";
+    }
+    public String answerForTesting(JsonNode response,String fallback){ return answer(response,fallback); }
+    private String deterministicFallback(Map<String,Object> toolResults){
+        Object raw=toolResults.get("sales_month_compare");
+        if(raw==null) return null;
+        try {
+            MonthCompareResponse comparison=mapper.convertValue(raw,MonthCompareResponse.class);
+            if(comparison.findings==null||comparison.findings.isEmpty()) return null;
+            StringBuilder text=new StringBuilder("Análise calculada pelo backend:\n");
+            comparison.findings.forEach(finding->text.append("- ").append(finding).append('\n'));
+            if(comparison.caveat!=null&&!comparison.caveat.isBlank()) text.append("\n").append(comparison.caveat);
+            return text.toString().trim();
+        } catch(Exception error){
+            LOG.warnf(error,"Could not build deterministic monthly analysis fallback");
+            return null;
+        }
     }
     private static String rootMessage(Throwable error){
         Throwable current=error;
