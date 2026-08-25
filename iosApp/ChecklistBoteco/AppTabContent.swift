@@ -119,7 +119,8 @@ extension AppTab {
           repository: context.repository,
           dashboardClient: context.dashboardClient,
           authToken: context.authToken,
-          refreshID: context.remoteSessionGeneration
+          refreshID: context.remoteSessionGeneration,
+          onLogout: context.onLogout
         ) { area in
           Task { @MainActor in
             tabRouter.push(.dashboardAreaDetail(area: area), on: hostTab)
