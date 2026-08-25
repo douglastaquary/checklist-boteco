@@ -57,7 +57,7 @@ public class OpenAiChatService {
         String apiKey=configuredApiKey.orElse("");
         if(apiKey.isBlank()) {
             throw fail(Response.Status.SERVICE_UNAVAILABLE,
-                "Chat de IA ainda não configurado. Defina OPENAI_API_KEY no backend (.env.local) e reinicie o Quarkus.");
+                "Chat de IA ainda não configurado. Defina OPENAI_API_KEY em backend/.env.local e inicie com ./backend/dev.sh.");
         }
         validate(request);
         UsageSummary current=usageService.summary(null);

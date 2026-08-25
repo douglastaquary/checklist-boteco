@@ -17,14 +17,10 @@ iOS (JWT do administrador) → /api/ai/chat → OpenAI Responses API
 
 ## Configuração local
 
-Defina `OPENAI_API_KEY` no ambiente antes de iniciar o Quarkus. Um arquivo local `backend/.env.local` pode ser usado pelo shell e está ignorado pelo Git. O nome `backend/env.local` também está ignorado para evitar vazamento acidental, mas o padrão recomendado é `backend/.env.local`. Não inclua chaves em `application.properties`, commits ou documentação.
+Defina `OPENAI_API_KEY` no ambiente antes de iniciar o Quarkus. Um arquivo local `backend/.env.local` é carregado automaticamente pelo script `backend/dev.sh` e está ignorado pelo Git. O script também aceita `.env.local` na raiz como fallback. Não inclua chaves em `application.properties`, commits ou documentação.
 
 ```bash
-cd backend
-set -a
-source .env.local
-set +a
-./mvnw quarkus:dev
+./backend/dev.sh
 ```
 
 ### Passo a passo para teste end-to-end local
@@ -46,11 +42,8 @@ set +a
 3. Suba o backend carregando o arquivo:
 
    ```bash
-   cd /Users/douglastaquary/ChecklistBoteco/backend
-   set -a
-   source .env.local
-   set +a
-   ./mvnw quarkus:dev
+   cd /Users/douglastaquary/ChecklistBoteco
+   ./backend/dev.sh
    ```
 
 4. Valide que o chat deixou de retornar `503`:

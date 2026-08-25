@@ -21,6 +21,8 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class SalesImportService {
     private static final String DEFAULT_LOCATION="Beco da Praia";
+    private static final Pattern FULL_MARKER_DATE=Pattern.compile("(?<!\\d)(\\d{1,2}/\\d{1,2}/\\d{2,4})(?!\\d)");
+    private static final Pattern SHORT_MARKER_DATE=Pattern.compile("(?<!\\d)(\\d{1,2}/\\d{1,2})(?![/\\d])");
     private static final Map<String,List<String>> ALIASES=Map.ofEntries(
         Map.entry("saleDate",List.of("data","data_venda","dt_venda","emissao","date","data_movimento","dia","dt","data_do_item","data_item","data_da_venda")),
         Map.entry("description",List.of("produto","item","mercadoria","descricao","description","nome")),
@@ -177,9 +179,9 @@ public class SalesImportService {
             List<String> raw=rows.get(i);
             if(raw==null||raw.stream().allMatch(value->value==null||value.isBlank())) continue;
             List<String> normalized=normalizeWidth(raw,baseSize);
-            String first=normalized.isEmpty()?"":normalized.get(0).trim();
-            if(isDateMarkerRow(normalized,referenceYear)){
-                currentDate=normalizeMarkerDate(first,referenceYear);
+            String markerDate=dateFromMarkerRow(normalized,referenceYear);
+            if(markerDate!=null){
+                currentDate=markerDate;
                 continue;
             }
             if(!headerHasDate){
@@ -221,23 +223,15 @@ public class SalesImportService {
         if(normalized.size()>size) normalized=new ArrayList<>(normalized.subList(0,size));
         return normalized;
     }
-    private static boolean isDateMarkerRow(List<String> row,Integer referenceYear){
-        if(row.isEmpty()) return false;
+    private static String dateFromMarkerRow(List<String> row,Integer referenceYear){
+        if(row.isEmpty()) return null;
         String first=row.get(0)==null?"":row.get(0).trim();
-        if(first.isBlank()) return false;
-        if(!looksLikeDate(first,referenceYear)) return false;
-        return row.stream().skip(1).allMatch(value->value==null||value.isBlank());
-    }
-    private static boolean looksLikeDate(String value,Integer referenceYear){
-        String current=value.trim();
-        if(current.matches("\\d{1,2}/\\d{1,2}/\\d{2,4}")) return true;
-        if(current.matches("\\d{1,2}/\\d{1,2}")) return referenceYear!=null;
-        return false;
-    }
-    private static String normalizeMarkerDate(String value,Integer referenceYear){
-        String current=value.trim();
-        if(current.matches("\\d{1,2}/\\d{1,2}$")&&referenceYear!=null) return current+"/"+referenceYear;
-        return current;
+        if(first.isBlank()||row.stream().skip(1).anyMatch(value->value!=null&&!value.isBlank())) return null;
+        Matcher fullDate=FULL_MARKER_DATE.matcher(first);
+        if(fullDate.find()) return fullDate.group(1);
+        if(referenceYear==null) return null;
+        Matcher shortDate=SHORT_MARKER_DATE.matcher(first);
+        return shortDate.find()?shortDate.group(1)+"/"+referenceYear:null;
     }
     private static boolean isSummary(List<String> row){ String first=row.stream().map(String::trim).filter(v->!v.isBlank()).findFirst().orElse(""); String key=CsvSupport.key(first); return key.equals("total")||key.equals("total_geral")||key.equals("resumo"); }
     private static Integer referenceYear(String csv){ Matcher matcher=Pattern.compile("(?<!\\d)(20\\d{2})(?!\\d)").matcher(csv); return matcher.find()?Integer.valueOf(matcher.group(1)):null; }

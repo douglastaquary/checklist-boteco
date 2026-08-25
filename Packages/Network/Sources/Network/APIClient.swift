@@ -52,6 +52,7 @@ public final class APIClient: @unchecked Sendable {
   ) async throws -> T {
     let url = config.url(for: path)
     var request = URLRequest(url: url)
+    request.cachePolicy = .reloadIgnoringLocalCacheData
     request.httpMethod = method
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }

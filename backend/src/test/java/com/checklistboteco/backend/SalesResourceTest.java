@@ -247,6 +247,38 @@ class SalesResourceTest {
             .body("items[0].saleDate",is("2026-05-16"));
     }
 
+    @Test void salesImportExtractsDateFromLocationMarkerInProductCodeColumn(){
+        String token=adminToken(),dataset="sales-location-marker-"+UUID.randomUUID();
+        String csv="""
+            Cód Produto;Nome;Tipo Preço;Val. Unit;Qtde;Total Venda
+            Beco da Praia - 01/07/2026;;;;;
+            30;HEINEKEN 600ML;A Vista;20;17;340
+            36;HEINEKEN LATA;A Vista;12;4;48
+            Beco da Praia – 02/07/2026;;;;;
+            30;HEINEKEN 600ML;A Vista;20;10;200
+            """;
+        String preview=given().auth().oauth2(token).contentType("application/json").body(Map.of("fileName","vendas-local-data.csv","csv",csv))
+            .when().post("/api/sales/imports/preview").then().statusCode(200)
+            .body("suggestedMapping.saleDate",is("Data da Venda"))
+            .body("totalRows",is(3))
+            .body("coverageFrom",is("2026-07-01"))
+            .body("coverageTo",is("2026-07-02"))
+            .body("rejectedRows",is(0))
+            .extract().asString();
+        String id=JsonPath.from(preview).getString("id");
+        given().auth().oauth2(token).contentType("application/json").body(Map.of(
+            "datasetId",dataset,
+            "mapping",Map.of("saleDate","Data da Venda","description","Nome","quantity","Qtde","totalInCents","Total Venda","documentNumber","Cód Produto")
+        )).when().post("/api/sales/imports/"+id+"/commit").then().statusCode(200)
+            .body("importedRows",is(3))
+            .body("rejectedRows",is(0));
+
+        given().auth().oauth2(token).contentType("application/json").body(Map.of("from","2026-07-02","to","2026-07-02","product","heineken"))
+            .when().post("/api/sales/query?datasetId="+dataset).then().statusCode(200)
+            .body("totalItems",is(1))
+            .body("items[0].saleDate",is("2026-07-02"));
+    }
+
     @Test void salesImportNormalizesBecoLocationAndMcpDefaultsToBecoDaPraia(){
         String token=adminToken(),dataset="sales-beco-"+UUID.randomUUID();
         String csv="""

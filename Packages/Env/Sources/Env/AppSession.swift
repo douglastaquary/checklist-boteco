@@ -8,6 +8,7 @@ public final class AppSession: ObservableObject {
   @Published public private(set) var currentUser: User?
   @Published public private(set) var authToken: String?
   @Published public private(set) var remoteUserId: String?
+  @Published public private(set) var remoteSessionGeneration = 0
   public var isLoggedIn: Bool { currentUser != nil }
 
   public var onRemoteLoginCompleted: (() async -> Void)?
@@ -65,6 +66,7 @@ public final class AppSession: ObservableObject {
       self.remoteUserId = remoteUserId
       await refreshWorksite(token: session.authToken)
       if !synced.mustChangePassword {
+        markRemoteSessionReady()
         await onRemoteLoginCompleted?()
       }
     } catch {
@@ -212,6 +214,7 @@ public final class AppSession: ObservableObject {
     pendingPasswordChangeCurrentPassword = synced.mustChangePassword ? password : nil
     await refreshWorksite(token: token)
     if !synced.mustChangePassword {
+      markRemoteSessionReady()
       await onRemoteLoginCompleted?()
     }
   }
@@ -238,6 +241,7 @@ public final class AppSession: ObservableObject {
     let synced = try repository.syncLocalUserFromRemote(localUserId: updated.id, remoteUser: remoteProfile)
     currentUser = synced
     pendingPasswordChangeCurrentPassword = nil
+    markRemoteSessionReady()
     await onRemoteLoginCompleted?()
     return synced
   }
@@ -264,6 +268,10 @@ public final class AppSession: ObservableObject {
     } catch {
       _ = repository.loadWorksite()
     }
+  }
+
+  private func markRemoteSessionReady() {
+    remoteSessionGeneration &+= 1
   }
 
   private func isUnauthorized(_ error: Error) -> Bool {

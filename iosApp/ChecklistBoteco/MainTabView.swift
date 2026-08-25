@@ -182,6 +182,7 @@ extension MainTabView {
         dashboardClient: dependencies.dashboardClient,
         aiChatClient: dependencies.aiChatClient,
         authToken: dependencies.authToken,
+        remoteSessionGeneration: dependencies.remoteSessionGeneration,
         remoteUserId: dependencies.remoteUserId,
         deviceId: dependencies.deviceId,
         onLogout: onLogout

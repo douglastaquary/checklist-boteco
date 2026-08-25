@@ -23,6 +23,7 @@ struct MainTabContext {
   let dashboardClient: DashboardClient?
   let aiChatClient: AIChatClient?
   let authToken: String?
+  let remoteSessionGeneration: Int
   let remoteUserId: String?
   let deviceId: String
   let onLogout: () -> Void
@@ -117,7 +118,8 @@ extension AppTab {
         DashboardRootView(
           repository: context.repository,
           dashboardClient: context.dashboardClient,
-          authToken: context.authToken
+          authToken: context.authToken,
+          refreshID: context.remoteSessionGeneration
         ) { area in
           Task { @MainActor in
             tabRouter.push(.dashboardAreaDetail(area: area), on: hostTab)

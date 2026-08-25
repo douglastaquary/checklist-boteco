@@ -185,5 +185,6 @@ import PurchasesFeature
 
 extension AppDependenciesHolder {
   var authToken: String? { session.authToken }
+  var remoteSessionGeneration: Int { session.remoteSessionGeneration }
   var remoteUserId: String? { session.remoteUserId }
 }

@@ -36,6 +36,7 @@ public struct DashboardRootView: View {
   private let repository: ChecklistRepository
   private let dashboardClient: DashboardClient?
   private let authToken: String?
+  private let refreshID: Int
   private let onSelectArea: ((Area) -> Void)?
 
   @Environment(\.colorScheme) private var colorScheme
@@ -47,11 +48,13 @@ public struct DashboardRootView: View {
     repository: ChecklistRepository,
     dashboardClient: DashboardClient? = nil,
     authToken: String? = nil,
+    refreshID: Int = 0,
     onSelectArea: ((Area) -> Void)? = nil
   ) {
     self.repository = repository
     self.dashboardClient = dashboardClient
     self.authToken = authToken
+    self.refreshID = refreshID
     self.onSelectArea = onSelectArea
   }
 
@@ -150,7 +153,7 @@ public struct DashboardRootView: View {
     .navigationTitle("")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar(.hidden, for: .navigationBar)
-    .task { await reload() }
+    .task(id: refreshID) { await reload() }
   }
 
   private func areaCount(for area: Area) -> Int {
